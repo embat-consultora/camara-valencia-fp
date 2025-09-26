@@ -17,6 +17,17 @@ def get(tableName):
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
+
+def getEquals(tableName, conditions: dict, in_filters: dict = None):
+    query = supabase.table(tableName).select("*")
+    if conditions:
+        for key, value in conditions.items():
+            query = query.eq(key, value)
+    if in_filters:
+        for key, values in in_filters.items():
+            query = query.in_(key, values)
+    response = query.execute()
+    return response.data
 def add(tableName, data):
     response = supabase.table(tableName).insert(data).execute()
     return response

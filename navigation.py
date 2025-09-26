@@ -25,6 +25,7 @@ def make_sidebar():
             st.page_link("pages/dashboard.py", label="Dashboard")
             st.page_link("pages/empresas.py", label="Empresas")
             st.page_link("pages/alumnos.py", label="Alumnos")
+            st.page_link("pages/emails.py", label="Contactar")
             st.page_link("pages/formsCreacion.py", label="Formularios")
             st.write("")
             st.write("")

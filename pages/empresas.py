@@ -21,12 +21,19 @@ if not empresas:
 df_empresas = pd.DataFrame(empresas)
 
 # --- Filtro por nombre ---
-col1, col2 = st.columns([2, 6])
+col1, col2, col3, col4 = st.columns([2,2,2,3])
 with col1:
     search = st.text_input("Buscar por nombre de empresa")
 if search:
     df_empresas = df_empresas[df_empresas["nombre"].str.contains(search, case=False, na=False)]
 
+with col2: 
+    st.markdown(f"[Formulario Empresa]({base_url}forms?form=1)")
+with col3:
+    if st.button("➕ Nueva Empresa"):
+        st.session_state.show_add_form = True
+with col4: 
+    st.page_link("pages/emails.py", label="Contactar Empresas", icon="📨")
 # --- Columnas a mostrar con nombres bonitos ---
 cols_map = {
     "CIF": "CIF",
