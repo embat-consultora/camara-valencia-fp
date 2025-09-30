@@ -6,7 +6,7 @@ from modules.data_base import get, update, upsert, getEquals,getEqual
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import alumnosTabla, estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa
-
+from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 apply_page_config()
 make_sidebar()
@@ -72,12 +72,38 @@ with tab1:
         if alumnos_options[selected_name]:
             alumno_id = alumnos_options[selected_name]
             alumno = df_alumnos[df_alumnos["id"] == alumno_id].iloc[0].to_dict()
-            estadosAlumno = getEqual(alumnoEstadosTabla, "alumno", alumno["NIA"])
+            estadosAlumnos = getEqual(alumnoEstadosTabla, "alumno", alumno["NIA"])
             st.subheader(f"Seguimiento - {alumno['nombre']}")
-            if estadosAlumno is None or len(estadosAlumno) == 0:
+            if not estadosAlumnos:
                 mostrar_fases(fasesAlumno, fase2colEmpresa, None)
+                estado_actual = {}
             else:
-                mostrar_fases(fasesAlumno, fase2colEmpresa, estadosAlumno[0])
+                mostrar_fases(fasesAlumno, fase2colEmpresa, estadosAlumnos[0])
+                estado_actual = estadosAlumnos[0]
+
+            # --- Checkboxes dinámicos para cada fase ---
+            cols = st.columns(len(fasesAlumno))
+
+            for i, fase in enumerate(fasesAlumno):
+                col = fase2colEmpresa[fase]
+                valor_actual = True if estado_actual.get(col) else False
+
+                with cols[i]:
+                    checked = st.checkbox(fase, value=valor_actual, key=f"{alumno['NIA']}_{col}")
+
+                if checked != valor_actual:  # solo si cambió
+                    if checked:
+                        new_value = datetime.now().isoformat()
+                    else:
+                        new_value = None
+
+                    upsert(
+                        alumnoEstadosTabla,
+                        {"alumno": alumno["NIA"], col: new_value},
+                        keys=["alumno"]
+                    )
+                    st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
+                    st.rerun()
             subtab1, subtab2 = st.tabs([f"✏️ Detalle: {alumno['nombre']} {alumno['apellido']}",
                                         "📌 Preferencias FP"])
 

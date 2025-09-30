@@ -6,7 +6,7 @@ from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import empresasTabla, necesidadFP, estados,fasesEmpresa, empresaEstadosTabla,fase2colEmpresa
 from modules.grafico_helper import mostrar_fases
-
+from datetime import datetime
 apply_page_config()
 make_sidebar()
 
@@ -88,12 +88,39 @@ with tab1:
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
         estadosEmpresa = getEqual(empresaEstadosTabla, "empresa", empresa["CIF"])
         st.subheader(f"Seguimiento - {empresa['nombre']}")
-        if estadosEmpresa is None or len(estadosEmpresa) == 0:
+
+        if not estadosEmpresa:
             mostrar_fases(fasesEmpresa, fase2colEmpresa, None)
+            estado_actual = {}
         else:
             mostrar_fases(fasesEmpresa, fase2colEmpresa, estadosEmpresa[0])
-        st.subheader(f"Oferta FP - {empresa['nombre']}")
+            estado_actual = estadosEmpresa[0]
 
+        # --- Checkboxes dinámicos para cada fase ---
+        cols = st.columns(len(fasesEmpresa))
+
+        for i, fase in enumerate(fasesEmpresa):
+            col = fase2colEmpresa[fase]
+            valor_actual = True if estado_actual.get(col) else False
+
+            with cols[i]:
+                checked = st.checkbox(fase, value=valor_actual, key=f"{empresa['CIF']}_{col}")
+
+            if checked != valor_actual:  # solo si cambió
+                if checked:
+                    new_value = datetime.now().isoformat()
+                else:
+                    new_value = None
+
+                upsert(
+                    empresaEstadosTabla,
+                    {"empresa": empresa["CIF"], col: new_value},
+                    keys=["empresa"]
+                )
+                st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
+                st.rerun()
+            
+        st.subheader(f"Oferta FP - {empresa['nombre']}")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or "Activo"
