@@ -7,7 +7,10 @@ from variables import (
     empresasTabla,
     alumnosTabla,
     necesidadFP,
+    alumnoEstadosTabla,
+    empresaEstadosTabla
 )
+from datetime import datetime
 st.set_page_config(page_title="Formulario", page_icon="🏢")
 # Obtener form_id desde query param
 form_id = st.query_params.get("form")
@@ -95,7 +98,7 @@ for field in fields:
 
 # Guardar
 if st.button("Enviar formulario"):
-    # Acumuladores por categoría
+    fecha_envio = datetime.now().isoformat()
     data_by_category = {
         "Empresa": {},
         "Alumno": {},
@@ -120,12 +123,18 @@ if st.button("Enviar formulario"):
     # Guardar Empresa
     if data_by_category["Empresa"]:
         data_by_category["FP"]["empresa"] = data_by_category["Empresa"].get("CIF", "N/A")
-        upsert(empresasTabla, data_by_category["Empresa"])
+        res = upsert(empresasTabla, data_by_category["Empresa"], keys=["CIF"])
+        upsert(
+            empresaEstadosTabla,
+            {"empresa": res.data[0]["CIF"], "form_completo": fecha_envio},
+            keys=["empresa"]
+        )
 
     # Guardar Alumno
     if data_by_category["Alumno"]:
-        upsert(alumnosTabla, data_by_category["Alumno"])
-
+       res = upsert(alumnosTabla, data_by_category["Alumno"], keys=["NIA"])
+       upsert(alumnoEstadosTabla,{"alumno": res.data[0]["NIA"], "form_completo": fecha_envio},
+                            keys=["alumno"])
     # Guardar FP (todo el dict como JSON)
     if data_by_category["FP"]:
         data_by_category["FP"]["estado"] = "Activo"

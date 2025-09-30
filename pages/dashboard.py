@@ -9,3 +9,4 @@ st.markdown(
     f"<h2 style='text-align: center;'>PANEL DE CONTROL</h2>",
     unsafe_allow_html=True
 )
+

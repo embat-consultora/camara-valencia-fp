@@ -42,8 +42,8 @@ def getOrdered(tableName, searchFor, searchValue, orderByColumn):
     response = supabase.table(tableName).select('*').eq(searchFor, searchValue).order(orderByColumn).execute()
     return response.data
 
-def upsert(tableName, data):
-    response = supabase.table(tableName).upsert(data).execute()
+def upsert(tableName, data,keys):
+    response = supabase.table(tableName).upsert(data, on_conflict=keys).execute()
     return response
 def saveAuthToken(data):
     return supabase.table('auth_tokens').insert(data).execute()
