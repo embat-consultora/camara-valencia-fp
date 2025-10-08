@@ -5,9 +5,11 @@ import json
 from modules.data_base import get, update, upsert, getEquals,getEqual
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa
+from variables import alumnosTabla, estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
+from modules.emailSender import send_email
+import re
 apply_page_config()
 make_sidebar()
 
@@ -49,7 +51,7 @@ with tab1:
 
     # Vista resumida
     cols_map = {
-        "NIA": "NIA",
+        "dni": "dni",
         "nombre": "Nombre",
         "apellido": "Apellido",
         "direccion": "Dirección",
@@ -72,7 +74,7 @@ with tab1:
         if alumnos_options[selected_name]:
             alumno_id = alumnos_options[selected_name]
             alumno = df_alumnos[df_alumnos["id"] == alumno_id].iloc[0].to_dict()
-            estadosAlumnos = getEqual(alumnoEstadosTabla, "alumno", alumno["NIA"])
+            estadosAlumnos = getEqual(alumnoEstadosTabla, "alumno", alumno["dni"])
             st.subheader(f"Seguimiento - {alumno['nombre']}")
             if not estadosAlumnos:
                 mostrar_fases(fasesAlumno, fase2colEmpresa, None)
@@ -89,7 +91,7 @@ with tab1:
                 valor_actual = True if estado_actual.get(col) else False
 
                 with cols[i]:
-                    checked = st.checkbox(fase, value=valor_actual, key=f"{alumno['NIA']}_{col}")
+                    checked = st.checkbox(fase, value=valor_actual, key=f"{alumno['dni']}_{col}")
 
                 if checked != valor_actual:  # solo si cambió
                     if checked:
@@ -99,7 +101,7 @@ with tab1:
 
                     upsert(
                         alumnoEstadosTabla,
-                        {"alumno": alumno["NIA"], col: new_value},
+                        {"alumno": alumno["dni"], col: new_value},
                         keys=["alumno"]
                     )
                     st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
@@ -114,7 +116,9 @@ with tab1:
                 new_nombre = st.text_input("Nombre", alumno.get("nombre", ""))
                 new_apellido = st.text_input("Apellido", alumno.get("apellido", ""))
                 new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
+                new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
                 new_localidad = st.text_input("Localidad", alumno.get("localidad", ""))
+                new_dni = st.text_input("dni", alumno.get("dni", ""))
                 new_nia = st.text_input("NIA", alumno.get("NIA", ""))
                 new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
                 new_email = st.text_input("Email", alumno.get("email_alumno", ""))
@@ -131,6 +135,8 @@ with tab1:
                             "apellido": new_apellido,
                             "direccion": new_direccion,
                             "localidad": new_localidad,
+                            "codigo_postal": new_codigoPostal,
+                            "dni": new_dni,
                             "NIA": new_nia,
                             "telefono": new_telefono,
                             "email_alumno": new_email,
@@ -162,25 +168,27 @@ with tab1:
                 ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
                 prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
 
-                current_ciclos = alumno.get("ciclo_formativo") or []
-                current_prefs = alumno.get("preferencias_fp") or []
+                current_ciclo = alumno.get("ciclo_formativo") or ""
+                current_pref = alumno.get("preferencias_fp") or ""
 
-                selected_ciclos = st.multiselect(
+                selected_ciclo = st.selectbox(
                     "Ciclo Formativo",
-                    options=ciclos_opts,
-                    default=current_ciclos,
-                    placeholder="Selecciona uno o más ciclos"
+                    options=[""] + ciclos_opts,  # agrega una opción vacía
+                    index=([""] + ciclos_opts).index(current_ciclo) if current_ciclo in ciclos_opts else 0,
+                    placeholder="Selecciona un ciclo formativo"
                 )
-                selected_prefs = []
-                for ciclo in selected_ciclos:
-                    if ciclo in prefs_opts_dict:
-                        selected_prefs.extend(
-                            st.multiselect(
-                                f"Preferencias para {ciclo}",
-                                options=prefs_opts_dict[ciclo],
-                                default=[p for p in current_prefs if p in prefs_opts_dict[ciclo]]
-                            )
-                        )
+
+                selected_pref = ""
+                if selected_ciclo and selected_ciclo in prefs_opts_dict:
+                    prefs_options = prefs_opts_dict[selected_ciclo]
+                    selected_pref = st.selectbox(
+                        f"Preferencia para {selected_ciclo}",
+                        options=[""] + prefs_options,
+                        index=([""] + prefs_options).index(current_pref) if current_pref in prefs_options else 0,
+                        placeholder="Selecciona una preferencia"
+                    )
+
+
 
                 vehiculo_selected = st.checkbox("Vehículo", value=vehiculo_bool,key="vehiculo_pref")
 
@@ -196,14 +204,14 @@ with tab1:
 
                 if st.button("💾 Guardar preferencias"):
                     data_to_update = {
-                        "NIA": alumno["NIA"],
+                        "dni": alumno["dni"],
                         "estado": estado,
                         "motivo": motivo_cancelacion,
-                        "ciclo_formativo": selected_ciclos,
-                        "preferencias_fp": selected_prefs,
+                        "ciclo_formativo": selected_ciclo,
+                        "preferencias_fp": selected_pref,
                         "vehiculo": "Sí" if vehiculo_selected else "No"
                     }
-                    upsert(alumnosTabla, data_to_update, keys=["NIA"])
+                    upsert(alumnosTabla, data_to_update, keys=["dni"])
                     st.success("Preferencias actualizadas")
                     st.rerun()
 
@@ -217,11 +225,14 @@ with tab2:
         new_nombre = st.text_input("Nombre")
         new_apellido = st.text_input("Apellido")
         new_direccion = st.text_input("Dirección")
+        new_codigoPostal = st.text_input("CP")
         new_localidad = st.text_input("Localidad")
+        new_dni = st.text_input("dni")
         new_nia = st.text_input("NIA")
         new_telefono = st.text_input("Teléfono")
         new_email = st.text_input("Email")
         new_vehiculo = st.checkbox("Vehículo")
+
 
         submitted = st.form_submit_button("Crear Alumno")
         if submitted:
@@ -232,12 +243,14 @@ with tab2:
                     "apellido": new_apellido,
                     "direccion": new_direccion,
                     "localidad": new_localidad,
+                    "dni": new_dni,
                     "NIA": new_nia,
+                    "codigo_postal": new_codigoPostal,
                     "telefono": new_telefono,
                     "email_alumno": new_email,
                     "vehiculo": "Sí" if new_vehiculo else "No",
                     "estado": "Activo"
-                }, keys=["NIA"]
+                }, keys=["dni"]
             )
             st.success("Nuevo alumno agregado correctamente")
             st.rerun()
@@ -245,11 +258,96 @@ with tab2:
 # -------------------------------------------------------------------
 # TAB 3: Formulario Alumno
 # -------------------------------------------------------------------
+formUrlAlumno = os.getenv("FORM_ALUMNO")
+can_send = True
 with tab3:
-    st.subheader("📨 Formularios & Contacto")
-    col1, col2 = st.columns(2)
-    formUrlAlumno = os.getenv("FORM_ALUMNO")
-    with col1:
-        st.markdown(f"📋 [Formulario Alumno]({formUrlAlumno})")
+    if "emailsList" not in st.session_state:
+        st.session_state.emailsList = []
+    st.write("🎓 Contactar Alumnos")
+    
+    if not alumnos:
+        st.warning("No hay alumnos registrados")
+        st.stop()
+
+    df_alumnos = pd.DataFrame(alumnos)[["id","NIA", "nombre", "email_alumno"]]
+    emailsAlumnosClean =df_alumnos["email_alumno"].dropna().unique().tolist()
+    
+    col1, col2 = st.columns([3, 2])
     with col2:
-        st.page_link("pages/emails.py", label="✉️ Contactar Alumnos")
+        checked = st.checkbox("Seleccionar todos", value=False, key="select_all_alumnos")
+    with col1:
+        emails_alumnos = st.multiselect(
+            "Selecciona alumnos (emails)", placeholder="Selecciona un valor",
+            options=emailsAlumnosClean,disabled=st.session_state.select_all_alumnos
+        )
+    emails_manual_alumnos = st.text_area(
+        "Agregar emails manualmente (separados por coma)",
+        placeholder="ejemplo1@mail.com, ejemplo2@mail.com",
+        key="emails_manual_alumnos"
+    )
+    EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+    valid_emails = []
+    invalid_emails = []
+    if emails_manual_alumnos.strip():
+        # Separar y limpiar
+        raw_list = [e.strip() for e in emails_manual_alumnos.split(",") if e.strip()]
+        for e in raw_list:
+            if EMAIL_REGEX.match(e):
+                valid_emails.append(e.lower())
+            else:
+                invalid_emails.append(e)
+
+        valid_emails = list(dict.fromkeys(valid_emails))
+
+        if invalid_emails:
+            can_send = False
+            st.warning(f"Puede que falte alguna coma o que tengas correos inválidos: {', '.join(invalid_emails)}")
+    
+    if checked:
+        allEmails = emailsAlumnosClean.copy()
+        final_list = list(set(allEmails + valid_emails))
+    else:
+        final_list = list(set(emails_alumnos + valid_emails))
+
+    st.session_state.emailsList = final_list
+    
+    st.write("**Destinatarios seleccionados:**")
+    for e in st.session_state.emailsList:
+        st.markdown(f"- {e}")
+
+    subject_al = st.text_input("Asunto del email", value="Pasantías FP 2025/2026", key="subj_al")
+    body_al = st.text_area(
+        "Cuerpo del email",
+        height=200,
+        value=bodyEmailsAlumno.replace("{{form_link}}", formUrlAlumno),
+        key="body_al"
+    )
+
+    email_sender = st.secrets['email']['gmail']
+    email_password = st.secrets['email']['password']
+
+    if st.button("📨 Enviar Emails a Alumnos", disabled=not can_send):
+        try:
+            if send_email(email_sender, email_password, final_list, subject_al, body_al):
+                fecha_envio = datetime.now().isoformat()
+
+                for email in final_list:
+                    alumno = df_alumnos[df_alumnos["email_alumno"] == email]
+
+                    if not alumno.empty:
+                        alumno_id = alumno["NIA"].values[0]
+                        upsert(
+                            alumnoEstadosTabla,
+                            {"alumno": alumno_id, "email_enviado": fecha_envio},
+                            keys=["alumno"]
+                        )
+                    else:
+                        upsert(
+                            contactoAlumnoTabla,
+                            {"email_alumno": email, "email_enviado": fecha_envio},
+                            keys=["email_alumno"]
+                        )
+                st.success("Emails enviados correctamente! 🚀")
+        except Exception as e:
+            st.error(f"Falló el envío de mail: {e}")
+

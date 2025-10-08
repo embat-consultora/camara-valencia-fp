@@ -8,8 +8,8 @@ companyIcon="./images/cv-fp.png"
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
-estados=["Activo", "Cerrado", "Cancelado"]
-estadosAlumno=["Activo", "Finalizado", "En progreso", "Cancelado"]
+estados=["Nuevo", "Activo", "Cerrado", "Cancelado"]
+estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
 
 #fases
 fasesEmpresa = ["Form Enviado", "Form Completo", "Documentación Completa", "Match en progreso", "Alumnos asignados","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
@@ -41,7 +41,9 @@ alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
 
 
-#
+#drive
+carpetaAlumnos="1Q6YVWNLi2Jm5V7E9dnT454Me_INBvU3Z"
+carpetaEmpresas="1S4WOBuY_Yn_7eiFqJ3BJrRSWu_QLhg4_"
 
 #emails
 bodyEmailsEmpresa= f"""Hola,
@@ -62,3 +64,21 @@ Llena esta formulario si te interesaría participar en alguna pasantía: {"{{for
 Saludos,
 Andrea
 """
+
+#forms
+ciclos = [
+    "COMERCIO INTERNACIONAL",
+    "TRANSPORTE Y LOGÍSTICA",
+    "MARKETING Y PUBLICIDAD",
+    "DESARROLLO APLICACIONES MULTIPLATAFORMA",
+    "DESARROLLO APLICACIONES WEB",
+]
+
+preferencias = "{\"COMERCIO INTERNACIONAL\": [\"Departamento Export/import\", \"Departamento Comercio Ext/aduanas\", \"Compras internacionales/ aprovisionamiento\", \"Atención a clientes internacionales\", \"Gestión documental/ almacén\"], \"TRANSPORTE Y LOGÍSTICA\": [\"Gestión de tráfico y transporte terrestre; marítimo o aéreo\", \"Gestión de almacén y stock\", \"Operaciones logísticas y distribución\", \"Atención al cliente/logística inversa (devoluciones)\", \"Administración y documentación de transporte\"], \"MARKETING Y PUBLICIDAD\": [\"Departamento de Marketing (estrategia/campañas)\", \"Publicidad y Comunicación (redes sociales)\", \"Marketing digital (SEO/SEM)\", \"Gestión de eventos\", \"Atención al cliente y fidelización\", \"Estudios de mercado e investigación comercial\"], \"DESARROLLO APLICACIONES MULTIPLATAFORMA\": [\"Desarrollo aplicaciones móviles\", \"Desarrollo software\", \"Bases de datos y gestión de información\", \"Soporte técnico y mantenimiento de apps\", \"Integración de sistemas multiplataforma\"], \"DESARROLLO APLICACIONES WEB\": [\"Desarrollo fronted\", \"Desarrollo backend\", \"Bases de datos\", \"Soporte técnico en entornos web\", \"Administración de sistemas web/hosting\"]}"
+
+opciones_motivo = [
+        "Ya no tienen necesidad de acoger becarios",
+        "El alumno/a no ha pasado la entrevista",
+        "El alumno/a ha decidido no continuar con el proceso",
+        "Otros"
+    ]

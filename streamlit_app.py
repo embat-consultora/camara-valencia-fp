@@ -6,12 +6,8 @@ from variables import title, companyIcon, page_icon,usuariosTabla
 st.set_page_config(page_title="Inicio", page_icon=page_icon)
 col1, col2, col3 = st.columns(3)
 with col2:
-    st.image(companyIcon, width=200)
+    st.image(companyIcon, width=500)
 
-st.markdown(
-    f"<h1 style='text-align: center;'>{title}</h1>",
-    unsafe_allow_html=True
-)
 
 st.session_state["current_page"] = "streamlit_app"
 
@@ -23,7 +19,7 @@ if st.session_state.get("logged_in"):
 # ✅ Si viene del login con Google y no hay sesión cargada aún
 islogged =validate_get_user()
 if islogged:
-    st.switch_page("pages/dashboard.py")
+    st.switch_page("pages/empresas.py")
 # 💻 Login tradicional
 username = st.text_input("Usuario", placeholder="Ingrese email")
 password = st.text_input("Contraseña", type="password", placeholder="Ingrese contraseña")
