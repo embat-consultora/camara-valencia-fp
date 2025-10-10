@@ -88,7 +88,10 @@ with st.expander("Seleccionar ciclos y cantidad de alumnos", expanded=False):
             if sel:
                 cantidad = st.number_input(f"Cantidad - {ciclo}", min_value=1, max_value=50, step=1, key=f"num_{slug(ciclo)}")
                 selected_ciclos.append(ciclo)
-                cantidades[ciclo] = cantidad
+                cantidades[ciclo] = {
+                    "alumnos": cantidad,
+                    "disponibles": cantidad
+                }
 
 # --- Puestos / áreas ---
 puestos_seleccionados = {}
@@ -103,8 +106,23 @@ if selected_ciclos:
                     elegido = st.checkbox(area, key=f"chk_area_{slug(ciclo)}_{slug(area)}")
                 with col2:
                     if elegido:
-                        proyecto = st.text_input(f"Proyecto relacionado ({area})", key=f"proy_{slug(ciclo)}_{slug(area)}")
-                        puestos_seleccionados.setdefault(ciclo, []).append({"area": area, "proyecto": proyecto})
+                        proyecto = st.text_input(
+                            f"Proyecto relacionado ({area})",
+                            key=f"proy_{slug(ciclo)}_{slug(area)}"
+                        )
+                        # agregamos el área/proyecto al ciclo
+                        puestos_seleccionados.setdefault(ciclo, [])
+                        # evitamos duplicados
+                        if not any(p["area"] == area for p in puestos_seleccionados[ciclo]):
+                            puestos_seleccionados[ciclo].append(
+                                {"area": area, "proyecto": proyecto}
+                            )
+                    else:
+                        # si se desmarca, lo quitamos del diccionario
+                        if ciclo in puestos_seleccionados:
+                            puestos_seleccionados[ciclo] = [
+                                p for p in puestos_seleccionados[ciclo] if p["area"] != area
+                            ]
 
 st.write("REQUISITOS ADICIONALES")
 requisitos = st.text_area(
@@ -173,10 +191,11 @@ if submit:
         "nif_tutor": nif_tutor.strip(),
         "email_tutor": email_tutor.strip().lower(),
         "telefono_tutor": telefono_tutor.strip(),
-        "direccion_empresa": direccion_centro.strip(),
-        "cp_empresa": cp_centro.strip(),
-        "localidad_empresa": localidad_centro.strip(),
+        "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
+        "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
+        "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
         "nombre_rellena_form": nombre_contacto.strip(),
+        "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
     }
     res_emp = upsert(empresasTabla, payloadEmpresa, keys=["CIF"])
     if res_emp and res_emp.data:

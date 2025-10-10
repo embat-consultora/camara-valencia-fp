@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import os
-from modules.data_base import get, getEqual, update, upsert
+from modules.data_base import get, getEqual, update, upsert,getEquals
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados,fasesEmpresa, empresaEstadosTabla,fase2colEmpresa,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
+from variables import empresasTabla, necesidadFP, estados,fasesEmpresa,formFieldsTabla, empresaEstadosTabla,fase2colEmpresa,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
 from datetime import datetime
 from modules.emailSender import send_email
 from modules.grafico_helper import mostrar_fases
@@ -137,7 +137,10 @@ with tab1:
 
                     if ciclos:
                         st.write("🎓 Ciclos formativos y cantidad de alumnos:")
-                        df_ciclos = pd.DataFrame(list(ciclos.items()), columns=["Ciclo", "Cantidad de Alumnos"])
+                        data = [
+                            {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
+                            for ciclo, valores in ciclos.items()]
+                        df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
                         st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
 
                     if puestos:
@@ -145,13 +148,12 @@ with tab1:
                         for ciclo, lista_puestos in puestos.items():
                             cantidad_alumnos = None
                             if ciclos and ciclo in ciclos:
-                                cantidad_alumnos = ciclos[ciclo]
+                                cantidad_alumnos = ciclos[ciclo]["alumnos"]
 
                             with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
                                 if lista_puestos:
-                                    df_puestos = pd.DataFrame(lista_puestos)
-                                    df_puestos = df_puestos.rename(columns={"area": "Área", "proyecto": "Proyecto"})
-                                    st.dataframe(df_puestos, hide_index=True, use_container_width=True)
+                                     for p in lista_puestos:
+                                        st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto']}")
                                 else:
                                     st.markdown("_Sin áreas o proyectos registrados_")
 
@@ -203,6 +205,44 @@ with tab1:
                 'No hay necesidades FP registradas para esta empresa. '
                 f"Mandale el link para que nos avise: [Formulario]({base_url}forms?form=1)"
             )
+            # if st.button("Crear Oferta Autogestionada"):
+            #     contrato = st.radio("Contrato Laboral",["Sí", "No"],horizontal=True)
+            #     vehiculo = st.radio("Vehiculo",["Sí", "No"],horizontal=True)
+            #     form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
+            #     ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
+            #     pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
+            #     ofertaPayload={
+            #             "contrato": contrato,
+            #             "vehiculo": vehiculo,
+            #             "ciclos_formativos": cantidades,
+            #             "puestos": puestos_seleccionados,
+            #             "requisitos": requisitos.strip(),
+            #             "estado": estados[0],
+            #             "nombre_tutor": nombre_tutor.strip(),
+            #             "nif_tutor": nif_tutor.strip(),
+            #             "email_tutor": email_tutor.strip().lower(),
+            #             "telefono_tutor": telefono_tutor.strip(),
+            #             "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
+            #             "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
+            #             "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
+            #             "nombre_rellena_form": nombre_contacto.strip(),
+            #             "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
+            #         }
+            #     try:
+            #         upsert(
+            #             necesidadFP,
+            #             {
+            #                 "empresa": empresa["CIF"],
+            #                 "estado": "Nuevo"
+            #             },
+            #             keys=["empresa", "created_at"]
+            #         )
+            #         st.success("Oferta FP creada correctamente")
+            #         st.rerun()
+            #     except Exception as e:
+            #         st.error(f"Error al crear la oferta FP: {e}")
+
+
 
 # -------------------------------------------------------------------
 # TAB 2: Crear nueva empresa

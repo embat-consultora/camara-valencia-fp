@@ -8,12 +8,12 @@ companyIcon="./images/cv-fp.png"
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
-estados=["Nuevo", "Activo", "Cerrado", "Cancelado"]
+estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelado"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
 
 #fases
-fasesEmpresa = ["Form Enviado", "Form Completo", "Documentación Completa", "Match en progreso", "Alumnos asignados","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-fasesAlumno = ["Form Enviado", "Form Completo", "Documentación Completa", "Match en progreso", "Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
 
 
 fase2colEmpresa = {
@@ -26,7 +26,11 @@ fase2colEmpresa = {
     "Finalizada": "fp_finalizada",
     "Evaluación Enviada": "evaluacion_enviada"
 }
-
+#colores
+verdeOk="#D8E4BC"
+celeste="#P3252C"
+azul="P3025C"
+gris="P431C"
 #Tablas
 usuariosTabla="usuarios"
 formTabla="forms"
@@ -39,6 +43,7 @@ empresaEstadosTabla="empresa_estados"
 contactoEmpresaTabla="contacto_empresas"
 alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
+practicaTabla="practicas_fp"
 
 
 #drive

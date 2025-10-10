@@ -28,6 +28,17 @@ def getEquals(tableName, conditions: dict, in_filters: dict = None):
             query = query.in_(key, values)
     response = query.execute()
     return response.data
+
+def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
+    query = supabase.table(tableName).select("*, empresas(*)")
+    if conditions:
+        for key, value in conditions.items():
+            query = query.eq(key, value)
+    if in_filters:
+        for key, values in in_filters.items():
+            query = query.in_(key, values)
+    response = query.execute()
+    return response.data
 def add(tableName, data):
     response = supabase.table(tableName).insert(data).execute()
     return response
@@ -53,3 +64,98 @@ def getAuthToken(email):
     if response.data:
         return response.data[0]  # ✅ Devolvemos el primer resultado como dict
     return None
+
+
+def getMatches():
+    """
+    Ejecuta la query de coincidencias entre ofertas y alumnos (ranking de match),
+    incluyendo el nombre de la empresa.
+    Retorna una lista de dicts (rows) con el resultado.
+    """
+    query = """
+    WITH ofertas_activas AS (
+      SELECT
+        of.*,
+        of.ciclos_formativos::jsonb AS ciclos_js
+      FROM oferta_fp of
+      WHERE LOWER(of.estado) = 'nuevo'
+        AND of.cupo_alumnos > 0
+    ),
+    alumnos_disponibles AS (
+      SELECT a.*
+      FROM alumnos a
+      WHERE LOWER(a.estado) = 'sin empresa'
+    ),
+    oferta_ciclos AS (
+      SELECT
+        o.id AS oferta_id,
+        o.empresa,
+        e.nombre AS nombre_empresa,
+        each.key::text AS ciclo_text,
+        ((each.value ->> 'disponibles')::int) AS disponibles,
+        o.vehiculo AS oferta_vehiculo,
+        o.localidad_empresa
+      FROM ofertas_activas o
+      JOIN empresas e ON e."CIF" = o.empresa
+      CROSS JOIN LATERAL jsonb_each(o.ciclos_js) AS each(key, value)
+      WHERE ((each.value ->> 'disponibles')::int) > 0
+    ),
+    candidatos AS (
+      SELECT
+        a.id AS alumno_id,
+        a.nombre AS alumno_nombre,
+        a.apellido AS alumno_apellido,
+        a.dni AS alumno_dni,
+        oc.oferta_id,
+        oc.empresa,
+        oc.nombre_empresa,
+        oc.ciclo_text AS ciclo,
+        a.ciclo_formativo,
+        a.preferencias_fp,
+        a.vehiculo AS alumno_vehiculo,
+        a.localidad AS alumno_localidad,
+        oc.oferta_vehiculo,
+        oc.localidad_empresa
+      FROM alumnos_disponibles a
+      JOIN oferta_ciclos oc
+        ON a.ciclo_formativo::text ILIKE '%' || oc.ciclo_text || '%'
+           OR oc.ciclo_text ILIKE '%' || a.ciclo_formativo::text || '%'
+    ),
+    ranking AS (
+      SELECT
+        c.*,
+        1 AS pts_ciclo,
+        CASE WHEN c.alumno_vehiculo = c.oferta_vehiculo THEN 1 ELSE 0 END AS pts_vehiculo,
+        CASE WHEN LOWER(c.alumno_localidad::text) = LOWER(c.localidad_empresa::text) THEN 1 ELSE 0 END AS pts_localidad,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM oferta_fp of2,
+                 jsonb_each_text(of2.puestos) AS p(key, value)
+            WHERE of2.id = c.oferta_id
+              AND LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(p.key::text) || '%'
+          )
+          THEN 1 ELSE 0
+        END AS pts_pref
+      FROM candidatos c
+    )
+    SELECT
+      r.alumno_id,
+      r.alumno_nombre,
+      r.alumno_apellido,
+      r.alumno_dni,
+      r.oferta_id,
+      r.empresa,
+      r.nombre_empresa,
+      r.ciclo,
+      (r.pts_ciclo + r.pts_vehiculo + r.pts_localidad + r.pts_pref) AS puntaje,
+      r.pts_ciclo,
+      r.pts_vehiculo,
+      r.pts_localidad,
+      r.pts_pref
+    FROM ranking r
+    ORDER BY puntaje DESC, r.pts_pref DESC, r.pts_localidad DESC
+    """
+    response = supabase.rpc("exec_sql", {"sql": query}).execute()
+    return response.data
+
