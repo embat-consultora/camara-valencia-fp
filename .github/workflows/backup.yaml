@@ -12,7 +12,7 @@ jobs:
       contents: write
 
     env:
-      SUPABASE_DB_URL: postgresql://postgres:C4m4r42025!@db.xdprztbhiwoyppujygll.supabase.co:5432/postgres
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_ENABLED: ${{ vars.BACKUP_ENABLED }}
 
     steps:
