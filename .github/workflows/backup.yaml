@@ -1,0 +1,73 @@
+name: Supabase Full Logical Backup
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      SUPABASE_DB_URL: postgresql://postgres:C4m4r42025!@db.xdprztbhiwoyppujygll.supabase.co:5432/postgres
+      BACKUP_ENABLED: ${{ vars.BACKUP_ENABLED }}
+
+    steps:
+      - name: Check if backups are enabled
+        run: |
+          if [ "$BACKUP_ENABLED" != "true" ]; then
+            echo "🛑 Backups are disabled. Set BACKUP_ENABLED=true to enable backups."
+            exit 0
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Create backup directory
+        run: mkdir -p backups
+
+      - name: Dump schema
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d')
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema_$TIMESTAMP.sql
+
+      - name: Dump data (excluding sensitive tables)
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d')a
+          supabase db dump \
+            --db-url "$SUPABASE_DB_URL" \
+            --data-only \
+            --use-copy \
+            --exclude "auth_tokens" \
+            -f backups/data_$TIMESTAMP.sql
+      - name: Clean old backups (keep only today and yesterday)
+        run: |
+          TODAY=$(date +'%Y-%m-%d')
+          YESTERDAY=$(date -d "yesterday" +'%Y-%m-%d')
+
+          echo "Manteniendo backups de: $TODAY y $YESTERDAY"
+          
+          for file in backups/*.sql; do
+            if [[ "$file" != *"$TODAY"* && "$file" != *"$YESTERDAY"* ]]; then
+              echo "🧹 Eliminando $file"
+              rm "$file"
+            else
+              echo "✅ Conservando $file"
+            fi
+          done
+      - name: Commit and push backup
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -f backups/
+          git commit -m "📦 Supabase schema + data backup on $(date +'%Y-%m-%d')" || echo "Nothing to commit"
+          git push
+      

@@ -44,6 +44,7 @@ contactoEmpresaTabla="contacto_empresas"
 alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
+practicaEstadosTabla="practica_estados"
 
 
 #drive

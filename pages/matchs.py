@@ -4,19 +4,27 @@ import json
 from modules.data_base import getMatches, upsert, add, getOfertaEmpresas,getEquals
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados
+from variables import alumnosTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados,practicaEstadosTabla
 from datetime import datetime
 from modules.text_helper import st_custom_message
 import os
 now = datetime.now().isoformat()
-def matchAlumno(empresaCif, alumnoDni, ofertaId, ciclo,ciclos_info,cupos_disp):
-    add(
+def matchAlumno(empresaCif, alumnoDni, ofertaId, ciclo,ciclos_info,cupos_disp, proyecto, area):
+    practica = add(
         practicaTabla,
         {
             "empresa": empresaCif,
             "alumno": alumnoDni,
             "oferta": ofertaId,
-            "estado": "Nueva"
+            "ciclo_formativo": ciclo,
+            "area": area,
+            "proyecto": proyecto,
+        },
+    )
+    add(
+        practicaEstadosTabla,
+        {
+            "practicaId": practica.data[0]["id"],
         },
     )
 
@@ -65,7 +73,7 @@ def checkEstadoOferta(ofertaId):
                 "estado": estados[1],
                 "empresa": oferta.get("empresa"),
             },
-            keys=["empresa"],
+            keys=["id"],
         )
 # ---------------------------------
 # Configuración inicial
@@ -84,6 +92,28 @@ if not ofertas:
     st.info("No se encontraron ofertas registradas.")
     st.stop()
 base_url = os.getenv("URL")
+
+empresas_disponibles = []
+for o in ofertas:
+    empresa_info = o.get("empresas", {})
+    if empresa_info and empresa_info.get("CIF"):
+        empresas_disponibles.append({
+            "nombre": empresa_info.get("nombre", "Sin nombre"),
+            "CIF": empresa_info.get("CIF")
+        })
+
+# Eliminar duplicados (por CIF)
+empresas_unicas = {e["CIF"]: e["nombre"] for e in empresas_disponibles}
+empresa_opciones = ["Todas"] + [f"{nombre} ({cif})" for cif, nombre in empresas_unicas.items()]
+col1,col2 = st.columns([2,3])
+with col1:
+    empresa_seleccionada = st.selectbox("🏢 Filtrar por Empresa", options=empresa_opciones)
+
+# Filtrar ofertas según selección
+if empresa_seleccionada != "Todas":
+    cif_seleccionado = empresa_seleccionada.split("(")[-1].replace(")", "")
+    ofertas = [o for o in ofertas if o.get("empresas", {}).get("CIF") == cif_seleccionado]
+
 # ---------------------------------
 # Obtener datos del ranking SQL (posibles matches)
 # ---------------------------------
@@ -143,8 +173,9 @@ for oferta_data in ofertas:
                 cupo_data = ciclos_info.get(ciclo, {"alumnos": 0, "disponibles": 0})
                 cupos_total = cupo_data.get("alumnos", 0)
                 cupos_disp = cupo_data.get("disponibles", 0)
-                st.write(f"**Proyectos:**",  oferta_data["puestos"][ciclo][0]["proyecto"])
-                st.write(f"**Area:**",  oferta_data["puestos"][ciclo][0]["area"])
+                proyecto = oferta_data["puestos"][ciclo][0]["proyecto"]
+                area = oferta_data["puestos"][ciclo][0]["area"]
+                st.write(f"**Proyectos:**",proyecto  )
                 st.write(f"📦 Cupos disponibles: {cupos_disp}/{cupos_total}")
 
                 if cupos_disp <= 0:
@@ -179,9 +210,8 @@ for oferta_data in ofertas:
                                     if cupos_disp > 0:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
-                                                matchAlumno(empresa.get("CIF"), row['alumno_dni'], row["oferta_id"], ciclo,ciclos_info,cupos_disp)
-                                                st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")
-                                                st.rerun()
+                                                matchAlumno(empresa.get("CIF"), row['alumno_dni'], row["oferta_id"], ciclo,ciclos_info,cupos_disp,proyecto, area)
+                                                st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                                #st.rerun()
                                             except Exception as e:
                                                 st.error(f"❌ Error al crear el match: {e}")
                                     else:
@@ -213,9 +243,9 @@ for oferta_data in ofertas:
                             dni_alumno = alumnoSeleccionado.split("(")[-1].replace(")", "")
                             if st.button("Asignar Alumno", key=f"match_manual_{oferta_id}_{ciclo}_{dni_alumno}"):
                                 try:
-                                    matchAlumno(empresa.get("CIF"), dni_alumno, oferta_id, ciclo, ciclos_info, cupos_disp)
+                                    matchAlumno(empresa.get("CIF"), dni_alumno, oferta_id, ciclo, ciclos_info, cupos_disp, proyecto, area)
                                     checkEstadoOferta(oferta_id)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
-                                    st.rerun()
+                                    #st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Error al crear el match: {e}")
