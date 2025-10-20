@@ -1,14 +1,17 @@
 import streamlit as st
 import pandas as pd
 import os
-import json
+import json, uuid
+from pathlib import Path
 from modules.data_base import get, update, upsert, getEquals,getEqual
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
+from variables import alumnosTabla,max_file_size,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 from modules.emailSender import send_email
+from modules.drive_helper import list_drive_files,upload_to_drive,delete_drive_file
+from modules.forms_helper import  file_size_bytes
 import re
 apply_page_config()
 make_sidebar()
@@ -106,8 +109,8 @@ with tab1:
                     )
                     st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
                     st.rerun()
-            subtab1, subtab2 = st.tabs([f"✏️ Detalle: {alumno['nombre']} {alumno['apellido']}",
-                                        "📌 Preferencias FP"])
+            subtab1, subtab2, subtab3 = st.tabs([f"✏️ Detalle: {alumno['nombre']} {alumno['apellido']}",
+                                        "📌 Preferencias FP","📂 Documentos"])
 
             # --- Detalle / edición ---
             with subtab1:
@@ -123,10 +126,6 @@ with tab1:
                 new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
                 new_email = st.text_input("Email", alumno.get("email_alumno", ""))
 
-                vehiculo_val = alumno.get("vehiculo")
-                vehiculo_bool = True if vehiculo_val == "Sí" else False
-                new_vehiculo = st.checkbox("Vehículo", value=vehiculo_bool)
-
                 if st.button("💾 Actualizar alumno"):
                     update(
                         alumnosTabla,
@@ -139,8 +138,7 @@ with tab1:
                             "dni": new_dni,
                             "NIA": new_nia,
                             "telefono": new_telefono,
-                            "email_alumno": new_email,
-                            "vehiculo": "Sí" if new_vehiculo else "No",
+                            "email_alumno": new_email
                         },
                         "id",
                         alumno_id
@@ -150,6 +148,8 @@ with tab1:
 
             # --- Preferencias FP ---
             with subtab2:
+                vehiculo_val = alumno.get("vehiculo")
+                vehiculo_bool = True if vehiculo_val == "Sí" else False
                 estado_actual = alumno.get("estado") or "Activo"
                 estado_map = {
                     "Activo": "⚪",
@@ -188,10 +188,8 @@ with tab1:
                         placeholder="Selecciona una preferencia"
                     )
 
-
-
-                vehiculo_selected = st.checkbox("Vehículo", value=vehiculo_bool,key="vehiculo_pref")
-
+                vehiculo_selected = st.checkbox("Vehículo", value=vehiculo_bool,key=f"vehiculo_pref_{new_email}")
+                requisitos = st.text_input("Requisitos adicionales (separados por comas)", value=alumno.get("requisitos") or "")
                 if estado_actual in estadosAlumno:
                     default_index = estadosAlumno.index(estado_actual)
                 else:
@@ -209,11 +207,72 @@ with tab1:
                         "motivo": motivo_cancelacion,
                         "ciclo_formativo": selected_ciclo,
                         "preferencias_fp": selected_pref,
-                        "vehiculo": "Sí" if vehiculo_selected else "No"
+                        "vehiculo": "Sí" if vehiculo_selected else "No",
+                        "requisitos": requisitos
                     }
                     upsert(alumnosTabla, data_to_update, keys=["dni"])
                     st.success("Preferencias actualizadas")
                     st.rerun()
+
+            with subtab3:
+                folder_name = f"{alumno['nombre']}_{alumno['apellido']}_{alumno['dni']}".strip()
+                files, folderId = list_drive_files(folder_name)
+
+                if not files:
+                    st.warning("No hay archivos en la carpeta del alumno.")
+                else:
+                    if folderId:
+                        folder_link = f"https://drive.google.com/drive/folders/{folderId}"
+                        st.link_button("🔗 Abrir carpeta en Drive", folder_link)
+                    st.write("Archivos encontrados:")
+                    for f in files:
+                                fecha = f.get("modifiedTime", "")[:10]
+                                col1, col2, col3 = st.columns([5, 1, 1])
+                                with col1:
+                                    st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
+
+                st.divider()
+                st.write("📤 Subir archivos adicionales para el alumno:")
+
+                uploaded_files = st.file_uploader(
+                    "Selecciona uno o varios archivos (PDF/DOC/DOCX/ODT)",
+                    type=["pdf", "doc", "docx", "odt"],
+                    accept_multiple_files=True
+                )
+
+                if uploaded_files:
+                    too_big_files = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+
+                    if too_big_files:
+                        st.error(f"Los siguientes archivos superan los 20 MB: {', '.join(too_big_files)}")
+                    else:
+                        if st.button("Subir Archivos"):
+                            try:
+                                total = len(uploaded_files)
+                                st.info(f"Subiendo {total} archivo(s), por favor espera...")
+
+                                for i, file in enumerate(uploaded_files, start=1):
+                                    original_name = file.name
+                                    tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{original_name}"
+                                    with open(tmp_path, "wb") as f:
+                                        f.write(file.getbuffer())
+
+                                    res = upload_to_drive(str(tmp_path), carpetaAlumnos, folder_name, original_name)
+
+                                    if isinstance(res, dict):
+                                        link = res.get("webViewLink") or res.get("webContentLink")
+                                    else:
+                                        link = None
+
+                                    st.success(f"✅ {i}/{total}: {original_name} subido correctamente")
+                                    if link:
+                                        st.markdown(f"[Abrir en Drive]({link})")
+
+                                st.success("🎉 Todos los archivos se subieron correctamente.")
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"❌ Error al subir los archivos: {e}")
 
 # -------------------------------------------------------------------
 # TAB 2: Nuevo Alumno
@@ -231,7 +290,6 @@ with tab2:
         new_nia = st.text_input("NIA")
         new_telefono = st.text_input("Teléfono")
         new_email = st.text_input("Email")
-        new_vehiculo = st.checkbox("Vehículo")
 
 
         submitted = st.form_submit_button("Crear Alumno")
@@ -248,7 +306,6 @@ with tab2:
                     "codigo_postal": new_codigoPostal,
                     "telefono": new_telefono,
                     "email_alumno": new_email,
-                    "vehiculo": "Sí" if new_vehiculo else "No",
                     "estado": "Activo"
                 }, keys=["dni"]
             )

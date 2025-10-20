@@ -179,7 +179,7 @@ for oferta_data in ofertas:
                 st.write(f"📦 Cupos disponibles: {cupos_disp}/{cupos_total}")
 
                 if cupos_disp <= 0:
-                    st_custom_message("Este Ciclo está completo!", color=verdeOk, emoji="✅")
+                    st_custom_message("La oferta está cogida", color=verdeOk, emoji="✅")
                 else:
                     df_ciclo = df_oferta[df_oferta["ciclo"] == ciclo] if not df_oferta.empty else pd.DataFrame()
                     st.write("Alumnos propuestos para este ciclo:")
@@ -203,7 +203,8 @@ for oferta_data in ofertas:
                                         f"- Ciclo: {row['pts_ciclo']} {'✅' if row['pts_ciclo'] > 0 else ''}\n"
                                         f"- Vehículo: {row['pts_vehiculo']} {'✅' if row['pts_vehiculo'] > 0 else ''}\n"
                                         f"- Localidad: {row['pts_localidad']} {'✅' if row['pts_localidad'] > 0 else ''}\n"
-                                        f"- Preferencias: {row['pts_pref']} {'✅' if row['pts_pref'] > 0 else ''}"
+                                        f"- Preferencias: {row['pts_pref']} {'✅' if row['pts_pref'] > 0 else ''}\n"
+                                        f"- Requisitos: {row['pts_requisitos']} {'✅' if row['pts_requisitos'] > 0 else ''}"
                                     )
 
                                 with col3:
@@ -212,6 +213,7 @@ for oferta_data in ofertas:
                                             try:
                                                 matchAlumno(empresa.get("CIF"), row['alumno_dni'], row["oferta_id"], ciclo,ciclos_info,cupos_disp,proyecto, area)
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                                #st.rerun()
+                                                st.rerun()
                                             except Exception as e:
                                                 st.error(f"❌ Error al crear el match: {e}")
                                     else:
@@ -237,6 +239,8 @@ for oferta_data in ofertas:
                                 st.write(f"**Preferencias FP:** {', '.join(alumno_info.get('preferencias_fp', [])) if isinstance(alumno_info.get('preferencias_fp'), list) else alumno_info.get('preferencias_fp', 'No especificado')}")
                                 st.write(f"**Vehículo:** {alumno_info.get('vehiculo', 'No especificado')}")
                                 st.write(f"**Localidad:** {alumno_info.get('localidad', 'No especificado')}")
+                                st.write(f"**Requisitos:** {alumno_info.get('requisitos', 'No especificado')}")
+
 
                     with colMatch:  
                         if alumnoSeleccionado != "Selecciona":
@@ -246,6 +250,6 @@ for oferta_data in ofertas:
                                     matchAlumno(empresa.get("CIF"), dni_alumno, oferta_id, ciclo, ciclos_info, cupos_disp, proyecto, area)
                                     checkEstadoOferta(oferta_id)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
-                                    #st.rerun()
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Error al crear el match: {e}")

@@ -13,7 +13,7 @@ st.session_state["current_page"] = "streamlit_app"
 
 # ✅ Si ya está logueado por cualquier medio, redirige
 if st.session_state.get("logged_in"):
-    st.switch_page("pages/dashboard.py")
+    st.switch_page("pages/empresas.py")
     st.stop()
 
 # ✅ Si viene del login con Google y no hay sesión cargada aún

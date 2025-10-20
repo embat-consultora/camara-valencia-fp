@@ -94,7 +94,8 @@ def getMatches():
         each.key::text AS ciclo_text,
         ((each.value ->> 'disponibles')::int) AS disponibles,
         o.vehiculo AS oferta_vehiculo,
-        o.localidad_empresa
+        o.localidad_empresa,
+        o.requisitos AS oferta_requisitos
       FROM ofertas_activas o
       JOIN empresas e ON e."CIF" = o.empresa
       CROSS JOIN LATERAL jsonb_each(o.ciclos_js) AS each(key, value)
@@ -114,12 +115,14 @@ def getMatches():
         a.preferencias_fp,
         a.vehiculo AS alumno_vehiculo,
         a.localidad AS alumno_localidad,
+        a.requisitos AS requisitos,
+        oc.oferta_requisitos,
         oc.oferta_vehiculo,
         oc.localidad_empresa
       FROM alumnos_disponibles a
       JOIN oferta_ciclos oc
         ON a.ciclo_formativo::text ILIKE '%' || oc.ciclo_text || '%'
-           OR oc.ciclo_text ILIKE '%' || a.ciclo_formativo::text || '%'
+        OR oc.ciclo_text ILIKE '%' || a.ciclo_formativo::text || '%'
     ),
     ranking AS (
       SELECT
@@ -127,16 +130,40 @@ def getMatches():
         1 AS pts_ciclo,
         CASE WHEN c.alumno_vehiculo = c.oferta_vehiculo THEN 1 ELSE 0 END AS pts_vehiculo,
         CASE WHEN LOWER(c.alumno_localidad::text) = LOWER(c.localidad_empresa::text) THEN 1 ELSE 0 END AS pts_localidad,
+
+        -- Preferencias (área, proyecto o ciclo)
         CASE
           WHEN EXISTS (
             SELECT 1
             FROM oferta_fp of2,
-                 jsonb_each_text(of2.puestos) AS p(key, value)
+                 jsonb_each(of2.puestos) AS ciclo(ciclo_text, puestos_array),
+                 jsonb_array_elements(puestos_array) AS puesto_obj
             WHERE of2.id = c.oferta_id
-              AND LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(p.key::text) || '%'
+              AND (
+                LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(puesto_obj ->> 'area') || '%'
+                OR LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(puesto_obj ->> 'proyecto') || '%'
+                OR LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(ciclo.ciclo_text) || '%'
+              )
           )
           THEN 1 ELSE 0
-        END AS pts_pref
+        END AS pts_pref,
+
+        -- Requisitos (comparación entre alumno y oferta, tolerante a tildes/espacios)
+        CASE
+          WHEN c.requisitos IS NOT NULL
+               AND c.oferta_requisitos IS NOT NULL
+               AND TRIM(c.requisitos) <> ''
+               AND TRIM(c.oferta_requisitos) <> ''
+               AND (
+                 translate(LOWER(regexp_replace(c.requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu')
+                   ILIKE '%' || translate(LOWER(regexp_replace(c.oferta_requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu') || '%'
+                 OR
+                 translate(LOWER(regexp_replace(c.oferta_requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu')
+                   ILIKE '%' || translate(LOWER(regexp_replace(c.requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu') || '%'
+               )
+          THEN 1 ELSE 0
+        END AS pts_requisitos
+
       FROM candidatos c
     )
     SELECT
@@ -148,11 +175,12 @@ def getMatches():
       r.empresa,
       r.nombre_empresa,
       r.ciclo,
-      (r.pts_ciclo + r.pts_vehiculo + r.pts_localidad + r.pts_pref) AS puntaje,
+      (r.pts_ciclo + r.pts_vehiculo + r.pts_localidad + r.pts_pref + r.pts_requisitos) AS puntaje,
       r.pts_ciclo,
       r.pts_vehiculo,
       r.pts_localidad,
-      r.pts_pref
+      r.pts_pref,
+      r.pts_requisitos
     FROM ranking r
     ORDER BY puntaje DESC, r.pts_pref DESC, r.pts_localidad DESC
     """

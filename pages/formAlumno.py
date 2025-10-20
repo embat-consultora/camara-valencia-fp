@@ -5,7 +5,7 @@ import json, uuid
 from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size
 
 # ---------------------------------
 # Config
@@ -25,8 +25,6 @@ CICLOS = ciclos
 
 PREFERENCIAS_JSON = preferencias
 PREFS_MAP = json.loads(PREFERENCIAS_JSON)
-
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
 
@@ -69,7 +67,7 @@ cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX/ODT)", type=["pdf", "
 cv_too_big = False
 if cv_file is not None:
     size_bytes = file_size_bytes(cv_file)
-    if size_bytes > MAX_FILE_SIZE:
+    if size_bytes > max_file_size:
         st.error("El archivo supera el máximo permitido (20 MB).")
         cv_too_big = True
 
@@ -101,51 +99,52 @@ submit = st.button("Enviar", disabled=not can_submit)
 # Submit
 # ---------------------------------
 if submit:
-    payload = {
-            "nombre": nombre.strip(),
-            "apellido": apellidos.strip(),
-            "email_alumno": email.strip().lower(),
-            "dni": dni.strip().upper(),
-            "direccion": direccion.strip(),
-            "codigo_postal": cp.strip(),
-            "localidad": localidad.strip(),
-            "vehiculo": vehiculo,
-            "ciclo_formativo": ciclo,
-            "preferencias_fp": preferencia,
-            "estado":estadosAlumno[0]
-    }
-    res_al = upsert(alumnosTabla, payload, keys=["dni"])
-    upsert(
-        alumnoEstadosTabla,
-        {"alumno": res_al.data[0]["dni"], "form_completo": datetime.now().isoformat()},
-        keys=["alumno"],
-        )
-    # Subir CV a Drive como {dni}_cv.ext
-    try:
-        original_name = cv_file.name
-        ext = ""
-        if "." in original_name:
-            ext = "." + original_name.split(".")[-1].lower()
-        final_name = f"{payload['dni']}_cv{ext}"
+    with st.spinner("⏳ Enviando formulario, por favor espera..."):
+        payload = {
+                "nombre": nombre.strip(),
+                "apellido": apellidos.strip(),
+                "email_alumno": email.strip().lower(),
+                "dni": dni.strip().upper(),
+                "direccion": direccion.strip(),
+                "codigo_postal": cp.strip(),
+                "localidad": localidad.strip(),
+                "vehiculo": vehiculo,
+                "ciclo_formativo": ciclo,
+                "preferencias_fp": preferencia,
+                "estado":estadosAlumno[0]
+        }
+        res_al = upsert(alumnosTabla, payload, keys=["dni"])
+        upsert(
+            alumnoEstadosTabla,
+            {"alumno": res_al.data[0]["dni"], "form_completo": datetime.now().isoformat()},
+            keys=["alumno"],
+            )
+        # Subir CV a Drive como {dni}_cv.ext
+        try:
+            original_name = cv_file.name
+            ext = ""
+            if "." in original_name:
+                ext = "." + original_name.split(".")[-1].lower()
+            final_name = f"{payload['dni']}_cv{ext}"
 
-        tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
-        with open(tmp_path, "wb") as f:
-            f.write(cv_file.getbuffer())
-        
-        # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
-        fileName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]+"_cv"
-        res = upload_to_drive(str(tmp_path), carpetaAlumnos, fileName)
-        if isinstance(res, dict):
-            file_id = res.get("id")
-            link = res.get("webViewLink") or res.get("webContentLink")
-        else:
-            file_id, link = str(res), None
+            tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
+            with open(tmp_path, "wb") as f:
+                f.write(cv_file.getbuffer())
+            
+            # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
+            folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
+            res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,payload["dni"]+"-cv" )
+            if isinstance(res, dict):
+                file_id = res.get("id")
+                link = res.get("webViewLink") or res.get("webContentLink")
+            else:
+                file_id, link = str(res), None
 
-        st.success("¡Formulario enviado correctamente!")
-        if link:
-            st.success(f"CV subido. [Abrir en Drive]({link})")
-        else:
-            st.success(f"CV subido correctamente")
+            st.success("¡Formulario enviado correctamente!")
+            if link:
+                st.success(f"CV subido. [Abrir en Drive]({link})")
+            else:
+                st.success(f"CV subido correctamente")
 
-    except Exception as e:
-        st.error(f"No se pudo subir el CV a Drive: {e}")
+        except Exception as e:
+            st.error(f"No se pudo subir el CV a Drive: {e}")
