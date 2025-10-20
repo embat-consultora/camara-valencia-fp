@@ -131,9 +131,10 @@ if submit:
         tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
         with open(tmp_path, "wb") as f:
             f.write(cv_file.getbuffer())
-
+        
         # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
-        res = upload_to_drive(str(tmp_path), carpetaAlumnos, payload["dni"])
+        fileName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]+"_cv"
+        res = upload_to_drive(str(tmp_path), carpetaAlumnos, fileName)
         if isinstance(res, dict):
             file_id = res.get("id")
             link = res.get("webViewLink") or res.get("webContentLink")
