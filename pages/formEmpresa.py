@@ -3,7 +3,7 @@ from datetime import datetime
 import json, re
 from modules.forms_helper import required_ok, slug
 from modules.data_base import upsert,add
-from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados
+from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla
 # ---------------------------------
 # Config
 # ---------------------------------
@@ -187,10 +187,6 @@ if submit:
         "puestos": puestos_seleccionados,
         "requisitos": requisitos.strip(),
         "estado": estados[0],
-        "nombre_tutor": nombre_tutor.strip(),
-        "nif_tutor": nif_tutor.strip(),
-        "email_tutor": email_tutor.strip().lower(),
-        "telefono_tutor": telefono_tutor.strip(),
         "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
         "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
         "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
@@ -203,5 +199,14 @@ if submit:
                 {"empresa": res_emp.data[0]["CIF"], "form_completo": datetime.now().isoformat()},
                 keys=["empresa"],
             )
-        add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+        tutor = upsert(tutoresTabla, {
+            "cif_empresa": res_emp.data[0]["CIF"],
+            "nombre": nombre_tutor.strip(),
+            "nif": nif_tutor.strip().upper(),
+            "email": email_tutor.strip().lower(),
+            "telefono": telefono_tutor.strip()
+        }, keys=["nif"])
+        ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
+        oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+
     st.success("✅ ¡Formulario de empresa enviado correctamente!")

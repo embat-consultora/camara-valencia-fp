@@ -30,7 +30,18 @@ def getEquals(tableName, conditions: dict, in_filters: dict = None):
     return response.data
 
 def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
-    query = supabase.table(tableName).select("*, empresas(*)")
+    query = supabase.table(tableName).select("*, empresas(*),tutores(*)")
+    if conditions:
+        for key, value in conditions.items():
+            query = query.eq(key, value)
+    if in_filters:
+        for key, values in in_filters.items():
+            query = query.in_(key, values)
+    response = query.execute()
+    return response.data
+
+def getPracticas(tableName, conditions: dict, in_filters: dict = None):
+    query = supabase.table(tableName).select("*, empresas(*),alumnos(*), oferta_fp(*), practica_estados(*)")
     if conditions:
         for key, value in conditions.items():
             query = query.eq(key, value)

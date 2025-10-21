@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from modules.data_base import get, getEqual, update, upsert,getEquals
 from page_utils import apply_page_config
+from pathlib import Path
 from navigation import make_sidebar
 from variables import empresasTabla, necesidadFP, estados,fasesEmpresa,formFieldsTabla, empresaEstadosTabla,fase2colEmpresa,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
 from datetime import datetime
@@ -35,12 +36,21 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 # TAB 1: Buscar y visualizar empresas
 # -------------------------------------------------------------------
 with tab1:
-    col1, col2 = st.columns([3, 2])
+    col1, col2, col3= st.columns([3, 2,2])
     with col1:
         search = st.text_input("🔍 Buscar por nombre de empresa")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
-
+    with col3:
+        temp_path = Path("/tmp") / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        df_empresas.to_excel(temp_path, index=False)
+        with open(temp_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar empresas (.xlsx)",
+                data=f,
+                file_name=temp_path.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
     if search:
         df_empresas = df_empresas[df_empresas["nombre"].str.contains(search, case=False, na=False)]
 

@@ -45,6 +45,7 @@ alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
 practicaEstadosTabla="practica_estados"
+tutoresTabla="tutores"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive

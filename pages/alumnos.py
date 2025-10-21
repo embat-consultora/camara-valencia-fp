@@ -39,12 +39,21 @@ tab1, tab2, tab3 = st.tabs(["🔍 Buscar / Visualizar", "➕ Nuevo Alumno", "�
 # TAB 1: Buscar / Visualizar / Editar
 # -------------------------------------------------------------------
 with tab1:
-    col1, col2 = st.columns([3, 2])
+    col1, col2, col3= st.columns([3, 2,2])
     with col1:
         search = st.text_input("Buscar alumnos")
     with col2:
         st.metric("Total alumnos", len(df_alumnos))
-
+    with col3:
+        temp_path = Path("/tmp") / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        df_alumnos.to_excel(temp_path, index=False)
+        with open(temp_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar alumnos (.xlsx)",
+                data=f,
+                file_name=temp_path.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
     if search:
         mask = df_alumnos.astype(str).apply(
             lambda row: row.str.contains(search, case=False, na=False).any(),

@@ -86,7 +86,7 @@ st.title("🚀 MATCH")
 # ---------------------------------
 # Traer todas las ofertas (necesidadFP)
 # ---------------------------------
-ofertas = getOfertaEmpresas(necesidadFP, {})  # trae todas las filas
+ofertas = getOfertaEmpresas(necesidadFP, {}) 
 alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa"})
 if not ofertas:
     st.info("No se encontraron ofertas registradas.")
@@ -158,9 +158,13 @@ for oferta_data in ofertas:
         with col2:
             st.write(f"**Dirección:**", oferta_data.get("direccion_empresa", "Ninguno especificado"))
             st.write(f"**Localidad:**", oferta_data.get("localidad_empresa", "Ninguno especificado"))
-            st.write(f"**Tutor:**", oferta_data.get("nombre_tutor", "Ninguno especificado"))
-            st.write(f"**Email:**", oferta_data.get("email_tutor", "Ninguno especificado"))
-
+            tutores = oferta_data.get("tutores", [])
+            if tutores:
+                st.write(f"**Tutor:**", tutores[0].get("nombre"))
+                st.write(f"**Email:**", tutores[0].get("email"))
+            else:
+                st.write(f"**Tutor:**",  "Ninguno asignado")
+                st.write(f"**Email:**", "Sin email")
         if not ciclos:
             st.warning("⚠️ Esta oferta no tiene ciclos formativos asignados.")
             continue
