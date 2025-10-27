@@ -13,7 +13,7 @@ TITLE = "Formación Empresas"
 SUBTITLE = "Ficha 2025/2026"
 DESCRIPTION = (
     "⚙️ **Objetivo:** Este formulario permite registrar a vuestra empresa para participar "
-    "en el programa de Formación en Centros de Trabajo (FCT). "
+    "en el Formación en Empresa (FE). "
     "Por favor, completad todos los campos con la información solicitada."
 )
 
