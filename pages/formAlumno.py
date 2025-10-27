@@ -11,7 +11,7 @@ from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTab
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Alumnos Formación", page_icon="🏫", layout="centered")
-
+st.image("./images/cv-fp.png", width=250)
 TITLE = "Alumnos Formación"
 SUBTITLE = "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa."
 DESCRIPTION = (

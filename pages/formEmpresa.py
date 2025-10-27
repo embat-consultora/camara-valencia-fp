@@ -8,7 +8,7 @@ from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, pref
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Empresas Formación", page_icon="🏢", layout="centered")
-
+st.image("./images/cv-fp.png", width=250)
 TITLE = "Formación Empresas"
 SUBTITLE = "Ficha 2025/2026"
 DESCRIPTION = (
