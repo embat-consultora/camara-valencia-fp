@@ -17,6 +17,9 @@ st.markdown("<h2 style='text-align: center;'>🚀 PRÁCTICAS</h2>", unsafe_allow
 
 # --- Traer datos base ---
 practicas = getPracticas(practicaTabla, {})
+if not practicas:
+    st.info("No se encontraron practicas asignadas aun.")
+    st.stop()
 tutores = getEquals(tutoresTabla, {})   
 for p in practicas:
     oferta = p.get("oferta_fp")
