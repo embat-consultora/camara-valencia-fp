@@ -4,7 +4,7 @@ import json
 from modules.data_base import getMatches, upsert, add, getOfertaEmpresas,getEquals
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados,practicaEstadosTabla
+from variables import alumnosTabla, tutoresTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados,practicaEstadosTabla
 from datetime import datetime
 from modules.text_helper import st_custom_message
 import os
@@ -128,6 +128,7 @@ for oferta_data in ofertas:
     empresa = oferta_data.get("empresas")
     nombre_empresa = oferta_data.get("nombre", "Empresa sin nombre")
     oferta_id = oferta_data.get("id")
+    tutores=getEquals(tutoresTabla,{"id":oferta_data.get("tutor")})
 
     # Cargar ciclos formativos
     ciclos_info = oferta_data.get("ciclos_formativos", {})
@@ -151,14 +152,14 @@ for oferta_data in ofertas:
     with st.expander(f"🏢 {empresa.get("nombre", "Empresa sin nombre")} — CIF: {empresa.get("CIF", "Sin CIF")} — Oferta #{oferta_id} ({candidatos_count} candidatos)"):
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Requisitos:**", oferta_data.get("requisitos", "Ninguno especificado"))
-            st.write(f"**Vehículo:**", oferta_data.get("vehiculo", "Ninguno especificado"))
-            st.write(f"**Contrato:**", oferta_data.get("contrato", "Ninguno especificado"))
-            st.write(f"**CP:**", oferta_data.get("cp_empresa", "Ninguno especificado"))
+            st.write(f"**Requisitos:**", oferta_data.get("requisitos"), "Ninguno especificado")
+            st.write(f"**Vehículo:**", oferta_data.get("vehiculo"),"Ninguno especificado")
+            st.write(f"**Contrato:**", oferta_data.get("contrato"), "Ninguno especificado")
+            st.write(f"**CP:**", oferta_data.get("cp_empresa"), "Ninguno especificado")
         with col2:
             st.write(f"**Dirección:**", oferta_data.get("direccion_empresa", "Ninguno especificado"))
             st.write(f"**Localidad:**", oferta_data.get("localidad_empresa", "Ninguno especificado"))
-            tutores = oferta_data.get("tutores", [])
+            #tutores = oferta_data.get("tutores", [])
             if tutores:
                 st.write(f"**Tutor:**", tutores[0].get("nombre"))
                 st.write(f"**Email:**", tutores[0].get("email"))
@@ -183,8 +184,6 @@ for oferta_data in ofertas:
                     .get("proyecto")
                     or "No completado"
                 )
-                #proyecto = oferta_data["puestos"][ciclo][0]["proyecto"]
-                #area = oferta_data["puestos"][ciclo][0]["area"]
                 area = (
                     oferta_data.get("puestos", {})
                     .get('area', [{}])[0]
