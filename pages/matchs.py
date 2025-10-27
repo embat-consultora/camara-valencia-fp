@@ -177,8 +177,20 @@ for oferta_data in ofertas:
                 cupo_data = ciclos_info.get(ciclo, {"alumnos": 0, "disponibles": 0})
                 cupos_total = cupo_data.get("alumnos", 0)
                 cupos_disp = cupo_data.get("disponibles", 0)
-                proyecto = oferta_data["puestos"][ciclo][0]["proyecto"]
-                area = oferta_data["puestos"][ciclo][0]["area"]
+                proyecto = (
+                    oferta_data.get("puestos", {})
+                    .get(ciclo, [{}])[0]
+                    .get("proyecto")
+                    or "No completado"
+                )
+                #proyecto = oferta_data["puestos"][ciclo][0]["proyecto"]
+                #area = oferta_data["puestos"][ciclo][0]["area"]
+                area = (
+                    oferta_data.get("puestos", {})
+                    .get('area', [{}])[0]
+                    .get("proyecto")
+                    or "No completado"
+                )
                 st.write(f"**Proyectos:**",proyecto  )
                 st.write(f"📦 Cupos disponibles: {cupos_disp}/{cupos_total}")
 

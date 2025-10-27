@@ -128,7 +128,23 @@ st.write("REQUISITOS ADICIONALES")
 requisitos = st.text_area(
     "Por favor, indícanos si el alumno debe cumplir algún requisito adicional (por ejemplo, B1 de inglés, trabajo en equipo, residencia, etc.) *"
 )
+errores_ciclos = []
+for ciclo in selected_ciclos:
+    # validar cantidad de alumnos
+    if ciclo not in cantidades or cantidades[ciclo]["alumnos"] <= 0:
+        errores_ciclos.append(f"Cantidad de alumnos en {ciclo}")
 
+    # validar que haya al menos un área seleccionada
+    if ciclo not in puestos_seleccionados or not puestos_seleccionados[ciclo]:
+        errores_ciclos.append(f"Área no seleccionada en {ciclo}")
+    else:
+        # validar que cada área tenga proyecto
+        for puesto in puestos_seleccionados[ciclo]:
+            if not puesto.get("proyecto", "").strip():
+                errores_ciclos.append(f"Proyecto vacío en área '{puesto['area']}' de {ciclo}")
+
+if errores_ciclos:
+    st.warning("Completa los siguientes datos en los ciclos: " + ", ".join(errores_ciclos))
 # ---------------------------------
 # Validación
 # ---------------------------------
@@ -159,7 +175,8 @@ faltantes = [k for k, v in required_fields.items() if not required_ok(v)]
 if faltantes:
     st.info("Completa los campos obligatorios: " + ", ".join(faltantes))
 
-can_submit = len(faltantes) == 0
+can_submit = len(faltantes) == 0 and len(errores_ciclos) == 0
+
 submit = st.button("Enviar formulario", disabled=not can_submit)
 
 # ---------------------------------
