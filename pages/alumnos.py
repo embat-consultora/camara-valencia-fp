@@ -70,7 +70,8 @@ with tab1:
         "localidad": "Localidad",
         "telefono": "Teléfono",
         "email_alumno": "Email",
-        "vehiculo": "Vehículo"
+        "vehiculo": "Vehículo",
+        "tipoPractica": "Tipo Práctica",
     }
     df_view = df_alumnos[list(cols_map.keys())].rename(columns=cols_map)
     st.dataframe(df_view, hide_index=True, use_container_width=True)
@@ -157,6 +158,7 @@ with tab1:
 
             # --- Preferencias FP ---
             with subtab2:
+                tipo_practica = alumno.get("tipoPractica") or "N/A"
                 vehiculo_val = alumno.get("vehiculo")
                 vehiculo_bool = True if vehiculo_val == "Sí" else False
                 estado_actual = alumno.get("estado") or "Activo"
@@ -168,7 +170,7 @@ with tab1:
                 }
                 icono = estado_map.get(estado_actual, "⚪")
                 st.write(f"**Estado actual:** {icono} {estado_actual}")
-
+                st.write(f"**Tipo de Práctica:**  {tipo_practica}")
                 # Obtener opciones de form_fields
                 form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
                 ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)

@@ -26,7 +26,13 @@ CICLOS = ciclos
 PREFERENCIAS_JSON = preferencias
 PREFS_MAP = json.loads(PREFERENCIAS_JSON)
 
-
+def input_requerido(label, key=None, **kwargs):
+    """Input obligatorio con mensaje inline inmediato"""
+    valor = st.text_input(label, key=key, **kwargs)
+    # Si el valor está vacío, mostrar mensaje en rojo
+    if not valor.strip():
+        st.markdown("<span style='color:red;font-size:0.9em;'>Este valor es requerido</span>", unsafe_allow_html=True)
+    return valor
 
 # ---------------------------------
 # UI
@@ -39,17 +45,26 @@ st.write(DESCRIPTION)
 st.subheader("Datos personales")
 col1, col2 = st.columns(2)
 with col1:
-    nombre = st.text_input("Nombre *")
-    email = st.text_input("Email *")
-    dni = st.text_input("DNI/NIE *")
-    cp = st.text_input("CP *")
+    nombre = input_requerido("Nombre *", key="nombre_alumno")
+    email = input_requerido("Email *", key="email_alumno")
+    dni = input_requerido("DNI/NIE *", key="dni_alumno")
+    cp = input_requerido("Código Postal *", key="cp_alumno")
 with col2:
-    apellidos = st.text_input("Apellidos *")
-    direccion = st.text_input("Indícanos tu dirección *")
-    localidad = st.text_input("Localidad *")
+    apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
+    direccion = input_requerido("Dirección *", key="direccion_alumno")
+    localidad = input_requerido("Localidad *", key="localidad_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
+st.subheader("Tipo de práctica")
+tipo_practica = st.radio(
+    "Indica si tu práctica es autogestionada o si prefieres que sea asignada por el centro:",
+    ["Práctica autogestionada", "Práctica asignada por el centro"],
+    index=None,
+    horizontal=False
+)
+if not tipo_practica:
+    st.markdown("<span style='color:red;'>Debes seleccionar el tipo de práctica</span>", unsafe_allow_html=True)
 # Ciclo formativo (único)
 st.subheader("Ciclo Formativo")
 ciclo = st.radio("Selecciona tu ciclo formativo", CICLOS, index=None)
@@ -60,6 +75,10 @@ if ciclo:
     opciones = PREFS_MAP.get(ciclo, [])
     with st.expander(ciclo, expanded=True):
         preferencia = st.radio("Elige tu preferencia principal", opciones, index=None, key=f"pref_{slug(ciclo)}")
+        if not preferencia:
+            st.markdown("<span style='color:red;'>Debes seleccionar al menos una preferencia</span>", unsafe_allow_html=True)
+if not ciclo:
+    st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
 
 # Subida de CV
 st.subheader("Subir CV")
@@ -70,6 +89,8 @@ if cv_file is not None:
     if size_bytes > max_file_size:
         st.error("El archivo supera el máximo permitido (20 MB).")
         cv_too_big = True
+
+
 
 # ---------------------------------
 # Validación requerida
@@ -86,8 +107,8 @@ if not required_ok(localidad): missing.append("Localidad")
 if vehiculo not in ("Sí", "No"): missing.append("Dispones de vehículo")
 if not ciclo: missing.append("Ciclo formativo")
 if not preferencia: missing.append("Preferencia de ciclo")
-if cv_file is None: missing.append("CV")
-if cv_too_big: missing.append("CV ≤ 20 MB")
+# if cv_file is None: missing.append("CV")
+# if cv_too_big: missing.append("CV ≤ 20 MB")
 
 if missing:
     st.info("Completa los campos obligatorios: " + ", ".join(missing))
@@ -111,7 +132,8 @@ if submit:
                 "vehiculo": vehiculo,
                 "ciclo_formativo": ciclo,
                 "preferencias_fp": preferencia,
-                "estado":estadosAlumno[0]
+                "estado":estadosAlumno[0],
+                "tipoPractica": tipo_practica,
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
         upsert(
@@ -121,30 +143,31 @@ if submit:
             )
         # Subir CV a Drive como {dni}_cv.ext
         try:
-            original_name = cv_file.name
-            ext = ""
-            if "." in original_name:
-                ext = "." + original_name.split(".")[-1].lower()
-            final_name = f"{payload['dni']}_cv{ext}"
+            if cv_file:
+                original_name = cv_file.name
+                ext = ""
+                if "." in original_name:
+                    ext = "." + original_name.split(".")[-1].lower()
+                final_name = f"{payload['dni']}_cv{ext}"
 
-            tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
-            with open(tmp_path, "wb") as f:
-                f.write(cv_file.getbuffer())
-            
-            # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
-            folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
-            res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,payload["dni"]+"-cv" )
-            if isinstance(res, dict):
-                file_id = res.get("id")
-                link = res.get("webViewLink") or res.get("webContentLink")
-            else:
-                file_id, link = str(res), None
+                tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
+                with open(tmp_path, "wb") as f:
+                    f.write(cv_file.getbuffer())
+                
+                # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
+                folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
+                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,payload["dni"]+"-cv" )
+                if isinstance(res, dict):
+                    file_id = res.get("id")
+                    link = res.get("webViewLink") or res.get("webContentLink")
+                else:
+                    file_id, link = str(res), None
 
-            st.success("¡Formulario enviado correctamente!")
-            if link:
-                st.success(f"CV subido. [Abrir en Drive]({link})")
-            else:
-                st.success(f"CV subido correctamente")
+                st.success("¡Formulario enviado correctamente!")
+                if link:
+                    st.success(f"CV subido. [Abrir en Drive]({link})")
+                else:
+                    st.success(f"CV subido correctamente")
 
         except Exception as e:
             st.error(f"No se pudo subir el CV a Drive: {e}")

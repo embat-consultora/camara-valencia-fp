@@ -8,6 +8,15 @@ from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, pref
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Empresas Formación", page_icon="🏢", layout="centered")
+st.markdown("""
+<style>
+div[data-testid="stTextInput"] input {
+    border: 2px solid #1E90FF; /* azul */
+    border-radius: 8px;
+    padding: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
 st.image("./images/cv-fp.png", width=250)
 TITLE = "Formación Empresas"
 SUBTITLE = "Ficha 2025/2026"
@@ -23,6 +32,14 @@ AREAS_JSON = preferencias
 
 AREAS_MAP = json.loads(AREAS_JSON)
 
+def input_requerido(label, key=None, **kwargs):
+    """Input obligatorio con mensaje inline inmediato"""
+    valor = st.text_input(label, key=key, **kwargs)
+    # Si el valor está vacío, mostrar mensaje en rojo
+    if not valor.strip():
+        st.markdown("<span style='color:red;font-size:0.9em;'>Este valor es requerido</span>", unsafe_allow_html=True)
+    return valor
+
 # ---------------------------------
 # UI
 # ---------------------------------
@@ -33,29 +50,29 @@ st.write(DESCRIPTION)
 st.write("DATOS DE LA EMPRESA Y PERSONA DE CONTACTO")
 col1, col2 = st.columns(2)
 with col1:
-    nombre_empresa = st.text_input("Nombre de la empresa *")
-    direccion = st.text_input("Dirección *")
-    cp = st.text_input("Código Postal *")
-    localidad = st.text_input("Localidad *")
-    cif = st.text_input("CIF *")
-    horario_inicio = st.time_input("Horario Empresa inicio *", step=900)
+    nombre_empresa = input_requerido("Nombre de la empresa *", key="nombre_empresa")
+    direccion = input_requerido("Dirección *", key="direccion")
+    cp = input_requerido("Código Postal *", key="cp")
+    localidad = input_requerido("Localidad *", key="localidad")
+    cif = input_requerido("CIF *", key="cif")
+    horario_inicio = st.time_input("Horario Empresa inicio *", step=900, key="inicio")
     pagina_web = st.text_input("Página web")
 with col2:
-    nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario *")
-    telefono_contacto = st.text_input("Teléfono de contacto *")
-    email_contacto = st.text_input("Email de contacto *")
-    nombre_responsable = st.text_input("Nombre del responsable legal *")
-    nie_responsable = st.text_input("NIF del responsable legal *")
+    nombre_contacto = input_requerido("Nombre de la persona que rellena el formulario *", key="nombre_contacto")
+    telefono_contacto = input_requerido("Teléfono de contacto *", key="telefono_contacto")
+    email_contacto = input_requerido("Email de contacto *", key="email_contacto")
+    nombre_responsable = input_requerido("Nombre del responsable legal *", key="nombre_responsable")
+    nie_responsable = input_requerido("NIF del responsable legal *", key="nie_responsable")
     horario_fin = st.time_input("Horario Empresa fin *", step=900)
 st.divider()
 st.write("DATOS DEL TUTOR DE LA EMPRESA (PERSONA QUE SE ENCARGARÁ DE SEGUIR AL ALUMNO EN PRÁCTICAS)")
 col1, col2 = st.columns(2)
 with col1:
-    nombre_tutor = st.text_input("Nombre Completo del tutor *")
-    nif_tutor = st.text_input("NIF del tutor *")
+    nombre_tutor = input_requerido("Nombre Completo del tutor *", key="nombre_tutor")
+    nif_tutor = input_requerido("NIF del tutor *", key="nif_tutor")
 with col2:
-    email_tutor = st.text_input("Email del tutor *")
-    telefono_tutor = st.text_input("Teléfono del tutor *")
+    email_tutor = input_requerido("Email del tutor *", key="email_tutor")
+    telefono_tutor = input_requerido("Teléfono del tutor *", key="telefono_tutor")
 st.divider()
 st.write("DIRECCIÓN DEL CENTRO DE TRABAJO DONDE SE REALIZARÁN LAS PRÁCTICAS")
 direccion_centro = st.text_input("Dirección del centro de trabajo")
@@ -92,7 +109,8 @@ with st.expander("Seleccionar ciclos y cantidad de alumnos", expanded=False):
                     "alumnos": cantidad,
                     "disponibles": cantidad
                 }
-
+if not selected_ciclos:
+    st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
 # --- Puestos / áreas ---
 puestos_seleccionados = {}
 if selected_ciclos:
@@ -123,7 +141,8 @@ if selected_ciclos:
                             puestos_seleccionados[ciclo] = [
                                 p for p in puestos_seleccionados[ciclo] if p["area"] != area
                             ]
-
+if not puestos_seleccionados:
+    st.markdown("<span style='color:red;'>Debes seleccionar al menos un puesto/area</span>", unsafe_allow_html=True)
 st.write("REQUISITOS ADICIONALES")
 requisitos = st.text_area(
     "Por favor, indícanos si el alumno debe cumplir algún requisito adicional (por ejemplo, B1 de inglés, trabajo en equipo, residencia, etc.) *"
@@ -137,14 +156,7 @@ for ciclo in selected_ciclos:
     # validar que haya al menos un área seleccionada
     if ciclo not in puestos_seleccionados or not puestos_seleccionados[ciclo]:
         errores_ciclos.append(f"Área no seleccionada en {ciclo}")
-    else:
-        # validar que cada área tenga proyecto
-        for puesto in puestos_seleccionados[ciclo]:
-            if not puesto.get("proyecto", "").strip():
-                errores_ciclos.append(f"Proyecto vacío en área '{puesto['area']}' de {ciclo}")
 
-if errores_ciclos:
-    st.warning("Completa los siguientes datos en los ciclos: " + ", ".join(errores_ciclos))
 # ---------------------------------
 # Validación
 # ---------------------------------
@@ -175,12 +187,11 @@ faltantes = [k for k, v in required_fields.items() if not required_ok(v)]
 if faltantes:
     st.info("Completa los campos obligatorios: " + ", ".join(faltantes))
 
-if not selected_ciclos:
-    st.warning("Debes seleccionar al menos un ciclo formativo antes de enviar el formulario.")
-
 can_submit = len(faltantes) == 0 and len(errores_ciclos) == 0 and len(selected_ciclos) > 0
 
+st.write("*Si completó todo el formulario, y aun no se habilita el botón de enviar, presione dentro y fuera de los campos nombrados.")
 submit = st.button("Enviar formulario", disabled=not can_submit)
+
 
 # ---------------------------------
 # Submit
