@@ -175,7 +175,10 @@ faltantes = [k for k, v in required_fields.items() if not required_ok(v)]
 if faltantes:
     st.info("Completa los campos obligatorios: " + ", ".join(faltantes))
 
-can_submit = len(faltantes) == 0 and len(errores_ciclos) == 0
+if not selected_ciclos:
+    st.warning("Debes seleccionar al menos un ciclo formativo antes de enviar el formulario.")
+
+can_submit = len(faltantes) == 0 and len(errores_ciclos) == 0 and len(selected_ciclos) > 0
 
 submit = st.button("Enviar formulario", disabled=not can_submit)
 
