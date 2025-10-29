@@ -107,8 +107,8 @@ if not required_ok(localidad): missing.append("Localidad")
 if vehiculo not in ("Sí", "No"): missing.append("Dispones de vehículo")
 if not ciclo: missing.append("Ciclo formativo")
 if not preferencia: missing.append("Preferencia de ciclo")
-# if cv_file is None: missing.append("CV")
-# if cv_too_big: missing.append("CV ≤ 20 MB")
+if cv_file is None: missing.append("CV")
+if cv_too_big: missing.append("CV ≤ 20 MB")
 
 if missing:
     st.info("Completa los campos obligatorios: " + ", ".join(missing))
