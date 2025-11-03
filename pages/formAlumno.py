@@ -75,8 +75,10 @@ if ciclo:
     opciones = PREFS_MAP.get(ciclo, [])
     with st.expander(ciclo, expanded=True):
         preferencias_seleccionadas = st.multiselect(
-            "Elige tus preferencias (puedes marcar varias)",
+            "Indica qué áreas son de tu interés (indicar al menos 3)",
             options=opciones,
+            max_selections=3,
+            placeholder="Selecciona tus preferencias",
             key=f"prefs_{slug(ciclo)}"
         )
         if not preferencias_seleccionadas:
