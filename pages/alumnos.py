@@ -180,7 +180,7 @@ with tab1:
                 prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
 
                 current_ciclo = alumno.get("ciclo_formativo") or ""
-                current_pref = alumno.get("preferencias_fp") or ""
+                current_pref = alumno.get("preferencias_fp") or "[]"
 
                 selected_ciclo = st.selectbox(
                     "Ciclo Formativo",
@@ -189,15 +189,18 @@ with tab1:
                     placeholder="Selecciona un ciclo formativo"
                 )
 
-                selected_pref = ""
+                selected_pref = []
                 if selected_ciclo and selected_ciclo in prefs_opts_dict:
                     prefs_options = prefs_opts_dict[selected_ciclo]
-                    selected_pref = st.selectbox(
+                    selected_pref = st.multiselect(
                         f"Preferencia para {selected_ciclo}",
-                        options=[""] + prefs_options,
-                        index=([""] + prefs_options).index(current_pref) if current_pref in prefs_options else 0,
-                        placeholder="Selecciona una preferencia"
+                        options=prefs_options,
+                        default=[p for p in current_pref if p in prefs_options],
+                        key=f"prefs_multiselect_{alumno['dni']}"
                     )
+                else:
+                    st.info("Selecciona un ciclo formativo para ver las preferencias disponibles.")
+
 
                 vehiculo_selected = st.checkbox("Vehículo", value=vehiculo_bool,key=f"vehiculo_pref_{new_email}")
                 requisitos = st.text_input("Requisitos adicionales (separados por comas)", value=alumno.get("requisitos") or "")

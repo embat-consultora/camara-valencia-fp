@@ -74,12 +74,15 @@ preferencia = None
 if ciclo:
     opciones = PREFS_MAP.get(ciclo, [])
     with st.expander(ciclo, expanded=True):
-        preferencia = st.radio("Elige tu preferencia principal", opciones, index=None, key=f"pref_{slug(ciclo)}")
-        if not preferencia:
+        preferencias_seleccionadas = st.multiselect(
+            "Elige tus preferencias (puedes marcar varias)",
+            options=opciones,
+            key=f"prefs_{slug(ciclo)}"
+        )
+        if not preferencias_seleccionadas:
             st.markdown("<span style='color:red;'>Debes seleccionar al menos una preferencia</span>", unsafe_allow_html=True)
 if not ciclo:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
-
 # Subida de CV
 st.subheader("Subir CV")
 cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX/ODT)", type=["pdf", "doc", "docx", "odt"], accept_multiple_files=False)
@@ -106,7 +109,6 @@ if not required_ok(cp): missing.append("CP")
 if not required_ok(localidad): missing.append("Localidad")
 if vehiculo not in ("Sí", "No"): missing.append("Dispones de vehículo")
 if not ciclo: missing.append("Ciclo formativo")
-if not preferencia: missing.append("Preferencia de ciclo")
 if cv_file is None: missing.append("CV")
 if cv_too_big: missing.append("CV ≤ 20 MB")
 
@@ -131,7 +133,7 @@ if submit:
                 "localidad": localidad.strip(),
                 "vehiculo": vehiculo,
                 "ciclo_formativo": ciclo,
-                "preferencias_fp": preferencia,
+                "preferencias_fp": preferencias_seleccionadas,
                 "estado":estadosAlumno[0],
                 "tipoPractica": tipo_practica,
         }
