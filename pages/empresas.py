@@ -10,6 +10,8 @@ from datetime import datetime
 from modules.emailSender import send_email
 from modules.grafico_helper import mostrar_fases
 import re
+import tempfile
+
 apply_page_config()
 make_sidebar()
 
@@ -35,6 +37,9 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 # -------------------------------------------------------------------
 # TAB 1: Buscar y visualizar empresas
 # -------------------------------------------------------------------
+
+# obtener la carpeta temporal correcta (Windows, Linux o Mac)
+
 with tab1:
     col1, col2, col3= st.columns([3, 2,2])
     with col1:
@@ -42,7 +47,8 @@ with tab1:
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:
-        temp_path = Path("/tmp") / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = temp_dir / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         df_empresas.to_excel(temp_path, index=False)
         with open(temp_path, "rb") as f:
             st.download_button(
