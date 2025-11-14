@@ -5,7 +5,7 @@ from modules.data_base import get, getEqual, update, upsert,getEquals
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados,fasesEmpresa,formFieldsTabla, empresaEstadosTabla,fase2colEmpresa,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
+from variables import empresasTabla, necesidadFP, estados,fasesEmpresa, empresaEstadosTabla,fase2colEmpresa,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
 from datetime import datetime
 from modules.emailSender import send_email
 from modules.grafico_helper import mostrar_fases

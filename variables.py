@@ -14,8 +14,14 @@ estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado
 #fases
 fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
 fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-
-
+fasesPractica = ["Documentación Pedida", "Documentación Firmada", "Pasantía en progreso", "Finalizada", "Cancelada"]
+faseColPractica = {
+    "Documentación Pedida": "documentacion_pedida",
+    "Documentación Firmada": "documentacion_firmada",
+    "Pasantía en progreso": "en_progreso",
+    "Finalizada": "fp_finalizada",
+    "Cancelada": "cancelada"
+}
 fase2colEmpresa = {
     "Form Enviado": "email_enviado",
     "Form Completo": "form_completo",
@@ -46,12 +52,13 @@ contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
 practicaEstadosTabla="practica_estados"
 tutoresTabla="tutores"
+
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive
 carpetaAlumnos="1Q6YVWNLi2Jm5V7E9dnT454Me_INBvU3Z"
 carpetaEmpresas="1S4WOBuY_Yn_7eiFqJ3BJrRSWu_QLhg4_"
-
+carpetaPractica="1a-s8ycno4rXBnennRUdodvJbrt-KgRHT"
 #emails
 bodyEmailsEmpresa= f"""Hola,
 
