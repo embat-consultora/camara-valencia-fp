@@ -10,7 +10,7 @@ from variables import alumnosTabla,max_file_size,carpetaAlumnos,estadosAlumno, f
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 from modules.emailSender import send_email
-from modules.drive_helper import list_drive_files,upload_to_drive,
+from modules.drive_helper import list_drive_files,upload_to_drive
 from modules.forms_helper import  file_size_bytes
 import re
 apply_page_config()

@@ -1,14 +1,15 @@
 import streamlit as st
 from modules.data_base import getEqual
 from modules.session_manager import load_user, validate_get_user
-from variables import title, companyIcon, page_icon,usuariosTabla
+from variables import companyIcon, page_icon,usuariosTabla
+import os
 # Configuración inicial
 st.set_page_config(page_title="Inicio", page_icon=page_icon)
 col1, col2, col3 = st.columns(3)
 with col2:
     st.image(companyIcon, width=500)
 
-
+env = os.getenv("SUPABASE_ENV")
 st.session_state["current_page"] = "streamlit_app"
 
 # ✅ Si ya está logueado por cualquier medio, redirige

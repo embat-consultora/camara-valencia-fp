@@ -3,8 +3,9 @@ logoutButton="Desloguearse"
 page_icon="./images/cv-fp.ico"
 companyIcon="./images/cv-fp.png"
 
-
-
+azul="#013d5f"
+celeste="2AD2C9"
+amarillo=""
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
