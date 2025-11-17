@@ -1,15 +1,11 @@
-streamlit
+streamlit==1.38.0
 pandas==2.2.2
 matplotlib
 plotly
 supabase
 dotenv
-streamlit
 gspread
 oauth2client
-google-auth
-google-auth-httplib2 
-google-api-python-client
 streamlit-cookies-manager
 streamlit-authenticator
 streamlit_extras
@@ -24,7 +20,6 @@ qrcode[pil]
 pyzbar
 pillow
 opencv-python-headless
-google-api-python-client
 google-auth-oauthlib>=1.2.0
 google-auth>=2.0.0
 google-auth-httplib2>=0.2.0
