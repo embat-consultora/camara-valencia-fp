@@ -50,28 +50,33 @@ ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
 # -------------------------------------------------------------------
 # 2. CALCULAR ESTADO PRÁCTICA
 # -------------------------------------------------------------------
+if df_prac.empty:
+    df_prac["estado_actual"] = None
+    df_prac["empresa"] = None
+    df_prac["alumno"] = None
+    df_prac["ciclo_formativo"] = None
+else:
+    estado_por_practica = {}
 
-estado_por_practica = {}
+    for _, p in df_prac.iterrows():
+        pid = p["id"]
+        estados = getEqual(practicaEstadosTabla, "practicaId", pid)
 
-for _, p in df_prac.iterrows():
-    pid = p["id"]
-    estados = getEqual(practicaEstadosTabla, "practicaId", pid)
+        if not estados:
+            estado_actual = fasesPractica[0]
+        else:
+            registro = estados[0]
+            estado_actual = fasesPractica[0]
+            for fase in fasesPractica:
+                col = faseColPractica[fase]
+                if registro.get(col):
+                    estado_actual = fase
 
-    if not estados:
-        estado_actual = fasesPractica[0]
-    else:
-        registro = estados[0]
-        estado_actual = fasesPractica[0]
-        for fase in fasesPractica:
-            col = faseColPractica[fase]
-            if registro.get(col):
-                estado_actual = fase
+        estado_por_practica[pid] = estado_actual
 
-    estado_por_practica[pid] = estado_actual
+    df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
 
-df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
-
-# Join empresa + alumno
+    # Join empresa + alumno
 df_prac = df_prac.merge(df_emp, left_on="empresa", right_on="CIF", suffixes=("", "_empresa"))
 df_prac = df_prac.merge(df_al, left_on="alumno", right_on="dni", suffixes=("", "_alumno"))
 
