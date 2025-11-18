@@ -3,8 +3,8 @@ import pandas as pd
 import json
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from modules.data_base import get, getEqual, getEquals
-from modules.utils import export_multiple_sheets
+from modules.data_base import get, getEqual, getEquals, getTodosEmpresaOfertas
+from modules.utils import df_to_excel
 from variables import (
     empresasTabla,
     alumnosTabla,
@@ -292,6 +292,42 @@ with tab1:
 
 st.divider()
 with tab2:
+    st.markdown("### 📥 Descargar datos")
+    col1 , col2 = st.columns([1, 5])
+
+    with col1:
+        
+        if st.button("⬇️ Descargar", use_container_width=True):
+
+            # 1) Traer datos desde Supabase
+            data_ofertas = getTodosEmpresaOfertas()
+            if not data_ofertas:
+                st.warning("No se encontraron ofertas para descargar.")
+            else:
+                df_ofertas = pd.DataFrame(data_ofertas)
+                column_order = [
+                "CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
+                "Email Empresa", "Nombre Responsable Legal", "NIF Responsable Legal",
+                "horario", "pagina_web", "nombre_rellena",
+
+                "ciclo_formativo", "alumnos_pedidos", "cupos_disponibles",
+                "areas_puestos",
+
+                "requisitos", "contrato", "vehiculo", "cupo_alumnos_totales_oferta",
+
+                "Nombre Tutor", "Email Tutor", "Telefono Tutor",
+            ]
+                df_ofertas = df_ofertas[column_order]
+                # 2) Exportar a Excel
+                excel_bytes = df_to_excel(df_ofertas)
+                st.download_button(
+                    label="📄 Descargar archivo Excel",
+                    data=excel_bytes,
+                    file_name="ofertas_fp.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
     c1, c2, c3 = st.columns(3)
 
     empresa_filter = c1.multiselect("Empresa", df_emp["nombre"].unique(), placeholder="Empresa",key="ofertaEmp")

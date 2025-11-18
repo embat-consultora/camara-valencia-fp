@@ -198,3 +198,56 @@ def getMatches():
     response = supabase.rpc("exec_sql", {"sql": query}).execute()
     return response.data
 
+
+def getTodosEmpresaOfertas():
+    query = """SELECT 
+    e."CIF",
+    e."nombre" as "Empresa",
+    e.telefono,
+    e."direccion",
+    e.localidad,
+    e.codigo_postal as "CP",
+    e.email_empresa as "Email Empresa",
+    e.responsable_legal as "Nombre Responsable Legal",
+    e.nif_responsable_legal as "NIF Responsable Legal",
+    e.horario,
+    e.pagina_web,
+    e.nombre_rellena,
+
+    cf.key AS ciclo_formativo,
+    (cf.value ->> 'alumnos')::int AS alumnos_pedidos,
+    (cf.value ->> 'disponibles')::int AS cupos_disponibles,
+
+    (
+        SELECT string_agg(
+            CONCAT(
+                pitem.value->>'area', 
+                ' — ',
+                pitem.value->>'proyecto'
+            ),
+            ' | '
+        )
+        FROM jsonb_each(o.puestos) AS px(key, value)
+        JOIN jsonb_array_elements(px.value) AS pitem(value) ON TRUE
+        WHERE px.key = cf.key
+    ) AS areas_puestos,
+
+    o.requisitos,
+    o.contrato,
+    o.vehiculo,
+    o.cupo_alumnos AS cupo_alumnos_totales_oferta,
+
+    t.nombre AS "Nombre Tutor",
+    t.email AS "Email Tutor",
+    t.telefono AS "Telefono Tutor"
+
+    FROM empresas e
+    JOIN oferta_fp o ON o.empresa = e."CIF"
+    LEFT JOIN tutores t ON t.id = o.tutor
+    LEFT JOIN LATERAL jsonb_each(o.ciclos_formativos) AS cf(key, value) ON TRUE
+
+    ORDER BY e.nombre, o.id, cf.key
+    """
+
+    response = supabase.rpc("exec_sql", {"sql": query}).execute()
+    return response.data
