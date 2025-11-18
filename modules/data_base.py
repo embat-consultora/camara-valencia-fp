@@ -7,17 +7,17 @@ load_dotenv()
 
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
-
+env = os.getenv("SUPABASE_ENV")
 supabase: Client = create_client(url, key)
-
+@st.cache_data(ttl=3600) 
 def get(tableName):
     response = supabase.table(tableName).select('*').execute()
     return response.data
-
+@st.cache_data(ttl=3600) 
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
-
+@st.cache_data(ttl=3600) 
 def getEquals(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*")
     if conditions:
@@ -28,7 +28,7 @@ def getEquals(tableName, conditions: dict, in_filters: dict = None):
             query = query.in_(key, values)
     response = query.execute()
     return response.data
-
+@st.cache_data(ttl=3600) 
 def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*, empresas(*),tutores(*)")
     if conditions:
@@ -39,7 +39,7 @@ def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
             query = query.in_(key, values)
     response = query.execute()
     return response.data
-
+@st.cache_data(ttl=3600) 
 def getPracticas(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*, empresas(*),alumnos(*), oferta_fp(*), practica_estados(*)")
     if conditions:
@@ -198,3 +198,56 @@ def getMatches():
     response = supabase.rpc("exec_sql", {"sql": query}).execute()
     return response.data
 
+
+def getTodosEmpresaOfertas():
+    query = """SELECT 
+    e."CIF",
+    e."nombre" as "Empresa",
+    e.telefono,
+    e."direccion",
+    e.localidad,
+    e.codigo_postal as "CP",
+    e.email_empresa as "Email Empresa",
+    e.responsable_legal as "Nombre Responsable Legal",
+    e.nif_responsable_legal as "NIF Responsable Legal",
+    e.horario,
+    e.pagina_web,
+    e.nombre_rellena,
+
+    cf.key AS ciclo_formativo,
+    (cf.value ->> 'alumnos')::int AS alumnos_pedidos,
+    (cf.value ->> 'disponibles')::int AS cupos_disponibles,
+
+    (
+        SELECT string_agg(
+            CONCAT(
+                pitem.value->>'area', 
+                ' — ',
+                pitem.value->>'proyecto'
+            ),
+            ' | '
+        )
+        FROM jsonb_each(o.puestos) AS px(key, value)
+        JOIN jsonb_array_elements(px.value) AS pitem(value) ON TRUE
+        WHERE px.key = cf.key
+    ) AS areas_puestos,
+
+    o.requisitos,
+    o.contrato,
+    o.vehiculo,
+    o.cupo_alumnos AS cupo_alumnos_totales_oferta,
+
+    t.nombre AS "Nombre Tutor",
+    t.email AS "Email Tutor",
+    t.telefono AS "Telefono Tutor"
+
+    FROM empresas e
+    JOIN oferta_fp o ON o.empresa = e."CIF"
+    LEFT JOIN tutores t ON t.id = o.tutor
+    LEFT JOIN LATERAL jsonb_each(o.ciclos_formativos) AS cf(key, value) ON TRUE
+
+    ORDER BY e.nombre, o.id, cf.key
+    """
+
+    response = supabase.rpc("exec_sql", {"sql": query}).execute()
+    return response.data

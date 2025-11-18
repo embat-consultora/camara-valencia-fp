@@ -1,25 +1,26 @@
 import streamlit as st
 from modules.data_base import getEqual
 from modules.session_manager import load_user, validate_get_user
-from variables import title, companyIcon, page_icon,usuariosTabla
+from variables import companyIcon, page_icon,usuariosTabla
+import os
 # Configuración inicial
 st.set_page_config(page_title="Inicio", page_icon=page_icon)
 col1, col2, col3 = st.columns(3)
 with col2:
     st.image(companyIcon, width=500)
 
-
+env = os.getenv("SUPABASE_ENV")
 st.session_state["current_page"] = "streamlit_app"
 
 # ✅ Si ya está logueado por cualquier medio, redirige
 if st.session_state.get("logged_in"):
-    st.switch_page("pages/empresas.py")
+    st.switch_page("pages/dashboard.py")
     st.stop()
 
 # ✅ Si viene del login con Google y no hay sesión cargada aún
 islogged =validate_get_user()
 if islogged:
-    st.switch_page("pages/empresas.py")
+    st.switch_page("pages/dashboard.py")
 # 💻 Login tradicional
 username = st.text_input("Usuario", placeholder="Ingrese email")
 password = st.text_input("Contraseña", type="password", placeholder="Ingrese contraseña")

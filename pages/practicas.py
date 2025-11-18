@@ -34,12 +34,40 @@ if not practicas:
 
 tutores = getEquals(tutoresTabla, {})
 
-# Estados posibles (si querés después lo traemos de base)
-estados_posibles = ["Pendiente", "En curso", "Finalizada", "Cancelada"]
-
 # Helper para filtrar tutores por empresa
 def tutores_por_empresa(empresa_id, lista_tutores):
     return [t for t in lista_tutores if t.get("cif_empresa") == empresa_id]
+
+st.subheader("🔎 Filtrar prácticas")
+
+# Estados definidos
+
+filtro_estado = st.selectbox("Filtrar por estado",  ["Todos"] + fasesPractica, index=0)
+
+# Armar diccionario práctica_id → estado
+estado_por_practica = {}
+
+for p in practicas:
+    pid = p["id"]
+    estadosPractica = getEqual(practicaEstadosTabla, "practicaId", pid)
+
+    if not estadosPractica:
+        estado_por_practica[pid] = "Pendiente"
+    else:
+        registro = estadosPractica[0]
+        
+        # Buscar fase activada más reciente
+        estado_actual = "Pendiente"
+        for fase in fasesPractica:
+            col = faseColPractica[fase]
+            if registro.get(col):
+                estado_actual = fase
+
+        estado_por_practica[pid] = estado_actual
+
+# Aplicar filtro
+if filtro_estado != "Todos":
+    practicas = [p for p in practicas if estado_por_practica[p["id"]] == filtro_estado]
 
 # --- Render de prácticas ---
 for p in practicas:
