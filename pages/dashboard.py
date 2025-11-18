@@ -296,7 +296,6 @@ with tab2:
     col1 , col2 = st.columns([1, 5])
 
     with col1:
-        
         if st.button("⬇️ Descargar", use_container_width=True):
 
             # 1) Traer datos desde Supabase
