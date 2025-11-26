@@ -60,7 +60,11 @@ with tab1:
     if search:
         df_empresas = df_empresas[df_empresas["nombre"].str.contains(search, case=False, na=False)]
 
+    df_empresas["created_at"] = pd.to_datetime(df_empresas["created_at"], errors="coerce")
+    df_empresas = df_empresas.sort_values("created_at", ascending=False)
+    df_empresas["created_at_fmt"] = df_empresas["created_at"].dt.strftime("%d/%m/%Y")
     cols_map = {
+        "created_at_fmt":"Creada",
         "CIF": "CIF",
         "nombre": "Nombre",
         "direccion": "Dirección",
@@ -69,7 +73,22 @@ with tab1:
         "email_empresa": "Email"
     }
     df_view = df_empresas[list(cols_map.keys())].rename(columns=cols_map)
-    st.dataframe(df_view, hide_index=True, use_container_width=True)
+
+    # --- HIGHLIGHT A LA FILA MÁS RECIENTE ---
+    ultima_fecha = df_empresas["created_at"].max().date()
+
+    def highlight_last_row(row):
+        if pd.to_datetime(row["Creada"]).date() == ultima_fecha:
+            return ["background-color: #fff3b0"] * len(row)  # amarillo suave
+        return [""] * len(row)
+
+    df_styled = df_view.style.apply(highlight_last_row, axis=1)
+
+    st.dataframe(
+        df_styled,
+        hide_index=True,
+        use_container_width=True
+    )
 
     if not df_empresas.empty:
         empresa_options = {row["nombre"]: row["id"] for _, row in df_empresas.iterrows()}
