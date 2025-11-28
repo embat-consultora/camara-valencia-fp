@@ -30,7 +30,7 @@ if not empresas:
     st.stop()
 
 df_empresas = pd.DataFrame(empresas)
-
+df_empresas = df_empresas[df_empresas["CIF"] != "00000000"]
 # --- Tabs principales ---
 tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨 Formularios & Contacto"])
 
