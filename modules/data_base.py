@@ -9,15 +9,13 @@ url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 env = os.getenv("SUPABASE_ENV")
 supabase: Client = create_client(url, key)
-@st.cache_data(ttl=3600) 
 def get(tableName):
     response = supabase.table(tableName).select('*').execute()
     return response.data
-@st.cache_data(ttl=3600) 
+
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
-@st.cache_data(ttl=3600) 
 def getEquals(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*")
     if conditions:
@@ -28,7 +26,6 @@ def getEquals(tableName, conditions: dict, in_filters: dict = None):
             query = query.in_(key, values)
     response = query.execute()
     return response.data
-@st.cache_data(ttl=3600) 
 def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*, empresas(*),tutores(*)")
     if conditions:
@@ -39,7 +36,6 @@ def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
             query = query.in_(key, values)
     response = query.execute()
     return response.data
-@st.cache_data(ttl=3600) 
 def getPracticas(tableName, conditions: dict, in_filters: dict = None):
     query = supabase.table(tableName).select("*, empresas(*),alumnos(*), oferta_fp(*), practica_estados(*)")
     if conditions:
