@@ -28,18 +28,31 @@ def fetch_alumnos_empresas():
     return alumnos, empresas
 
 # ----------------------------------------------
+# INICIALIZAR SESSION_STATE (evita KeyError)
+# ----------------------------------------------
+if "alumnos" not in st.session_state:
+    st.session_state["alumnos"] = []
+
+if "empresas" not in st.session_state:
+    st.session_state["empresas"] = []
+
+if "data_loaded" not in st.session_state:
+    st.session_state["data_loaded"] = False
+
+if "force_reload" not in st.session_state:
+    st.session_state["force_reload"] = False
+# ----------------------------------------------
 # BOTÓN DE REFRESCAR (arriba a la derecha)
 # ----------------------------------------------
 col_refresh = st.columns([1, 0.15])
 with col_refresh[1]:
     if st.button("🔄 Actualizar", key="btn_refresh"):
         st.session_state["force_reload"] = True
-
 # ----------------------------------------------
 # CARGA CENTRAL DESDE BD → session_state
 # ----------------------------------------------
-def load_data(force=False):
-    if force or "data_loaded" not in st.session_state or st.session_state.get("force_reload"):
+def load_data():
+    if st.session_state["data_loaded"] or not st.session_state["force_reload"]:
         with st.spinner("Cargando datos desde la base..."):
 
             alumnos, empresas = fetch_alumnos_empresas()

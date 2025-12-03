@@ -121,40 +121,6 @@ with tab1:
                 st.success("Empresa actualizada correctamente")
                 st.rerun()
 
-        estadosEmpresa = getEqual(empresaEstadosTabla, "empresa", empresa["CIF"])
-        st.subheader(f"Seguimiento - {empresa['nombre']}")
-
-        if not estadosEmpresa:
-            mostrar_fases(fasesEmpresa, fase2colEmpresa, None)
-            estado_actual = {}
-        else:
-            mostrar_fases(fasesEmpresa, fase2colEmpresa, estadosEmpresa[0])
-            estado_actual = estadosEmpresa[0]
-
-        # --- Checkboxes dinámicos para cada fase ---
-        cols = st.columns(len(fasesEmpresa))
-
-        for i, fase in enumerate(fasesEmpresa):
-            col = fase2colEmpresa[fase]
-            valor_actual = True if estado_actual.get(col) else False
-
-            with cols[i]:
-                checked = st.checkbox(fase, value=valor_actual, key=f"{empresa['CIF']}_{col}")
-
-            if checked != valor_actual:  # solo si cambió
-                if checked:
-                    new_value = datetime.now().isoformat()
-                else:
-                    new_value = None
-
-                upsert(
-                    empresaEstadosTabla,
-                    {"empresa": empresa["CIF"], col: new_value},
-                    keys=["empresa"]
-                )
-                st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
-                st.rerun()
-        
         # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
         st.subheader(f"Oferta FP - {empresa['nombre']}")

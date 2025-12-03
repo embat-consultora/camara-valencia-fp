@@ -6,7 +6,7 @@ from pathlib import Path
 from modules.data_base import get, update, upsert, getEquals,getEqual
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla,max_file_size,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
+from variables import alumnosTabla,max_file_size,tipoPracticas,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 from modules.emailSender import send_email
@@ -135,7 +135,12 @@ with tab1:
                 new_nia = st.text_input("NIA", alumno.get("NIA", ""))
                 new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
                 new_email = st.text_input("Email", alumno.get("email_alumno", ""))
-
+                tipo_opts = tipoPracticas
+                new_tipo_practica = st.selectbox(
+                    "Tipo de Práctica",
+                    options=tipo_opts,
+                    index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
+                )
                 if st.button("💾 Actualizar alumno"):
                     update(
                         alumnosTabla,
@@ -148,7 +153,8 @@ with tab1:
                             "dni": new_dni,
                             "NIA": new_nia,
                             "telefono": new_telefono,
-                            "email_alumno": new_email
+                            "email_alumno": new_email,
+                            "tipoPractica": new_tipo_practica
                         },
                         "id",
                         alumno_id
@@ -292,39 +298,151 @@ with tab1:
 # TAB 2: Nuevo Alumno
 # -------------------------------------------------------------------
 with tab2:
-    st.subheader("➕ Nuevo Alumno")
-
-    with st.form("form_nuevo_alumno"):
-        new_nombre = st.text_input("Nombre")
-        new_apellido = st.text_input("Apellido")
-        new_direccion = st.text_input("Dirección")
-        new_codigoPostal = st.text_input("CP")
-        new_localidad = st.text_input("Localidad")
-        new_dni = st.text_input("dni")
-        new_nia = st.text_input("NIA")
-        new_telefono = st.text_input("Teléfono")
-        new_email = st.text_input("Email")
-
-
-        submitted = st.form_submit_button("Crear Alumno")
-        if submitted:
-            upsert(
-                alumnosTabla,
-                {
-                    "nombre": new_nombre,
-                    "apellido": new_apellido,
-                    "direccion": new_direccion,
-                    "localidad": new_localidad,
-                    "dni": new_dni,
-                    "NIA": new_nia,
-                    "codigo_postal": new_codigoPostal,
-                    "telefono": new_telefono,
-                    "email_alumno": new_email,
-                    "estado": "Activo"
-                }, keys=["dni"]
+    tabNuevo, tabBulk = st.tabs(["Nuevo Alumno", "Carga Masiva (.csv)"])
+    with tabNuevo:
+        st.write("➕ Nuevo Alumno")
+        
+        with st.form("form_nuevo_alumno"):
+            new_nombre = st.text_input("Nombre")
+            new_apellido = st.text_input("Apellido")
+            new_direccion = st.text_input("Dirección")
+            new_codigoPostal = st.text_input("CP")
+            new_localidad = st.text_input("Localidad")
+            new_dni = st.text_input("dni")
+            new_nia = st.text_input("NIA")
+            new_telefono = st.text_input("Teléfono")
+            new_email = st.text_input("Email")
+            tipo_opts = tipoPracticas
+            new_tipo_practica = st.selectbox(
+                "Tipo de Práctica",
+                options=tipo_opts,
+                index=0
             )
-            st.success("Nuevo alumno agregado correctamente")
-            st.rerun()
+
+            submitted = st.form_submit_button("Crear Alumno")
+            if submitted:
+                upsert(
+                    alumnosTabla,
+                    {
+                        "nombre": new_nombre,
+                        "apellido": new_apellido,
+                        "direccion": new_direccion,
+                        "localidad": new_localidad,
+                        "dni": new_dni,
+                        "NIA": new_nia,
+                        "codigo_postal": new_codigoPostal,
+                        "telefono": new_telefono,
+                        "email_alumno": new_email,
+                        "estado": "Activo",
+                        "tipoPractica": new_tipo_practica
+                    }, keys=["dni"]
+                )
+                st.success("Nuevo alumno agregado correctamente")
+                st.rerun()
+    with tabBulk:
+        st.write("📥 Cargar alumnos desde CSV")
+
+        # 1. Excel de muestra
+        sample_df = pd.DataFrame({
+            "nombre": [""],
+            "apellido": [""],
+            "direccion": [""],
+            "codigo_postal": [""],
+            "localidad": [""],
+            "dni": [""],  # obligatorio
+            "NIA": [""],
+            "telefono": [""],
+            "email_alumno": [""],
+            "tipoPractica": ["Práctica Autogestionada | Práctica Asignada por el Centro"]
+        })
+
+        sample_csv_path = Path("/tmp") / "alumnos_muestra.csv"
+        sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
+
+        with open(sample_csv_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar CSV de ejemplo",
+                data=f,
+                file_name="alumnos_muestra.csv",
+                mime="text/csv"
+            )
+
+        st.info("Sube un archivo CSV. Solo el DNI es obligatorio. El resto de las columnas son opcionales. Intenta que ninguna fila quede vacia")
+
+        # 2. File uploader
+        uploaded_csv = st.file_uploader(
+            "Subir archivo CSV (.csv)",
+            type=["csv"],
+            key="upload_csv_alumnos"
+        )
+
+        if uploaded_csv:
+            try:
+                # Leer TODO como string siempre → adiós floats y NaNs
+                df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
+
+                st.write("📄 **Vista previa del archivo cargado:**")
+                st.dataframe(df_csv.head(), use_container_width=True)
+
+                # Validar presencia de columna DNI
+                if "dni" not in df_csv.columns:
+                    st.error("❌ El archivo debe incluir la columna 'dni'.")
+                    st.stop()
+
+                if st.button("🚀 Crear alumnos desde CSV"):
+                    creados = 0
+                    errores = []
+
+                    # Iterar filas
+                    for _, row in df_csv.iterrows():
+
+                        # 1️⃣ Saltar fila completamente vacía
+                        if not any(str(v).strip() for v in row.values):
+                            continue
+
+                        # 2️⃣ Normalizar DNI
+                        dni_raw = row.get("dni", "").strip()
+                        dni = re.sub(r"\.0+$", "", dni_raw)  # eliminar .0 si CSV viene de Excel
+                        dni = dni.strip()
+
+                        if not dni:
+                            errores.append("Fila sin DNI — omitida.")
+                            continue
+
+                        # 3️⃣ Construir payload limpio
+                        data = {
+                            "dni": dni,
+                            "nombre": row.get("nombre", "").strip(),
+                            "apellido": row.get("apellido", "").strip(),
+                            "direccion": row.get("direccion", "").strip(),
+                            "codigo_postal": row.get("codigo_postal", "").strip(),
+                            "localidad": row.get("localidad", "").strip(),
+                            "NIA": row.get("NIA", "").strip(),
+                            "telefono": row.get("telefono", "").strip(),
+                            "email_alumno": row.get("email_alumno", "").strip(),
+                            "estado": "Activo",
+                            "tipoPractica": row.get("tipoPractica", "").strip(),
+                        }
+
+                        # 4️⃣ Insert/update
+                        try:
+                            upsert(alumnosTabla, data, keys=["dni"])
+                            creados += 1
+                        except Exception as e:
+                            errores.append(f"DNI {dni}: {e}")
+
+                    # Resultado del proceso
+                    st.success(f"🎉 {creados} alumnos creados o actualizados correctamente.")
+
+                    if errores:
+                        st.warning("⚠️ Errores encontrados:")
+                        for err in errores:
+                            st.write("- " + err)
+
+                    st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error leyendo el CSV: {e}")
 
 # -------------------------------------------------------------------
 # TAB 3: Formulario Alumno

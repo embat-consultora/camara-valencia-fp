@@ -28,6 +28,17 @@ st.set_page_config(page_title="Prácticas", page_icon="🚀")
 now = datetime.now().isoformat()
 
 # ----------------------------------------------
+# INICIALIZAR SESSION_STATE (evita KeyError)
+# ----------------------------------------------
+if "practicas" not in st.session_state:
+    st.session_state["practicas"] = []
+
+if "tutores" not in st.session_state:
+    st.session_state["tutores"] = []
+
+if "estados" not in st.session_state:
+    st.session_state["estados"] = []
+# ----------------------------------------------
 # FETCH FUNCTIONS
 # ----------------------------------------------
 def fetch_practicas_tutores():
@@ -54,7 +65,6 @@ def load_data(force=False):
 
         estados = getEquals(practicaEstadosTabla, {})
         estados_map = {e["practicaId"]: e for e in estados}
-
         st.session_state["practicas"] = practicas
         st.session_state["tutores"] = tutores
         st.session_state["estados"] = estados_map
@@ -265,6 +275,9 @@ def mostrar_detalle():
                             f.write(file.getbuffer())
                         upload_to_drive(str(temp), carpetaPractica, folder_name, file.name)
                         st.success(f"Subido: {file.name}")
+
+
+
 
     # ------------------------------------------
     # VOLVER SIN EXPERIMENTAL
