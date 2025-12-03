@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-from modules.data_base import getMatches, upsert, add, getOfertaEmpresas,getEquals
+from modules.data_base import getMatches, upsert, add, getOfertaEmpresas,getEquals,crearPractica
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import alumnosTabla, tutoresTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados,practicaEstadosTabla
@@ -9,47 +9,6 @@ from datetime import datetime
 from modules.text_helper import st_custom_message
 import os
 now = datetime.now().isoformat()
-def matchAlumno(empresaCif, alumnoDni, ofertaId, ciclo,ciclos_info,cupos_disp, proyecto, area):
-    practica = add(
-        practicaTabla,
-        {
-            "empresa": empresaCif,
-            "alumno": alumnoDni,
-            "oferta": ofertaId,
-            "ciclo_formativo": ciclo,
-            "area": area,
-            "proyecto": proyecto,
-        },
-    )
-    add(
-        practicaEstadosTabla,
-        {
-            "practicaId": practica.data[0]["id"],
-        },
-    )
-
-    upsert(
-        alumnosTabla,
-        {"dni": alumnoDni, "estado": estadosAlumno[1]},
-        keys=["dni"],
-    )
-
-    upsert(
-        alumnoEstadosTabla,
-        {"alumno": alumnoDni, 'match_fp': now, 'fp_asignada': now},
-        keys=["alumno"]
-    )
-
-    ciclos_info[ciclo]["disponibles"] = max(cupos_disp - 1, 0)
-    upsert(
-        necesidadFP,
-        {
-            "id": oferta_id,
-            "empresa": empresaCif,
-            "ciclos_formativos": ciclos_info,
-        },
-        keys=["id"],
-    )
 
 def checkEstadoOferta(ofertaId):
     oferta = getOfertaEmpresas(necesidadFP, {"id": ofertaId})
@@ -108,7 +67,7 @@ empresa_opciones = ["Todas"] + [f"{nombre} ({cif})" for cif, nombre in empresas_
 col1,col2 = st.columns([2,3])
 with col1:
     empresa_seleccionada = st.selectbox("🏢 Filtrar por Empresa", options=empresa_opciones)
-
+    
 # Filtrar ofertas según selección
 if empresa_seleccionada != "Todas":
     cif_seleccionado = empresa_seleccionada.split("(")[-1].replace(")", "")
@@ -226,8 +185,8 @@ for oferta_data in ofertas:
                                     if cupos_disp > 0:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
-                                                matchAlumno(empresa.get("CIF"), row['alumno_dni'], row["oferta_id"], ciclo,ciclos_info,cupos_disp,proyecto, area)
-                                                st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                                #st.rerun()
+                                                crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"])
+                                                st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
                                             except Exception as e:
                                                 st.error(f"❌ Error al crear el match: {e}")

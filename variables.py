@@ -97,3 +97,8 @@ opciones_motivo = [
         "El alumno/a ha decidido no continuar con el proceso",
         "Otros"
     ]
+
+tipoPracticas= [
+                    "Práctica Autogestionada",
+                    "Práctica Asignada por el Centro"
+                ]

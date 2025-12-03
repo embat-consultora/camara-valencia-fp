@@ -247,3 +247,50 @@ def getTodosEmpresaOfertas():
 
     response = supabase.rpc("exec_sql", {"sql": query}).execute()
     return response.data
+
+from variables import (
+    practicaTabla,
+    practicaEstadosTabla,
+    alumnosTabla,
+    alumnoEstadosTabla,
+    estadosAlumno,
+    necesidadFP
+)
+def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
+    practica = add(
+        practicaTabla,
+        {
+            "empresa": empresaCif,
+            "alumno": alumnoDni,
+            "ciclo_formativo": ciclo,
+            "area": area,
+            "proyecto": proyecto,
+        },
+    )
+    add(
+        practicaEstadosTabla,
+        {
+            "practicaId": practica.data[0]["id"],
+        },
+    )
+    upsert(
+        alumnoEstadosTabla,
+        {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
+        keys=["alumno"]
+    )
+    upsert(
+        alumnosTabla,
+        {"dni": alumnoDni, "estado": estadosAlumno[1]},
+        keys=["dni"],
+    )
+    if ciclos_info != None:
+      ciclos_info[ciclo]["disponibles"] = max(cupos_disp - 1, 0)
+      upsert(
+          necesidadFP,
+          {
+              "id": oferta_id,
+              "empresa": empresaCif,
+              "ciclos_formativos": ciclos_info,
+          },
+          keys=["id"],
+      )
