@@ -14,8 +14,7 @@ from variables import (
     tutoresTabla,
     fasesPractica,
     faseColPractica,
-    formFieldsTabla,
-    azul
+    formFieldsTabla
 )
 
 # CONFIG
