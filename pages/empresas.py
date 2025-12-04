@@ -41,14 +41,24 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 # obtener la carpeta temporal correcta (Windows, Linux o Mac)
 
 with tab1:
-    col1, col2, col3= st.columns([3, 2,2])
+    col1, col2, col3,col4= st.columns([3, 2,2,2])
     with col1:
         search = st.text_input("🔍 Buscar por nombre de empresa")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:
+        tipo = st.radio(
+            "Descarga por",
+            ["Fecha", "Alfabético"]
+        )
+    with col4:
         temp_dir = Path(tempfile.gettempdir())
         temp_path = temp_dir / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        if tipo == "Fecha":
+            df_empresas.sort_values(by="created_at", ascending=False, inplace=True)
+        else: 
+            df_empresas.sort_values(by="nombre", ascending=True, inplace=True)
         df_empresas.to_excel(temp_path, index=False)
         with open(temp_path, "rb") as f:
             st.download_button(

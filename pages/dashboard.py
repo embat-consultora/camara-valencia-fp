@@ -299,10 +299,14 @@ with tab1:
 
 st.divider()
 with tab2:
-    st.markdown("### 📥 Descargar datos")
-    col1 , col2 = st.columns([1, 5])
-
+    col1 , col2, col3 = st.columns([1,1, 5])
     with col1:
+        tipo = st.radio(
+            "Descarga por",
+            ["Fecha", "Alfabético"]
+        )
+
+    with col2: 
         if st.button("⬇️ Descargar", use_container_width=True):
 
             # 1) Traer datos desde Supabase
@@ -312,7 +316,7 @@ with tab2:
             else:
                 df_ofertas = pd.DataFrame(data_ofertas)
                 column_order = [
-                "CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
+                "Creada","CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
                 "Email Empresa", "Nombre Responsable Legal", "NIF Responsable Legal",
                 "horario", "pagina_web", "nombre_rellena",
 
@@ -325,6 +329,10 @@ with tab2:
             ]
                 df_ofertas = df_ofertas[column_order]
                 # 2) Exportar a Excel
+                if tipo == "Fecha":
+                    df_ofertas.sort_values(by="Creada", ascending=False, inplace=True)
+                else: 
+                    df_ofertas.sort_values(by="Empresa", ascending=True, inplace=True)
                 excel_bytes = df_to_excel(df_ofertas)
                 st.download_button(
                     label="📄 Descargar archivo Excel",

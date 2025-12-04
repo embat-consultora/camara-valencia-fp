@@ -198,6 +198,7 @@ def getMatches():
 def getTodosEmpresaOfertas():
     query = """SELECT 
     e."CIF",
+    e.created_at as "Creada",
     e."nombre" as "Empresa",
     e.telefono,
     e."direccion",
@@ -242,7 +243,7 @@ def getTodosEmpresaOfertas():
     LEFT JOIN tutores t ON t.id = o.tutor
     LEFT JOIN LATERAL jsonb_each(o.ciclos_formativos) AS cf(key, value) ON TRUE
 
-    ORDER BY e.nombre, o.id, cf.key
+    ORDER BY e.created_at desc, o.id, cf.key
     """
 
     response = supabase.rpc("exec_sql", {"sql": query}).execute()
