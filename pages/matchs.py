@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import json
-from modules.data_base import getMatches, upsert, add, getOfertaEmpresas,getEquals,crearPractica
+from modules.data_base import getMatches, upsert, getOfertaEmpresas,getEquals,crearPractica
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, tutoresTabla, necesidadFP, estadosAlumno, practicaTabla, alumnoEstadosTabla, verdeOk, estados,practicaEstadosTabla
+from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados
 from datetime import datetime
 from modules.text_helper import st_custom_message
 import os
