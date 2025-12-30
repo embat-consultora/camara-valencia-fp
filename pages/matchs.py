@@ -167,7 +167,7 @@ for oferta_data in ofertas:
 
                                 with col1:
                                     st.markdown(
-                                        f"👤 [**{row['alumno_nombre']} {row['alumno_apellido']}**]({base_url}?alumno={row['alumno_dni']})",
+                                        f"👤 **{row['alumno_nombre']} {row['alumno_apellido']}**",
                                         unsafe_allow_html=True
                                     )
 
@@ -221,7 +221,7 @@ for oferta_data in ofertas:
                             dni_alumno = alumnoSeleccionado.split("(")[-1].replace(")", "")
                             if st.button("Asignar Alumno", key=f"match_manual_{oferta_id}_{ciclo}_{dni_alumno}"):
                                 try:
-                                    matchAlumno(empresa.get("CIF"), dni_alumno, oferta_id, ciclo, ciclos_info, cupos_disp, proyecto, area)
+                                    crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id)
                                     checkEstadoOferta(oferta_id)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
                                     st.rerun()

@@ -53,7 +53,7 @@ col_refresh = st.columns([1, 0.15])
 with col_refresh[1]:
     if st.button("🔄 Actualizar", key="btn_refresh"):
         st.session_state["force_reload"] = True
-        st.stop()
+        st.rerun()
 
 # ----------------------------------------------
 # CARGA DE DATOS
@@ -130,7 +130,7 @@ def mostrar_lista():
         if st.button(label, key=f"btn_{p['id']}"):
             st.session_state.practica_seleccionada = p["id"]
             st.session_state.page = "detalle"
-            st.stop()
+            st.rerun()
 
 # ----------------------------------------------
 # PAGINA: DETALLE
@@ -150,7 +150,6 @@ def mostrar_detalle():
     oferta = p["oferta_fp"]
     empresa = p["empresas"]
     alumno = p["alumnos"]
-
     st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
 
     # ------------------------------------------
@@ -161,14 +160,18 @@ def mostrar_detalle():
         st.write(f"**Alumno:** {alumno['nombre']} {alumno['apellido']}")
         st.write(f"**DNI:** {alumno['dni']}")
         st.write(f"**Ciclo:** {p.get('ciclo_formativo', '—')}")
-        st.write(f"**Área:** {p.get('area', '—')}")
-        st.write(f"**Proyecto:** {p.get('proyecto', '—')}")
+        area = oferta.get("area") or "No especificado"
+        st.write(f"**Área:** {area}")     
+        proyecto = oferta.get("proyecto") or "No especificado"
+        st.write(f"**Proyecto:** {proyecto}")      
 
     with col2:
         st.write(f"**Empresa:** {empresa['nombre']}")
         st.write(f"**CIF:** {empresa['CIF']}")
-        st.write(f"**Dirección práctica:** {oferta.get('direccion_empresa','')}")
-        st.write(f"**Localidad:** {oferta.get('localidad_empresa','')}")
+        direccion = oferta.get("direccion_empresa") or "No especificado"
+        st.write(f"**Dirección práctica:** {direccion}")
+        localidad = oferta.get("localidad_empresa") or "No especificado"
+        st.write(f"**Localidad:** {localidad}")
 
     # ------------------------------------------
     # TUTOR (idéntico)
@@ -176,6 +179,7 @@ def mostrar_detalle():
     st.write("👨‍🏫 Tutor asignado")
 
     tutor_actual = None
+
     if oferta.get("tutor"):
         tutor_actual = next((t for t in tutores if t["id"] == oferta.get("tutor")), None)
 
@@ -240,43 +244,47 @@ def mostrar_detalle():
     # FILE UPLOADER (idéntico)
     # ------------------------------------------
     st.divider()
-    st.subheader("📎 Adjuntar documentos")
+    doctab, feedbacktab = st.tabs(["Documentos", "Feedback"])
+    with doctab:
+        st.subheader("📎 Adjuntar documentos")
 
-    folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
-    files, folderId = list_drive_files(folder_name)
+        folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
+        files, folderId = list_drive_files(folder_name)
 
-    if folderId:
-        st.link_button("Abrir carpeta en Drive", f"https://drive.google.com/drive/folders/{folderId}")
+        if folderId:
+            st.link_button("Abrir carpeta en Drive", f"https://drive.google.com/drive/folders/{folderId}")
 
-    if files:
-        for f in files:
-            fecha = f.get("modifiedTime", "")[:10]
-            st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
-    else:
-        st.warning("No hay archivos.")
-
-    uploaded_files = st.file_uploader(
-        "Subir archivos",
-        type=["pdf", "doc", "docx", "odt"],
-        accept_multiple_files=True,
-        key=f"up_{practicaId}"
-    )
-
-    if uploaded_files:
-        too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
-        if too_big:
-            st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+        if files:
+            for f in files:
+                fecha = f.get("modifiedTime", "")[:10]
+                st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
         else:
-            if st.button("Subir Archivos", key=f"subir_{practicaId}"):
-                with st.spinner("Subiendo archivos..."):
-                    for file in uploaded_files:
-                        temp = Path("/tmp") / f"{uuid.uuid4()}_{file.name}"
-                        with open(temp, "wb") as f:
-                            f.write(file.getbuffer())
-                        upload_to_drive(str(temp), carpetaPractica, folder_name, file.name)
-                        st.success(f"Subido: {file.name}")
+            st.warning("No hay archivos.")
+
+        uploaded_files = st.file_uploader(
+            "Subir archivos",
+            type=["pdf", "doc", "docx", "odt"],
+            accept_multiple_files=True,
+            key=f"up_{practicaId}"
+        )
+
+        if uploaded_files:
+            too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+            if too_big:
+                st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+            else:
+                if st.button("Subir Archivos", key=f"subir_{practicaId}"):
+                    with st.spinner("Subiendo archivos..."):
+                        for file in uploaded_files:
+                            temp = Path("/tmp") / f"{uuid.uuid4()}_{file.name}"
+                            with open(temp, "wb") as f:
+                                f.write(file.getbuffer())
+                            upload_to_drive(str(temp), carpetaPractica, folder_name, file.name)
+                            st.success(f"Subido: {file.name}")
 
 
+
+    # with feedbacktab:
 
 
     # ------------------------------------------
@@ -284,7 +292,7 @@ def mostrar_detalle():
     # ------------------------------------------
     if st.button("⬅️ Volver"):
         st.session_state.page = "lista"
-        st.stop()
+        st.rerun()
 
 # ----------------------------------------------
 # RENDER SEGÚN PÁGINA

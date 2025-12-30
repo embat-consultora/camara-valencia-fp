@@ -20,7 +20,7 @@ faseColPractica = {
     "Documentación Pedida": "documentacion_pedida",
     "Documentación Firmada": "documentacion_firmada",
     "Pasantía en progreso": "en_progreso",
-    "Finalizada": "fp_finalizada",
+    "Finalizada": "finalizada",
     "Cancelada": "cancelada"
 }
 fase2colEmpresa = {
@@ -53,7 +53,8 @@ contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
 practicaEstadosTabla="practica_estados"
 tutoresTabla="tutores"
-
+feedbackFormsTabla="feedback_forms"
+feedbackResponseTabla="feedback_respuestas"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive

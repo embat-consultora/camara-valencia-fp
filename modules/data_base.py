@@ -1,8 +1,9 @@
 import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from datetime import timedelta
 import os
-
+import uuid
 load_dotenv()
 
 url = os.getenv("SUPABASE_URL")
@@ -255,7 +256,9 @@ from variables import (
     alumnosTabla,
     alumnoEstadosTabla,
     estadosAlumno,
-    necesidadFP
+    necesidadFP,
+    feedbackFormsTabla,
+    feedbackResponseTabla
 )
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
     practica = add(
@@ -266,12 +269,14 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
             "ciclo_formativo": ciclo,
             "area": area,
             "proyecto": proyecto,
+            "oferta":oferta_id
         },
     )
+    practicaId=practica.data[0]["id"]
     add(
         practicaEstadosTabla,
         {
-            "practicaId": practica.data[0]["id"],
+            "practicaId": practicaId,
         },
     )
     upsert(
@@ -284,6 +289,19 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
         {"dni": alumnoDni, "estado": estadosAlumno[1]},
         keys=["dni"],
     )
+
+    for tipo in ["feedback_inicial", "feedback_adaptacion", "feedback_final"]:
+        token = uuid.uuid4().hex
+        add(
+            feedbackFormsTabla,
+            {
+                "practica_id": practicaId,
+                "tipo_form": tipo,
+                "token": token,
+                "estado": "pendiente",
+            }
+        )
+        
     if ciclos_info != None:
       ciclos_info[ciclo]["disponibles"] = max(cupos_disp - 1, 0)
       upsert(
