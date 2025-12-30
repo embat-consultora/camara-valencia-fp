@@ -45,8 +45,14 @@ with tab1:
     with col2:
         st.metric("Total alumnos", len(df_alumnos))
     with col3:
-        temp_path = Path("/tmp") / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        import tempfile
+        from pathlib import Path
+
+        # Esto funcionará en Windows, Linux y Mac automáticamente
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = temp_dir / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         df_alumnos.to_excel(temp_path, index=False)
+        
         with open(temp_path, "rb") as f:
             st.download_button(
                 label="⬇️ Descargar alumnos (.xlsx)",
@@ -355,8 +361,7 @@ with tab2:
             "email_alumno": [""],
             "tipoPractica": ["Práctica Autogestionada | Práctica Asignada por el Centro"]
         })
-
-        sample_csv_path = Path("/tmp") / "alumnos_muestra.csv"
+        sample_csv_path = Path(tempfile.gettempdir()) / "alumnos_muestra.csv"
         sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
 
         with open(sample_csv_path, "rb") as f:
