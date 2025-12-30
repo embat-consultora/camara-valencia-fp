@@ -34,6 +34,7 @@ def make_sidebar():
                 st.page_link("pages/autogestionada.py", label="P. Autogestionada")
                 st.page_link("pages/empresas.py", label="Empresas")
                 st.page_link("pages/alumnos.py", label="Alumnos")
+                st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
                 st.write("")
                 st.write("")
 
