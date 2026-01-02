@@ -520,7 +520,7 @@ with tab2:
                             with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
                                 if lista_puestos:
                                     for p in lista_puestos:
-                                        st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto'] if p['proyecto'] else "No mencionado" }")
+                                        st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto'] if p['proyecto'] else 'No mencionado' }")
                                 else:
                                     st.markdown("_Sin áreas o proyectos registrados_")
 
