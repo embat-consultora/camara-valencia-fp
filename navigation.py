@@ -30,7 +30,8 @@ def make_sidebar():
             if st.session_state.get("logged_in", False):
                 st.page_link("pages/dashboard.py", label="Panel de Control")
                 st.page_link("pages/matchs.py", label="Matchs")
-                st.page_link("pages/practicas.py", label="Prácticas")
+                st.page_link("pages/practicas.py", label="Lista Prácticas")
+                st.page_link("pages/autogestionada.py", label="P. Autogestionada")
                 st.page_link("pages/empresas.py", label="Empresas")
                 st.page_link("pages/alumnos.py", label="Alumnos")
                 st.write("")

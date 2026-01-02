@@ -30,7 +30,7 @@ if not empresas:
     st.stop()
 
 df_empresas = pd.DataFrame(empresas)
-
+df_empresas = df_empresas[df_empresas["CIF"] != "00000000"]
 # --- Tabs principales ---
 tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨 Formularios & Contacto"])
 
@@ -41,14 +41,24 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 # obtener la carpeta temporal correcta (Windows, Linux o Mac)
 
 with tab1:
-    col1, col2, col3= st.columns([3, 2,2])
+    col1, col2, col3,col4= st.columns([3, 2,2,2])
     with col1:
         search = st.text_input("🔍 Buscar por nombre de empresa")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:
+        tipo = st.radio(
+            "Descarga por",
+            ["Fecha", "Alfabético"]
+        )
+    with col4:
         temp_dir = Path(tempfile.gettempdir())
         temp_path = temp_dir / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        if tipo == "Fecha":
+            df_empresas.sort_values(by="created_at", ascending=False, inplace=True)
+        else: 
+            df_empresas.sort_values(by="nombre", ascending=True, inplace=True)
         df_empresas.to_excel(temp_path, index=False)
         with open(temp_path, "rb") as f:
             st.download_button(
@@ -60,7 +70,11 @@ with tab1:
     if search:
         df_empresas = df_empresas[df_empresas["nombre"].str.contains(search, case=False, na=False)]
 
+    df_empresas["created_at"] = pd.to_datetime(df_empresas["created_at"], errors="coerce")
+    df_empresas = df_empresas.sort_values("created_at", ascending=False)
+    df_empresas["created_at_fmt"] = df_empresas["created_at"].dt.strftime("%d/%m/%Y")
     cols_map = {
+        "created_at_fmt":"Creada",
         "CIF": "CIF",
         "nombre": "Nombre",
         "direccion": "Dirección",
@@ -69,7 +83,22 @@ with tab1:
         "email_empresa": "Email"
     }
     df_view = df_empresas[list(cols_map.keys())].rename(columns=cols_map)
-    st.dataframe(df_view, hide_index=True, use_container_width=True)
+
+    # --- HIGHLIGHT A LA FILA MÁS RECIENTE ---
+    ultima_fecha = df_empresas["created_at"].max().date()
+
+    def highlight_last_row(row):
+        if pd.to_datetime(row["Creada"]).date() == ultima_fecha:
+            return ["background-color: #fff3b0"] * len(row)  # amarillo suave
+        return [""] * len(row)
+
+    df_styled = df_view.style.apply(highlight_last_row, axis=1)
+
+    st.dataframe(
+        df_styled,
+        hide_index=True,
+        use_container_width=True
+    )
 
     if not df_empresas.empty:
         empresa_options = {row["nombre"]: row["id"] for _, row in df_empresas.iterrows()}
@@ -95,47 +124,14 @@ with tab1:
                         "CIF": new_cif,
                         "telefono": new_telefono,
                         "email_empresa": new_email
-                    },
-                    "id",
-                    empresa_id
+                    },{
+                    "id":empresa_id
+                    }
+
                 )
                 st.success("Empresa actualizada correctamente")
                 st.rerun()
 
-        estadosEmpresa = getEqual(empresaEstadosTabla, "empresa", empresa["CIF"])
-        st.subheader(f"Seguimiento - {empresa['nombre']}")
-
-        if not estadosEmpresa:
-            mostrar_fases(fasesEmpresa, fase2colEmpresa, None)
-            estado_actual = {}
-        else:
-            mostrar_fases(fasesEmpresa, fase2colEmpresa, estadosEmpresa[0])
-            estado_actual = estadosEmpresa[0]
-
-        # --- Checkboxes dinámicos para cada fase ---
-        cols = st.columns(len(fasesEmpresa))
-
-        for i, fase in enumerate(fasesEmpresa):
-            col = fase2colEmpresa[fase]
-            valor_actual = True if estado_actual.get(col) else False
-
-            with cols[i]:
-                checked = st.checkbox(fase, value=valor_actual, key=f"{empresa['CIF']}_{col}")
-
-            if checked != valor_actual:  # solo si cambió
-                if checked:
-                    new_value = datetime.now().isoformat()
-                else:
-                    new_value = None
-
-                upsert(
-                    empresaEstadosTabla,
-                    {"empresa": empresa["CIF"], col: new_value},
-                    keys=["empresa"]
-                )
-                st.success(f"Estado actualizado: {fase} → {new_value if new_value else '❌'}")
-                st.rerun()
-        
         # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
         st.subheader(f"Oferta FP - {empresa['nombre']}")

@@ -5,7 +5,7 @@ import json, uuid
 from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades
 
 # ---------------------------------
 # Config
@@ -52,7 +52,8 @@ with col1:
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
     direccion = input_requerido("Dirección *", key="direccion_alumno")
-    localidad = input_requerido("Localidad *", key="localidad_alumno")
+    localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
+    sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
@@ -129,6 +130,7 @@ if submit:
                 "nombre": nombre.strip(),
                 "apellido": apellidos.strip(),
                 "email_alumno": email.strip().lower(),
+                "sexo": sexo,
                 "dni": dni.strip().upper(),
                 "direccion": direccion.strip(),
                 "codigo_postal": cp.strip(),

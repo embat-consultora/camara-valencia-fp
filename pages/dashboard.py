@@ -14,8 +14,7 @@ from variables import (
     tutoresTabla,
     fasesPractica,
     faseColPractica,
-    formFieldsTabla,
-    azul
+    formFieldsTabla
 )
 
 # CONFIG
@@ -34,6 +33,9 @@ st.markdown(
 # -------------------------------------------------------------------
 
 df_emp = pd.DataFrame(get(empresasTabla))
+if "created_at" in df_emp.columns:
+    df_emp["created_at"] = pd.to_datetime(df_emp["created_at"], errors="coerce")
+    df_emp = df_emp.sort_values("created_at", ascending=False)
 df_al = pd.DataFrame(get(alumnosTabla))
 df_prac = pd.DataFrame(get(practicaTabla))
 df_ofe = pd.DataFrame(get(necesidadFP))
@@ -43,6 +45,7 @@ df_tut = pd.DataFrame(get(tutoresTabla))
 # LOAD ALL CICLOS DESDE formFieldsTabla
 # -------------------------------------------------------------------
 
+
 form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
 ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
 ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
@@ -50,28 +53,33 @@ ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
 # -------------------------------------------------------------------
 # 2. CALCULAR ESTADO PRÁCTICA
 # -------------------------------------------------------------------
+if df_prac.empty:
+    df_prac["estado_actual"] = None
+    df_prac["empresa"] = None
+    df_prac["alumno"] = None
+    df_prac["ciclo_formativo"] = None
+else:
+    estado_por_practica = {}
 
-estado_por_practica = {}
+    for _, p in df_prac.iterrows():
+        pid = p["id"]
+        estados = getEqual(practicaEstadosTabla, "practicaId", pid)
 
-for _, p in df_prac.iterrows():
-    pid = p["id"]
-    estados = getEqual(practicaEstadosTabla, "practicaId", pid)
+        if not estados:
+            estado_actual = fasesPractica[0]
+        else:
+            registro = estados[0]
+            estado_actual = fasesPractica[0]
+            for fase in fasesPractica:
+                col = faseColPractica[fase]
+                if registro.get(col):
+                    estado_actual = fase
 
-    if not estados:
-        estado_actual = fasesPractica[0]
-    else:
-        registro = estados[0]
-        estado_actual = fasesPractica[0]
-        for fase in fasesPractica:
-            col = faseColPractica[fase]
-            if registro.get(col):
-                estado_actual = fase
+        estado_por_practica[pid] = estado_actual
 
-    estado_por_practica[pid] = estado_actual
+    df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
 
-df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
-
-# Join empresa + alumno
+    # Join empresa + alumno
 df_prac = df_prac.merge(df_emp, left_on="empresa", right_on="CIF", suffixes=("", "_empresa"))
 df_prac = df_prac.merge(df_al, left_on="alumno", right_on="dni", suffixes=("", "_alumno"))
 
@@ -220,7 +228,6 @@ with tab1:
         "responsable_legal": "Responsable Legal",
         "horario": "Horario"
     }
-
     # Filas únicas + columnas limpias
     df_emp_display = (
         df_f[cols_emp]
@@ -292,10 +299,14 @@ with tab1:
 
 st.divider()
 with tab2:
-    st.markdown("### 📥 Descargar datos")
-    col1 , col2 = st.columns([1, 5])
-
+    col1 , col2, col3 = st.columns([1,1, 5])
     with col1:
+        tipo = st.radio(
+            "Descarga por",
+            ["Fecha", "Alfabético"]
+        )
+
+    with col2: 
         if st.button("⬇️ Descargar", use_container_width=True):
 
             # 1) Traer datos desde Supabase
@@ -305,7 +316,7 @@ with tab2:
             else:
                 df_ofertas = pd.DataFrame(data_ofertas)
                 column_order = [
-                "CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
+                "Creada","CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
                 "Email Empresa", "Nombre Responsable Legal", "NIF Responsable Legal",
                 "horario", "pagina_web", "nombre_rellena",
 
@@ -318,6 +329,10 @@ with tab2:
             ]
                 df_ofertas = df_ofertas[column_order]
                 # 2) Exportar a Excel
+                if tipo == "Fecha":
+                    df_ofertas.sort_values(by="Creada", ascending=False, inplace=True)
+                else: 
+                    df_ofertas.sort_values(by="Empresa", ascending=True, inplace=True)
                 excel_bytes = df_to_excel(df_ofertas)
                 st.download_button(
                     label="📄 Descargar archivo Excel",
@@ -405,7 +420,6 @@ with tab2:
         "responsable_legal": "Responsable Legal",
         "horario": "Horario"
     }
-
     # Filas únicas + columnas limpias
     df_emp_display = (
         df_f[cols_emp]
@@ -414,71 +428,107 @@ with tab2:
         .reset_index(drop=True)
     )
 
-    # Mostrar tabla
+
     if df_emp_display.empty:
         st.info("No hay empresas que coincidan con este filtro.")
     else:
-        st.dataframe(
-            df_emp_display,
-            use_container_width=True,
-            hide_index=True,
-            
-        )
+
+        # Ordenar por created_at si existe
+        if "created_at" in df_f.columns:
+            df_f["created_at"] = pd.to_datetime(df_f["created_at"], errors="coerce")
+
+            # Merge para incorporar la fecha
+            df_emp_display = df_emp_display.merge(
+                df_f[["CIF", "created_at"]].drop_duplicates(),
+                on="CIF",
+                how="left"
+            )
+
+            # Ordenar
+            df_emp_display = df_emp_display.sort_values("created_at", ascending=False)
+
+            # Highlight de las creadas en las últimas 24 horas
+            today = pd.Timestamp.now().normalize()
+
+            def highlight_recent(row):
+                if pd.isna(row["created_at"]):
+                    return [''] * len(row)
+                
+                # Si se creó hoy → la pintamos
+                if row["created_at"].normalize() == today:
+                    return ['background-color: #fff3cd'] * len(row)   # amarillo suave
+                
+                return [''] * len(row)
+
+            df_emp_display_styled = df_emp_display.style.apply(highlight_recent, axis=1)
+
+            # Dropear la columna antes de mostrar si no querés que se vea
+            df_emp_display_styled = df_emp_display_styled.hide_index()
+
+            st.dataframe(df_emp_display_styled, use_container_width=True)
+
+        else:
+            st.dataframe(
+                df_emp_display,
+                use_container_width=True,
+                hide_index=True
+            )
 
 
-    # -------------------------------------------------------------------
-    # 6. TABS: OFERTAS 
-    # -------------------------------------------------------------------
 
-    # OFERTAS
-    st.markdown("#### 📄 Ofertas de FP")
-    fps = df_f[["CIF","nombre", "ciclos_formativos", "puestos", "estado","vehiculo", "contrato","requisitos"]].copy()
+        # -------------------------------------------------------------------
+        # 6. TABS: OFERTAS 
+        # -------------------------------------------------------------------
 
-    if not fps.empty:
-        for i, (idx, fp) in enumerate(fps.iterrows(), start=1):
-            estado_actual = fp["estado"] or "Nuevo"
-            completa = False
-            if fp["ciclos_formativos"]:
-                completa = all(valores["disponibles"] == 0 for valores in fp["ciclos_formativos"].values())
+        # OFERTAS
+        st.markdown("#### 📄 Ofertas de FP")
+        fps = df_f[["CIF","nombre", "ciclos_formativos", "puestos", "estado","vehiculo", "contrato","requisitos"]].copy()
 
-            estado_visual = "Completa" if completa else estado_actual
-            bg_color = "✅" if completa else ("🟧" if estado_actual == "Nuevo" else "✅")
-            estado_actual =estado_visual
+        if not fps.empty:
+            for i, (idx, fp) in enumerate(fps.iterrows(), start=1):
+                estado_actual = fp["estado"] or "Nuevo"
+                completa = False
+                if fp["ciclos_formativos"]:
+                    completa = all(valores["disponibles"] == 0 for valores in fp["ciclos_formativos"].values())
 
-            with st.expander(
-                f"Oferta #{i} | {fp['nombre']} - {fp['CIF']} - {estado_actual} {bg_color}",
-                expanded=False
-            ):
+                estado_visual = "Completa" if completa else estado_actual
+                bg_color = "✅" if completa else ("🟧" if estado_actual == "Nuevo" else "✅")
+                estado_actual =estado_visual
 
-                ciclos = fp["ciclos_formativos"]
-                puestos = fp["puestos"]
+                with st.expander(
+                    f"Oferta #{i} | {fp['nombre']} - {fp['CIF']} - {estado_actual} {bg_color}",
+                    expanded=False
+                ):
 
-                if ciclos:
-                    st.write("🎓 Ciclos formativos y cantidad de alumnos:")
-                    data = [
-                        {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
-                        for ciclo, valores in ciclos.items()
-                    ]
-                    df_ciclos = pd.DataFrame(data, columns=["Ciclo", "Alumnos", "Disponibles"])
-                    st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
+                    ciclos = fp["ciclos_formativos"]
+                    puestos = fp["puestos"]
 
-                if puestos:
-                    st.write("🧩 Puestos por ciclo formativo:")
-                    for ciclo, lista_puestos in puestos.items():
-                        cantidad_alumnos = ciclos[ciclo]["alumnos"] if ciclos and ciclo in ciclos else None
+                    if ciclos:
+                        st.write("🎓 Ciclos formativos y cantidad de alumnos:")
+                        data = [
+                            {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
+                            for ciclo, valores in ciclos.items()
+                        ]
+                        df_ciclos = pd.DataFrame(data, columns=["Ciclo", "Alumnos", "Disponibles"])
+                        st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
 
-                        with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
-                            if lista_puestos:
-                                for p in lista_puestos:
-                                    st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto'] if p['proyecto'] else "No mencionado" }")
-                            else:
-                                st.markdown("_Sin áreas o proyectos registrados_")
+                    if puestos:
+                        st.write("🧩 Puestos por ciclo formativo:")
+                        for ciclo, lista_puestos in puestos.items():
+                            cantidad_alumnos = ciclos[ciclo]["alumnos"] if ciclos and ciclo in ciclos else None
 
-                requisitos = fp.get("requisitos")
+                            with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
+                                if lista_puestos:
+                                    for p in lista_puestos:
+                                        st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto'] if p['proyecto'] else 'No mencionado' }")
+                                else:
+                                    st.markdown("_Sin áreas o proyectos registrados_")
 
-                st.write(f"**Requisitos:** {requisitos if requisitos else 'No mencionados'}")
+                    requisitos = fp.get("requisitos")
 
-                st.write(f"**Contrato:** {'Sí' if fp['contrato'] else 'No'}")
-                st.write(f"**Vehículo:** {'Sí' if fp['vehiculo'] else 'No'}")
+                    st.write(f"**Requisitos:** {requisitos if requisitos else 'No mencionados'}")
+
+                    st.write(f"**Contrato:** {'Sí' if fp['contrato'] else 'No'}")
+                    st.write(f"**Vehículo:** {'Sí' if fp['vehiculo'] else 'No'}")
 
 
