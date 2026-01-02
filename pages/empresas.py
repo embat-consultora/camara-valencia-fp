@@ -124,9 +124,10 @@ with tab1:
                         "CIF": new_cif,
                         "telefono": new_telefono,
                         "email_empresa": new_email
-                    },
-                    "id",
-                    empresa_id
+                    },{
+                    "id":empresa_id
+                    }
+
                 )
                 st.success("Empresa actualizada correctamente")
                 st.rerun()

@@ -1,9 +1,19 @@
 import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from datetime import timedelta
 import os
 import uuid
+from datetime import datetime, timedelta
+from variables import (
+    practicaTabla,
+    practicaEstadosTabla,
+    alumnosTabla,
+    alumnoEstadosTabla,
+    estadosAlumno,
+    necesidadFP,
+    feedbackFormsTabla,
+    forms,empresasTabla, practicaTabla, alumnosTabla
+)
 load_dotenv()
 
 url = os.getenv("SUPABASE_URL")
@@ -50,9 +60,21 @@ def getPracticas(tableName, conditions: dict, in_filters: dict = None):
 def add(tableName, data):
     response = supabase.table(tableName).insert(data).execute()
     return response
-def update(tableName, data,searchFor, searchValue):
-    response = supabase.table(tableName).update(data).eq(searchFor, searchValue).execute()
+# def update(tableName, data,searchFor, searchValue):
+#     response = supabase.table(tableName).update(data).eq(searchFor, searchValue).execute()
+#     return response
+
+#tabla = "feedback_forms"
+# body = {"estado": "completado", "token": "nuevo_token_123"}
+# filtros = {"practica_id": "123", "tipo_form": "feedback_inicial"}
+def update(tabla: str, body: dict, filtros: dict):
+    query = supabase.table(tabla).update(body)
+    for col, val in filtros.items():
+        query = query.eq(col, val)
+
+    response = query.execute()
     return response
+    
 def delete(tableName,searchFor, searchValue):
     response = supabase.table(tableName).delete().eq(searchFor, searchValue).execute()
     return response
@@ -72,6 +94,72 @@ def getAuthToken(email):
     if response.data:
         return response.data[0]  # ✅ Devolvemos el primer resultado como dict
     return None
+
+def getPracticaByToken(token, tipo_form):
+    try:
+        fb_res = (
+            supabase
+            .table(feedbackFormsTabla)
+            .select("*")
+            .eq("token", token)
+            .eq("tipo_form", tipo_form)
+            .maybe_single()
+            .execute()
+        )
+        if not fb_res.data:
+            return None
+
+        feedback = fb_res.data
+        practica_id = feedback["practica_id"]
+
+        # 2️⃣ Traer la práctica
+        practica_res = (
+            supabase
+            .table(practicaTabla)
+            .select("ciclo_formativo, area, fecha_inicio, empresa, alumno")
+            .eq("id", practica_id)
+            .single()
+            .execute()
+        )
+        if not practica_res.data: return None           
+        practica = practica_res.data
+
+        # 3️⃣ Traer empresa
+        empresa_res = (
+            supabase
+            .table(empresasTabla)
+            .select("nombre")
+            .eq("CIF", practica["empresa"])
+            .single()
+            .execute()
+        )
+
+        empresa = empresa_res.data
+
+        # 4️⃣ Traer alumno
+        alumno_res = (
+            supabase
+            .table(alumnosTabla)
+            .select("nombre","apellido")
+            .eq("dni", practica["alumno"])
+            .single()
+            .execute()
+        )
+
+        alumno = alumno_res.data
+
+        # 5️⃣ Combinar todo en un dict final
+        return {
+            "feedback_form_id": feedback["id"],
+            "practica_id": practica_id,
+            "ciclo": practica["ciclo_formativo"],
+            "area": practica["area"],
+            "fecha_inicio": practica["fecha_inicio"],
+            "empresa": empresa["nombre"],
+            "alumno": alumno["nombre"] + " " + alumno["apellido"],
+        }
+    except Exception as e:
+            return None
 
 
 def getMatches():
@@ -250,16 +338,7 @@ def getTodosEmpresaOfertas():
     response = supabase.rpc("exec_sql", {"sql": query}).execute()
     return response.data
 
-from variables import (
-    practicaTabla,
-    practicaEstadosTabla,
-    alumnosTabla,
-    alumnoEstadosTabla,
-    estadosAlumno,
-    necesidadFP,
-    feedbackFormsTabla,
-    feedbackResponseTabla
-)
+
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
     practica = add(
         practicaTabla,
@@ -290,7 +369,7 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
         keys=["dni"],
     )
 
-    for tipo in ["feedback_inicial", "feedback_adaptacion", "feedback_final"]:
+    for tipo in forms:
         token = uuid.uuid4().hex
         add(
             feedbackFormsTabla,
@@ -313,3 +392,16 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
           },
           keys=["id"],
       )
+
+def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino):
+  for tipo in forms[:-1]:
+    dias_a_sumar = 7 if tipo == forms[0] else 30 if tipo == forms[1] else 32 if tipo == forms[2] else 0
+    fecha_envio = (fecha_inicio + timedelta(days=dias_a_sumar)).isoformat()
+    update(feedbackFormsTabla,
+            {
+                "practica_id": practica_id,
+                "fecha_envio": fecha_envio,
+                "email_destino": email_destino
+            },
+            {"practica_id": practica_id, "tipo_form": tipo}
+        )

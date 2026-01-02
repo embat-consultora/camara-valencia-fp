@@ -156,8 +156,10 @@ with tab1:
                             "email_alumno": new_email,
                             "tipoPractica": new_tipo_practica
                         },
-                        "id",
-                        alumno_id
+                        {
+                            "id":alumno_id
+                        }
+                        
                     )
                     st.success("Alumno actualizado correctamente")
                     st.rerun()
