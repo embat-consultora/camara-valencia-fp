@@ -5,81 +5,55 @@ from google.oauth2 import service_account
 import mimetypes
 
 def upload_to_drive(file_name, folder_id, folderName, nombre_archivo_drive=None):
-    """
-    Sube un archivo a Google Drive dentro de una subcarpeta (folderName).
-    Si la subcarpeta no existe, la crea.
-    
-    Parámetros:
-      file_name (str): ruta local del archivo a subir
-      folder_id (str): ID de la carpeta padre en Drive
-      folderName (str): nombre de la subcarpeta (por ejemplo, email del alumno)
-      nombre_archivo_drive (str): nombre que tendrá el archivo en Drive (opcional)
-    """
     # --- Autenticación ---
     credentials_info = st.secrets.connections.gcs
     credentials = service_account.Credentials.from_service_account_info(credentials_info)
     service = build("drive", "v3", credentials=credentials)
 
-    # --- Verificar que folder_id sea una carpeta válida ---
-    meta = service.files().get(
-        fileId=folder_id,
-        fields="id,name,mimeType",
-        supportsAllDrives=True
-    ).execute()
+    # --- Verificar carpeta padre ---
+    meta = service.files().get(fileId=folder_id, fields="id,mimeType", supportsAllDrives=True).execute()
     if meta.get("mimeType") != "application/vnd.google-apps.folder":
         raise RuntimeError("El ID provisto no es una carpeta.")
 
-    # --- Buscar si ya existe una carpeta con el nombre indicado ---
-    query = (
-        f"'{folder_id}' in parents and "
-        f"name = '{folderName}' and "
-        f"mimeType = 'application/vnd.google-apps.folder' and "
-        f"trashed = false"
-    )
+    # --- Buscar/Crear subcarpeta (folderName) ---
+    query_folder = f"'{folder_id}' in parents and name = '{folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results_folder = service.files().list(q=query_folder, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
 
-    results = service.files().list(
-        q=query,
-        spaces="drive",
-        fields="files(id, name)",
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True
-    ).execute()
-
-    if results.get("files"):
-        # Ya existe la carpeta
-        email_folder_id = results["files"][0]["id"]
+    if results_folder.get("files"):
+        email_folder_id = results_folder["files"][0]["id"]
     else:
-        # Crear nueva carpeta
-        folder_metadata = {
-            "name": folderName,
-            "mimeType": "application/vnd.google-apps.folder",
-            "parents": [folder_id]
-        }
-        folder = service.files().create(
-            body=folder_metadata,
-            fields="id",
-            supportsAllDrives=True
-        ).execute()
+        folder_metadata = {"name": folderName, "mimeType": "application/vnd.google-apps.folder", "parents": [folder_id]}
+        folder = service.files().create(body=folder_metadata, fields="id", supportsAllDrives=True).execute()
         email_folder_id = folder["id"]
 
-    # --- Subir el archivo dentro de la carpeta ---
+    # --- Lógica de Sobrescritura ---
+    nombre_final = nombre_archivo_drive or file_name.split("/")[-1]
+    
+    # 1. Buscar si el archivo ya existe EN ESA carpeta específica
+    query_file = f"'{email_folder_id}' in parents and name = '{nombre_final}' and trashed = false"
+    results_file = service.files().list(q=query_file, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+    
     mime_type, _ = mimetypes.guess_type(file_name)
     media = MediaFileUpload(file_name, mimetype=mime_type, resumable=True)
 
-    # Usar el nombre personalizado si se pasa, o el nombre del archivo local
-    nombre_final = nombre_archivo_drive or file_name.split("/")[-1]
-
-    file_metadata = {
-        "name": nombre_final,
-        "parents": [email_folder_id]
-    }
-
-    uploaded = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink, parents",
-        supportsAllDrives=True
-    ).execute()
+    if results_file.get("files"):
+        # 2. SI EXISTE: Actualizar (Pisamos el archivo)
+        file_id = results_file["files"][0]["id"]
+        uploaded = service.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True
+        ).execute()
+    else:
+        # 3. NO EXISTE: Crear nuevo
+        file_metadata = {"name": nombre_final, "parents": [email_folder_id]}
+        uploaded = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True
+        ).execute()
 
     return uploaded["id"]
 

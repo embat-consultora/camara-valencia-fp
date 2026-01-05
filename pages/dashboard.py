@@ -31,57 +31,57 @@ st.markdown(
 # -------------------------------------------------------------------
 # 1. LOAD DATA
 # -------------------------------------------------------------------
+with st.spinner('Cargando datos...'):
+    df_emp = pd.DataFrame(get(empresasTabla))
+    if "created_at" in df_emp.columns:
+        df_emp["created_at"] = pd.to_datetime(df_emp["created_at"], errors="coerce")
+        df_emp = df_emp.sort_values("created_at", ascending=False)
+    df_al = pd.DataFrame(get(alumnosTabla))
+    df_prac = pd.DataFrame(get(practicaTabla))
+    df_ofe = pd.DataFrame(get(necesidadFP))
+    df_tut = pd.DataFrame(get(tutoresTabla))
 
-df_emp = pd.DataFrame(get(empresasTabla))
-if "created_at" in df_emp.columns:
-    df_emp["created_at"] = pd.to_datetime(df_emp["created_at"], errors="coerce")
-    df_emp = df_emp.sort_values("created_at", ascending=False)
-df_al = pd.DataFrame(get(alumnosTabla))
-df_prac = pd.DataFrame(get(practicaTabla))
-df_ofe = pd.DataFrame(get(necesidadFP))
-df_tut = pd.DataFrame(get(tutoresTabla))
-
-# -------------------------------------------------------------------
-# LOAD ALL CICLOS DESDE formFieldsTabla
-# -------------------------------------------------------------------
+    # -------------------------------------------------------------------
+    # LOAD ALL CICLOS DESDE formFieldsTabla
+    # -------------------------------------------------------------------
 
 
-form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
+    form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
+    ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
+    ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
 
-# -------------------------------------------------------------------
-# 2. CALCULAR ESTADO PRÁCTICA
-# -------------------------------------------------------------------
-if df_prac.empty:
-    df_prac["estado_actual"] = None
-    df_prac["empresa"] = None
-    df_prac["alumno"] = None
-    df_prac["ciclo_formativo"] = None
-else:
-    estado_por_practica = {}
+    # -------------------------------------------------------------------
+    # 2. CALCULAR ESTADO PRÁCTICA
+    # -------------------------------------------------------------------
+    if df_prac.empty:
+        df_prac["estado_actual"] = None
+        df_prac["empresa"] = None
+        df_prac["alumno"] = None
+        df_prac["ciclo_formativo"] = None
+    else:
+        estado_por_practica = {}
 
-    for _, p in df_prac.iterrows():
-        pid = p["id"]
-        estados = getEqual(practicaEstadosTabla, "practicaId", pid)
+        for _, p in df_prac.iterrows():
+            pid = p["id"]
+            estados = getEqual(practicaEstadosTabla, "practicaId", pid)
 
-        if not estados:
-            estado_actual = fasesPractica[0]
-        else:
-            registro = estados[0]
-            estado_actual = fasesPractica[0]
-            for fase in fasesPractica:
-                col = faseColPractica[fase]
-                if registro.get(col):
-                    estado_actual = fase
+            if not estados:
+                estado_actual = fasesPractica[0]
+            else:
+                registro = estados[0]
+                estado_actual = fasesPractica[0]
+                for fase in fasesPractica:
+                    col = faseColPractica[fase]
+                    if registro.get(col):
+                        estado_actual = fase
 
-        estado_por_practica[pid] = estado_actual
+            estado_por_practica[pid] = estado_actual
 
-    df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
+        df_prac["estado_actual"] = df_prac["id"].map(estado_por_practica)
 
-    # Join empresa + alumno
-df_prac = df_prac.merge(df_emp, left_on="empresa", right_on="CIF", suffixes=("", "_empresa"))
-df_prac = df_prac.merge(df_al, left_on="alumno", right_on="dni", suffixes=("", "_alumno"))
+        # Join empresa + alumno
+    df_prac = df_prac.merge(df_emp, left_on="empresa", right_on="CIF", suffixes=("", "_empresa"))
+    df_prac = df_prac.merge(df_al, left_on="alumno", right_on="dni", suffixes=("", "_alumno"))
 
 # -------------------------------------------------------------------
 # 3. KPIs — BALLS
@@ -308,39 +308,39 @@ with tab2:
 
     with col2: 
         if st.button("⬇️ Descargar", use_container_width=True):
+            with st.spinner('Generando Excel...'):
+                # 1) Traer datos desde Supabase
+                data_ofertas = getTodosEmpresaOfertas()
+                if not data_ofertas:
+                    st.warning("No se encontraron ofertas para descargar.")
+                else:
+                    df_ofertas = pd.DataFrame(data_ofertas)
+                    column_order = [
+                    "Creada","CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
+                    "Email Empresa", "Nombre Responsable Legal", "NIF Responsable Legal",
+                    "horario", "pagina_web", "nombre_rellena",
 
-            # 1) Traer datos desde Supabase
-            data_ofertas = getTodosEmpresaOfertas()
-            if not data_ofertas:
-                st.warning("No se encontraron ofertas para descargar.")
-            else:
-                df_ofertas = pd.DataFrame(data_ofertas)
-                column_order = [
-                "Creada","CIF", "Empresa", "telefono", "direccion", "localidad", "CP",
-                "Email Empresa", "Nombre Responsable Legal", "NIF Responsable Legal",
-                "horario", "pagina_web", "nombre_rellena",
+                    "ciclo_formativo", "alumnos_pedidos", "cupos_disponibles",
+                    "areas_puestos",
 
-                "ciclo_formativo", "alumnos_pedidos", "cupos_disponibles",
-                "areas_puestos",
+                    "requisitos", "contrato", "vehiculo", "cupo_alumnos_totales_oferta",
 
-                "requisitos", "contrato", "vehiculo", "cupo_alumnos_totales_oferta",
-
-                "Nombre Tutor", "Email Tutor", "Telefono Tutor",
-            ]
-                df_ofertas = df_ofertas[column_order]
-                # 2) Exportar a Excel
-                if tipo == "Fecha":
-                    df_ofertas.sort_values(by="Creada", ascending=False, inplace=True)
-                else: 
-                    df_ofertas.sort_values(by="Empresa", ascending=True, inplace=True)
-                excel_bytes = df_to_excel(df_ofertas)
-                st.download_button(
-                    label="📄 Descargar archivo Excel",
-                    data=excel_bytes,
-                    file_name="ofertas_fp.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+                    "Nombre Tutor", "Email Tutor", "Telefono Tutor",
+                ]
+                    df_ofertas = df_ofertas[column_order]
+                    # 2) Exportar a Excel
+                    if tipo == "Fecha":
+                        df_ofertas.sort_values(by="Creada", ascending=False, inplace=True)
+                    else: 
+                        df_ofertas.sort_values(by="Empresa", ascending=True, inplace=True)
+                    excel_bytes = df_to_excel(df_ofertas)
+                    st.download_button(
+                        label="📄 Descargar archivo Excel",
+                        data=excel_bytes,
+                        file_name="ofertas_fp.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
 
     c1, c2, c3 = st.columns(3)
 

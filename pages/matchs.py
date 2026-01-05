@@ -45,11 +45,12 @@ st.title("🚀 MATCH")
 # ---------------------------------
 # Traer todas las ofertas (necesidadFP)
 # ---------------------------------
-ofertas = getOfertaEmpresas(necesidadFP, {}) 
-alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa"})
-if not ofertas:
-    st.info("No se encontraron ofertas registradas.")
-    st.stop()
+with st.spinner("Cargando datos..."):
+    ofertas = getOfertaEmpresas(necesidadFP, {}) 
+    alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa"})
+    if not ofertas:
+        st.info("No se encontraron ofertas registradas.")
+        st.stop()
 base_url = os.getenv("URL")
 
 empresas_disponibles = []
