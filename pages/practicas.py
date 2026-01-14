@@ -16,7 +16,7 @@ import uuid
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     fasesPractica, faseColPractica, max_file_size, carpetaPractica,
-    necesidadFP,feedbackFormsTabla,feedbackResponseTabla,forms
+    necesidadFP,linkCalendar,feedbackResponseTabla,forms
 )
 import plotly.graph_objects as go
 
@@ -178,8 +178,6 @@ def mostrar_detalle():
     # ------------------------------------------
     # TUTOR (idéntico)
     # ------------------------------------------
-    st.write("👨‍🏫 Tutor asignado")
-
     tutor_actual = None
 
     if oferta.get("tutor"):
@@ -189,27 +187,41 @@ def mostrar_detalle():
 
     st.write(f"**Tutor actual:** {tutor_actual['nombre'] if tutor_actual else '— Sin tutor —'}")
 
-    nombres_tutores = [t["nombre"] for t in tutor_empresa] if tutor_empresa else ["— Sin tutores —"]
-    tutor_inicial = (
-        nombres_tutores.index(tutor_actual["nombre"])
-        if tutor_actual and tutor_actual["nombre"] in nombres_tutores
-        else 0
-    )
+    opciones_nombres = ["— Sin tutor —"] + [t["nombre"] for t in tutor_empresa]
+    
+    # 4. Determinar el índice inicial
+    # Si hay un tutor actual y está en la lista de la empresa, buscamos su posición (+1 por el "Sin tutor")
+    if tutor_actual and tutor_actual["nombre"] in [t["nombre"] for t in tutor_empresa]:
+        index_actual = [t["nombre"] for t in tutor_empresa].index(tutor_actual["nombre"]) + 1
+    else:
+        index_actual = 0 # Posición de "— Sin tutor —"
+    col1, col2 = st.columns([2, 4])
+    with col1:
+        nuevo_tutor_nombre = st.selectbox(
+            "Asignar o cambiar tutor",
+            options=opciones_nombres,
+            index=index_actual,
+            key=f"tutor_select_{practicaId}"
+        )
 
-    nuevo_tutor = st.selectbox(
-        "Cambiar tutor",
-        options=nombres_tutores,
-        index=tutor_inicial,
-        key=f"tutor_select_{practicaId}", width=300
-    )
+    tutor_elegido = next((t for t in tutor_empresa if t["nombre"] == nuevo_tutor_nombre), None)
+    id_a_guardar = tutor_elegido["id"] if tutor_elegido else None
+    id_en_db = oferta.get("tutor")
 
-    tutor_elegido = next((t for t in tutor_empresa if t["nombre"] == nuevo_tutor), None)
-    tutor_id_nuevo = tutor_elegido["id"] if tutor_elegido else None
-    oferta_id = oferta.get("id")
-
-    if oferta_id and tutor_id_nuevo != (tutor_actual["id"] if tutor_actual else None):
-        update(necesidadFP, {"tutor": tutor_id_nuevo}, {"id":oferta_id})
-        st.success(f"Tutor actualizado: {nuevo_tutor}")
+    # Solo actualizamos si el ID cambió
+    if id_a_guardar != id_en_db:
+        st.write('etro')
+        with st.spinner("Actualizando tutor..."):
+            try:
+                oferta_id = oferta.get("id")
+                if oferta_id:
+                    update(necesidadFP, {"tutor": id_a_guardar}, {"id": oferta_id})
+                    st.success(f"Tutor actualizado a: {nuevo_tutor_nombre}")
+                    # Forzamos recarga para que el estado de la oferta se actualice en la sesión
+                    st.session_state["force_reload"] = True
+                    #st.rerun()
+            except Exception as e:
+                st.error(f"Error al actualizar tutor: {e}")
 
     # ------------------------------------------
     # ESTADOS (idéntico, sin value=)
@@ -247,10 +259,82 @@ def mostrar_detalle():
             st.session_state["estados"][practicaId] = estado_actual
             st.success(f"Estado actualizado: {fase}")
     # ------------------------------------------
+    # CALENDARIO 
+    # ------------------------------------------
+# ------------------------------------------
+    # CALENDARIO (VISTA IMAGEN PNG)
+    # ------------------------------------------
+    st.divider()
+    st.subheader("📅 Planificación de Prácticas")
+
+    # 1. Preparar datos de Drive
+    folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
+    files, folderId = list_drive_files(folder_name)
+    
+    # Buscamos el archivo (ahora aceptando png, jpg, etc.)
+    archivo_calendario = next((f for f in files if "calendario" in f['name']), None)
+
+    col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
+    
+    with col_cal1:
+        url_generador = linkCalendar
+        st.link_button("🛠️ Generar Nuevo Calendario", url_generador, use_container_width=True)
+        
+        st.info("Sube el calendario en formato imagen (PNG/JPG).")
+        uploaded_cal = st.file_uploader(
+            "Subir imagen del Calendario",
+            type=["png", "jpg", "jpeg"],
+            key=f"cal_up_{practicaId}"
+        )
+        if uploaded_cal:
+            if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                with st.spinner("Subiendo imagen..."):
+                    temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded_cal.getbuffer())
+                    upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
+                    st.success("Imagen guardada.")
+                    st.rerun()
+
+    with col_cal2:
+        if archivo_calendario:
+            st.write("🔍 **Vista Previa del Calendario:**")
+            
+            # Obtenemos el ID del archivo
+            file_id = archivo_calendario.get('id')
+            
+            if file_id:
+                # Construimos la URL de previsualización oficial de Google Drive
+                preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                
+                # Usamos un contenedor de Streamlit para el estilo
+                with st.container():
+                    st.markdown(
+                        f"""
+                        <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+                            <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+            
+            st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+        else:
+            # Placeholder si no hay imagen
+            st.markdown(
+                """
+                <div style="border: 2px dashed #ccc; border-radius: 10px; height: 500px; display: flex; align-items: center; justify-content: center; color: #aaa;">
+                    Esperando archivo de calendario (PNG/JPG)...
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    
+    # ------------------------------------------
     # FEEDBACK 
     # ------------------------------------------
     st.divider()
-    st.subheader("¿Cómo se siente el alumno?")
+    st.subheader("¿Cómo se siente el candidato?")
 
     feedbacks_db = getEquals(feedbackResponseTabla, {"practica_id": practicaId})
     progreso_feedback = {
