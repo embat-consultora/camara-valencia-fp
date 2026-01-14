@@ -210,7 +210,6 @@ def mostrar_detalle():
 
     # Solo actualizamos si el ID cambió
     if id_a_guardar != id_en_db:
-        st.write('etro')
         with st.spinner("Actualizando tutor..."):
             try:
                 oferta_id = oferta.get("id")
