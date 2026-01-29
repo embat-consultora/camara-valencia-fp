@@ -28,14 +28,16 @@ def make_sidebar():
             st.write("")
 
             if st.session_state.get("logged_in", False):
+                st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
                 st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
-                st.page_link("pages/dashboard.py", label="Panel de Control")
-                st.page_link("pages/matchs.py", label="Matchs")
+                # st.page_link("pages/dashboard.py", label="Panel de Control")
                 st.page_link("pages/practicas.py", label="Prácticas")
-                st.page_link("pages/autogestionada.py", label="P. Autogestionada")
+                st.page_link("pages/matchs.py", label="Matchs")
+                st.page_link("pages/cargaRapida.py", label="Carga Rápida")
+                
                 st.page_link("pages/empresas.py", label="Empresas")
                 st.page_link("pages/alumnos.py", label="Alumnos")
-                st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
+                
                 st.write("")
                 st.write("")
 

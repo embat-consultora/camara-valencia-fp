@@ -208,52 +208,7 @@ def mostrar_detalle():
         localidad = oferta.get("localidad_empresa") or "No especificado"
         st.write(f"**Localidad:** {localidad}")
 
-    # ------------------------------------------
-    # TUTOR (idéntico)
-    # ------------------------------------------
-    tutor_actual = None
 
-    if oferta.get("tutor"):
-        tutor_actual = next((t for t in tutores if t["id"] == oferta.get("tutor")), None)
-
-    tutor_empresa = tutores_por_empresa(empresa["CIF"], tutores)
-
-    st.write(f"**Tutor actual:** {tutor_actual['nombre'] if tutor_actual else '— Sin tutor —'}")
-
-    opciones_nombres = ["— Sin tutor —"] + [t["nombre"] for t in tutor_empresa]
-    
-    # 4. Determinar el índice inicial
-    # Si hay un tutor actual y está en la lista de la empresa, buscamos su posición (+1 por el "Sin tutor")
-    if tutor_actual and tutor_actual["nombre"] in [t["nombre"] for t in tutor_empresa]:
-        index_actual = [t["nombre"] for t in tutor_empresa].index(tutor_actual["nombre"]) + 1
-    else:
-        index_actual = 0 # Posición de "— Sin tutor —"
-    col1, col2 = st.columns([2, 4])
-    with col1:
-        nuevo_tutor_nombre = st.selectbox(
-            "Asignar o cambiar tutor",
-            options=opciones_nombres,
-            index=index_actual,
-            key=f"tutor_select_{practicaId}"
-        )
-
-    tutor_elegido = next((t for t in tutor_empresa if t["nombre"] == nuevo_tutor_nombre), None)
-    id_a_guardar = tutor_elegido["id"] if tutor_elegido else None
-    id_en_db = oferta.get("tutor")
-
-    # Solo actualizamos si el ID cambió
-    if id_a_guardar != id_en_db:
-        with st.spinner("Actualizando tutor..."):
-            try:
-                oferta_id = oferta.get("id")
-                if oferta_id:
-                    update(necesidadFP, {"tutor": id_a_guardar}, {"id": oferta_id})
-                    st.success(f"Tutor actualizado a: {nuevo_tutor_nombre}")
-                    # Forzamos recarga para que el estado de la oferta se actualice en la sesión
-                    st.session_state["force_reload"] = True
-                    #st.rerun()
-            except Exception as e:
-                st.error(f"Error al actualizar tutor: {e}")
 
     # ------------------------------------------
     # ESTADOS (idéntico, sin value=)
@@ -281,12 +236,13 @@ def mostrar_detalle():
 
         if checked != valor:
             new_value = datetime.now().isoformat() if checked else None
-            upsert(practicaEstadosTabla, {"practicaId": practicaId, col: new_value}, keys=["practicaId"])
+
+            upsert(practicaEstadosTabla, {"practicaId": int(practicaId), col: new_value}, keys=["practicaId"])
             estado_actual[col] = new_value
 
             if fase == fasesPractica[2] and checked:
                 st.success("📌 La práctica ha pasado a estado EN CURSO")
-                asignarFechasFormsFeedback(practicaId, datetime.now().date(), alumno['email_alumno'])
+                asignarFechasFormsFeedback(int(practicaId), datetime.now().date(), alumno['email_alumno'])
 
             st.session_state["estados"][practicaId] = estado_actual
             st.success(f"Estado actualizado: {fase}")
@@ -429,11 +385,14 @@ def mostrar_detalle():
             if st.button("Subir Archivos", key=f"subir_{practicaId}"):
                 with st.spinner("Subiendo archivos..."):
                     for file in uploaded_files:
-                        temp = Path("/tmp") / f"{uuid.uuid4()}_{file.name}"
+                        extension = Path(file.name).suffix
+                        nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
+                        nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                        temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                         with open(temp, "wb") as f:
                             f.write(file.getbuffer())
-                        upload_to_drive(str(temp), carpetaPractica, folder_name, file.name)
-                        st.success(f"Subido: {file.name}")
+                        upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
+                        st.success(f"Subido: {nuevo_nombre}")
 
 
 

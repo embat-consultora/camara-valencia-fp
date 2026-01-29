@@ -185,7 +185,6 @@ with tab1:
                 icono = estado_map.get(estado_actual, "⚪")
                 st.write(f"**Estado actual:** {icono} {estado_actual}")
                 st.write(f"**Tipo de Práctica:**  {tipo_practica}")
-                # Obtener opciones de form_fields
                 form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
                 ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
                 pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
@@ -280,19 +279,21 @@ with tab1:
                                 st.info(f"Subiendo {total} archivo(s), por favor espera...")
 
                                 for i, file in enumerate(uploaded_files, start=1):
-                                    original_name = file.name
-                                    tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{original_name}"
+                                    extension = Path(file.name).suffix
+                                    nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
+                                    nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                                    tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                                     with open(tmp_path, "wb") as f:
                                         f.write(file.getbuffer())
 
-                                    res = upload_to_drive(str(tmp_path), carpetaAlumnos, folder_name, original_name)
+                                    res = upload_to_drive(str(tmp_path), carpetaAlumnos, folder_name, nuevo_nombre)
 
                                     if isinstance(res, dict):
                                         link = res.get("webViewLink") or res.get("webContentLink")
                                     else:
                                         link = None
 
-                                    st.success(f"✅ {i}/{total}: {original_name} subido correctamente")
+                                    st.success(f"✅ {i}/{total}: {nuevo_nombre} subido correctamente")
                                     if link:
                                         st.markdown(f"[Abrir en Drive]({link})")
 

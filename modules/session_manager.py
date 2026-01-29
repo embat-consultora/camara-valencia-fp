@@ -22,6 +22,7 @@ def load_user(email):
     if response:
         user = response[0]
         st.session_state.username = user["email"]
+        st.session_state.rol = user["rol"]
         st.session_state.logged_in = True
         return True
     return False

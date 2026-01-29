@@ -14,7 +14,8 @@ from variables import (
     necesidadFP,
     feedbackFormsTabla,
     forms,empresasTabla, practicaTabla, alumnosTabla,
-    gestoresTabla
+    gestoresTabla,
+    usuariosTabla
 )
 load_dotenv()
 
@@ -95,22 +96,65 @@ def getGestores():
 def getEmpresas():
     res = supabase.table(empresasTabla).select("*").order("nombre").execute()
     return pd.DataFrame(res.data)
-def updateGestores(changes, df_original):
-    # 1. Procesar filas editadas
-    for idx, values in changes.get("edited_rows", {}).items():
-        # Obtenemos el ID real usando el índice del DataFrame original
-        real_id = df_original.iloc[int(idx)]['id']
-        supabase.table(gestoresTabla).update(values).eq("id", real_id).execute()
-    
-    # 2. Procesar filas nuevas
-    added_rows = changes.get("added_rows", [])
-    if added_rows:
-        supabase.table(gestoresTabla).insert(added_rows).execute()
+def updateGestores(cambios, df_original):
+    # 1. MANEJAR ALTAS (Added)
+    for new_row in cambios["added_rows"]:
+        nombre = new_row.get("nombre", "").strip()
+        email = new_row.get("email", "").strip().lower()
+        password = new_row.get("password_temp") 
         
-    # 3. Procesar filas eliminadas
-    for idx in changes.get("deleted_rows", []):
-        real_id = df_original.iloc[int(idx)]['id']
-        supabase.table(gestoresTabla).delete().eq("id", real_id).execute()
+        if email and nombre:
+            try:
+                # Insertamos en la tabla de GESTORES
+                # Nota: Asumo que tu función se llama 'add' o 'insert' según tu librería
+                add(gestoresTabla, {
+                    "nombre": nombre,
+                    "email": email,
+                    "activo": new_row.get("activo", True)
+                })
+
+                # Insertamos en la tabla de USUARIOS
+                add("usuarios", {
+                    "email": email,
+                    "password": password,
+                    "rol": "gestor"
+                })
+            except Exception as e:
+                raise Exception(f"Error al crear el usuario {email}: {e}")
+
+    # 2. MANEJAR EDICIONES (Edited)
+    for idx, mods in cambios["edited_rows"].items():
+        # Obtenemos los datos originales mediante el índice del DataFrame
+        fila_orig = df_original.iloc[int(idx)]
+        id_gestor = fila_orig["id"]
+        email_orig = fila_orig["email"]
+        
+        try:
+            # Actualizamos la tabla de gestores
+            update(gestoresTabla, mods, {"id": id_gestor})
+            
+            # Si el email cambió, actualizamos también la tabla de usuarios
+            if "email" in mods:
+                nuevo_email = mods["email"].strip().lower()
+                update("usuarios", {"email": nuevo_email}, {"email": email_orig})
+                
+            # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
+        except Exception as e:
+            raise Exception(f"Error al actualizar el gestor {id_gestor}: {e}")
+
+    # 3. MANEJAR BORRADOS (Deleted)
+    for idx in cambios["deleted_rows"]:
+        fila_orig = df_original.iloc[int(idx)]
+        id_gestor = fila_orig["id"]
+        email_gestor = fila_orig["email"]
+        
+        try:
+            # Eliminamos de ambas tablas
+            delete(gestoresTabla, "id", id_gestor)
+            delete(usuariosTabla, "email", email_gestor)
+        except Exception as e:
+            raise Exception(f"Error al eliminar el gestor {email_gestor}: {e}")
+        
 def getOfertasTabla():
     response = supabase.table(necesidadFP).select("*, empresas(*), tutores(*)").execute()
     return pd.DataFrame(response.data)
@@ -438,7 +482,7 @@ def getTodosEmpresaOfertas():
     return response.data
 
 def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
-    # 1. Aseguramos que el original sea un diccionario indexado por DNI para acceso ultra rápido
+    # 1. Aseguramos que el original sea un diccionario indexado por DNI para acceso rápido
     original_dict = df_original.set_index('dni').to_dict('index')
     
     for _, row in df_updated.iterrows():
@@ -450,7 +494,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
             
         row_orig = original_dict[dni]
 
-        # 2. LIMPIEZA Y NORMALIZACIÓN DE VALORES (Crucial para que la comparación funcione)
+        # 2. LIMPIEZA Y NORMALIZACIÓN DE VALORES
         def clean_str(val):
             if pd.isna(val) or val is None: return ""
             return str(val).strip()
@@ -460,25 +504,39 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 return "true" in val.lower() or "✅" in val
             return bool(val)
 
+        def clean_int(val):
+            try:
+                # Maneja nulos, strings vacíos y decimales antes de convertir a entero
+                if pd.isna(val) or str(val).strip() == "": return 0
+                return int(float(val))
+            except:
+                return 0
+
         # 3. EXTRAER VALORES ACTUALES
         curr_comentarios = clean_str(row.get('comentarios_centro'))
         curr_obs = clean_str(row.get('observaciones_seguimiento'))
         curr_nombre = clean_str(row.get('nombre'))
         curr_apellido = clean_str(row.get('apellido'))
-        
+        curr_horas = clean_int(row.get('horas_totales'))
+        curr_gestor = clean_str(row.get('gestor'))
         # 4. EXTRAER VALORES ORIGINALES
         orig_comentarios = clean_str(row_orig.get('comentarios_centro'))
         orig_obs = clean_str(row_orig.get('observaciones_seguimiento'))
         orig_nombre = clean_str(row_orig.get('nombre'))
         orig_apellido = clean_str(row_orig.get('apellido'))
+        orig_horas = clean_int(row_orig.get('horas_totales'))
+        orig_gestor = clean_str(row_orig.get('gestor'))
 
         # 5. DETECCIÓN DE CAMBIOS EXPLÍCITA
+        # He añadido curr_horas != orig_horas aquí para que el IF se active si cambian las horas
         hubo_cambio_texto = (curr_comentarios != orig_comentarios or 
                             curr_obs != orig_obs or
                             curr_nombre != orig_nombre or 
-                            curr_apellido != orig_apellido)
+                            curr_apellido != orig_apellido or
+                            curr_horas != orig_horas or
+                            curr_gestor != orig_gestor)
         
-        # Comparación de booleanos (tus anexos)
+        # Comparación de booleanos (anexos)
         hubo_cambio_anexos = any(
             clean_bool(row[col]) != clean_bool(row_orig[col]) 
             for col in ["anexos_creados", "anexos_enviados", "anexos_firmados", "doc_sao_entregada"]
@@ -487,43 +545,76 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         if hubo_cambio_texto or hubo_cambio_anexos:
             datos_alumno = {
                 "dni": dni,
-                "nombre": curr_nombre,      # <-- Añadido
-                "apellido": curr_apellido,  # <-- Añadido
-                "horas_totales": int(float(row.get("horas_totales", 0))),
+                "nombre": curr_nombre,
+                "apellido": curr_apellido,
+                "horas_totales": curr_horas,
                 "anexos_creados": clean_bool(row['anexos_creados']),
                 "anexos_enviados": clean_bool(row['anexos_enviados']),
                 "anexos_firmados": clean_bool(row['anexos_firmados']),
                 "doc_sao_entregada": clean_bool(row['doc_sao_entregada']),
                 "comentarios_centro": curr_comentarios,
-                "observaciones_seguimiento": curr_obs
+                "observaciones_seguimiento": curr_obs,
+                "gestor": curr_gestor
             }
             
             # Ejecutar el guardado
             upsert(alumnosTabla, datos_alumno, keys=["dni"])
 
-        # 2. LÓGICA DE ASIGNACIÓN DE EMPRESA
-        nueva_empresa = row['nombre_empresa']
-        empresa_antigua = row_orig['nombre_empresa']
+        # 6. LÓGICA DE ASIGNACIÓN DE EMPRESA
+        nueva_empresa = row.get('nombre_empresa')
+        empresa_antigua = row_orig.get('nombre_empresa')
 
         if nueva_empresa != empresa_antigua:
             if nueva_empresa == "⚠️ SIN ASIGNAR":
-                # Lógica para desvincular (Borrar de practicaTabla y resetear estado)
-                delete(practicaTabla, {"alumno": dni})
+                delete(practicaTabla, "alumno", dni)
                 upsert(alumnosTabla, {"dni": dni, "estado": "Sin Empresa"}, keys=["dni"])
             else:
                 cif_empresa = mapa_nombres_id.get(nueva_empresa)
-        
-                crearPractica(
-                    empresaCif=cif_empresa,
-                    alumnoDni=dni,
-                    ciclo=row['ciclo_formativo'], # El original antes del acrónimo
-                    area="General", 
-                    proyecto="Asignación Masiva",
-                    fecha=datetime.now().isoformat(),
-                    ciclos_info=None, # Opcional: pasar si manejas cupos
-                    cupos_disp=0, 
-                    oferta_id=row.get('oferta_id') # Asegúrate de traer esto en la query
-                )
+                if cif_empresa:
+                    crearDraftPractica(
+                        empresaCif=cif_empresa,
+                        alumnoDni=dni,
+                        ciclo=row['ciclo_formativo'], 
+                        area="General", 
+                        proyecto="Asignación Masiva",
+                        fecha=datetime.now().isoformat(),
+                        ciclos_info=None, 
+                        cupos_disp=0, 
+                        oferta_id=row.get('oferta_id') 
+                    )
+
+def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
+        payload_practica = {
+            "empresa": empresaCif,
+            "alumno": alumnoDni,
+            "ciclo_formativo": ciclo,
+            "area": area,
+            "proyecto": proyecto,
+            "oferta": oferta_id
+        }
+        add(practicaTabla, payload_practica)
+
+        upsert(
+        alumnosTabla,
+        {"dni": alumnoDni, "estado": estadosAlumno[1]},
+        keys=["dni"])
+
+        if ciclos_info != None:
+            ciclos_info[ciclo]["disponibles"] = max(cupos_disp - 1, 0)
+            upsert(
+                necesidadFP,
+                {
+                    "id": oferta_id,
+                    "empresa": empresaCif,
+                    "ciclos_formativos": ciclos_info,
+                },
+                keys=["id"],
+            )
+        upsert(
+            alumnoEstadosTabla,
+            {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
+            keys=["alumno"]
+        )
 
 
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
@@ -580,18 +671,26 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
     )
 
 
-        
-
-
+    
 def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino):
-  for tipo in forms[:-1]:
-    dias_a_sumar = 7 if tipo == forms[0] else 30 if tipo == forms[1] else 32 if tipo == forms[2] else 0
-    fecha_envio = (fecha_inicio + timedelta(days=dias_a_sumar)).isoformat()
-    update(feedbackFormsTabla,
-            {
-                "practica_id": practica_id,
+    for tipo in forms[:-1]:
+        # 1. Calcular fechas
+        dias_a_sumar = 7 if tipo == forms[0] else 30 if tipo == forms[1] else 32 if tipo == forms[2] else 0
+        fecha_envio = (fecha_inicio + timedelta(days=dias_a_sumar)).isoformat()
+    
+        try:
+            registro_existente = getEquals(feedbackFormsTabla, {"practica_id": int(practica_id), "tipo_form":tipo})
+            data_feedback = {
+                "practica_id": int(practica_id),
                 "fecha_envio": fecha_envio,
-                "email_destino": email_destino
-            },
-            {"practica_id": practica_id, "tipo_form": tipo}
-        )
+                "email_destino": email_destino,
+                "tipo_form": tipo
+            }
+            if registro_existente:
+                id_registro = registro_existente[0]['id']
+                update(feedbackFormsTabla, data_feedback, {"id": id_registro})
+            else:
+                add(feedbackFormsTabla, data_feedback)
+                    
+        except Exception as e:
+            st.error(f"Error procesando feedback para {tipo}: {e}")
