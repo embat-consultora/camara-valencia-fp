@@ -55,6 +55,7 @@ practicaEstadosTabla="practica_estados"
 tutoresTabla="tutores"
 feedbackFormsTabla="feedback_forms"
 feedbackResponseTabla="feedback_respuestas"
+gestoresTabla="gestores"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from modules.data_base import (
     getEquals, getPracticas,
-    update, upsert,asignarFechasFormsFeedback
+    update, upsert,asignarFechasFormsFeedback,getOrdered, crearPractica
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -16,9 +16,9 @@ import uuid
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     fasesPractica, faseColPractica, max_file_size, carpetaPractica,
-    necesidadFP,linkCalendar,feedbackResponseTabla,forms
+    necesidadFP,linkCalendar,feedbackResponseTabla,forms,alumnosTabla, empresasTabla
 )
-import plotly.graph_objects as go
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 # ----------------------------------------------
 # CONFIG
@@ -28,10 +28,9 @@ make_sidebar()
 st.set_page_config(page_title="Prácticas", page_icon="🚀")
 
 now = datetime.now().isoformat()
+st.title("🚀 Prácticas")
 
-# ----------------------------------------------
-# INICIALIZAR SESSION_STATE (evita KeyError)
-# ----------------------------------------------
+
 if "practicas" not in st.session_state:
     st.session_state["practicas"] = []
 
@@ -97,43 +96,77 @@ if "practica_seleccionada" not in st.session_state:
 # ----------------------------------------------
 # PAGINA: LISTA
 # ----------------------------------------------
+
 def mostrar_lista():
-    st.title("🚀 Prácticas")
-
+    st.subheader("Listado de Prácticas")
+    
     filtro_estado = st.selectbox("Filtrar por estado", ["Todos"] + fasesPractica, index=0)
-    estado_por_practica = {}
-
+    
+    # 1. Preparar el DataFrame para el Grid
+    data_for_grid = []
     for p in practicas:
         pid = p["id"]
-        estadosPractica = st.session_state["estados"].get(pid, {})
-        if not estadosPractica:
-            estado_por_practica[pid] = "Pendiente"
+        # Lógica de estados simplificada para el grid
+        estados_p = st.session_state["estados"].get(pid, {})
+        estado_actual = "Pendiente"
+        for fase in fasesPractica:
+            if estados_p.get(faseColPractica[fase]):
+                estado_actual = fase
+        
+        if filtro_estado == "Todos" or estado_actual == filtro_estado:
+            data_for_grid.append({
+                "ID": pid,
+                "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
+                "Empresa": p.get('empresas', {}).get('nombre'),
+                "Estado": estado_actual,
+                "Ciclo": p.get('ciclo_formativo', '—')
+            })
+
+    df = pd.DataFrame(data_for_grid)
+
+    if df.empty:
+        st.info("No hay prácticas que coincidan con el filtro.")
+        return
+
+    # 2. Configurar AgGrid
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_selection('single', use_checkbox=False) # Selección de fila completa
+    gb.configure_column("ID", hide=True) # Ocultamos el ID técnico
+    gb.configure_grid_options(domLayout='normal')
+    
+    # Tip de experto: Hacer que las columnas se ajusten automáticamente
+    gridOptions = gb.build()
+
+    st.write("Selecciona una fila para ver el detalle:")
+    
+    # 3. Renderizar el Grid
+    response = AgGrid(
+        df,
+        gridOptions=gridOptions,
+        update_mode=GridUpdateMode.SELECTION_CHANGED, # Se dispara al hacer click
+        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+        fit_columns_on_grid_load=True,
+        theme='streamlit', # O 'balham', 'alpine'
+        height=400,
+        allow_unsafe_縫tml=True
+    )
+
+    # 4. Lógica de Navegación (Detección de Click)
+    selected_rows = response.get('selected_rows')
+    
+    # st-aggrid v0.3.3+ devuelve una lista o un DataFrame según configuración
+    if selected_rows is not None and len(selected_rows) > 0:
+        # Extraemos el ID de la fila seleccionada
+        # Dependiendo de la versión de aggrid, selected_rows puede ser un DataFrame o lista
+        if isinstance(selected_rows, pd.DataFrame):
+            selected_id = selected_rows.iloc[0]['ID']
         else:
-            registro = estadosPractica
-            estado_actual = "Pendiente"
-            for fase in fasesPractica:
-                col = faseColPractica[fase]
-                if registro.get(col):
-                    estado_actual = fase
-            estado_por_practica[pid] = estado_actual
+            selected_id = selected_rows[0]['ID']
 
-    practicas_filtradas = practicas if filtro_estado == "Todos" else [
-        p for p in practicas if estado_por_practica[p["id"]] == filtro_estado
-    ]
-
-    st.write("Selecciona una práctica para ver el detalle:")
-
-    for p in practicas_filtradas:
-        empresa = p.get("empresas") or {}
-        alumno = p.get("alumnos") or {}
-
-        label = f"{alumno.get('nombre')} {alumno.get('apellido')} — {empresa.get('nombre')}"
-
-        if st.button(label, key=f"btn_{p['id']}"):
-            st.session_state.practica_seleccionada = p["id"]
-            st.session_state.page = "detalle"
-            st.rerun()
-
+        # Seteamos el estado y redirigimos
+        st.session_state.practica_seleccionada = selected_id
+        st.session_state.page = "detalle"
+        st.rerun()
 # ----------------------------------------------
 # PAGINA: DETALLE
 # ----------------------------------------------
@@ -421,3 +454,4 @@ if st.session_state.page == "lista":
     mostrar_lista()
 else:
     mostrar_detalle()
+
