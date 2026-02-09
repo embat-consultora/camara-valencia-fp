@@ -52,7 +52,7 @@ acompanado = st.slider("Me siento acompañado/a en el proceso", 1, 5, 3)
 # 4. Satisfacción
 st.subheader("Satisfacción general")
 experiencia_global = st.slider("Evaluación de tu experiencia hasta ahora", 1, 10, 7)
-mejoras = st.text_area("¿Qué mejorarías de la experiencia de prácticas?")
+mejoras = st.text_area("¿Qué mejorarías de la experiencia de la formación de empresa?")
 
 if st.button("Enviar"):
     respuestas_json = {

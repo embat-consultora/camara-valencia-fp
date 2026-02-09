@@ -11,6 +11,7 @@ def load_env_once():
 
 def make_sidebar():
     load_env_once()
+    rol = st.session_state.get("rol", "admin")
     with st.sidebar:
             st.markdown(
             """
@@ -28,19 +29,24 @@ def make_sidebar():
             st.write("")
 
             if st.session_state.get("logged_in", False):
-                st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
-                st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
-                # st.page_link("pages/dashboard.py", label="Panel de Control")
-                st.page_link("pages/practicas.py", label="Prácticas")
-                st.page_link("pages/matchs.py", label="Matchs")
-                st.page_link("pages/cargaRapida.py", label="Carga Rápida")
-                
-                st.page_link("pages/empresas.py", label="Empresas")
-                st.page_link("pages/alumnos.py", label="Alumnos")
-                
-                st.write("")
-                st.write("")
-
+                if rol == "admin":
+                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
+                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    # st.page_link("pages/dashboard.py", label="Panel de Control")
+                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/matchs.py", label="Matchs")
+                    st.page_link("pages/cargaRapida.py", label="Carga Rápida")
+                    
+                    st.page_link("pages/empresas.py", label="Empresas")
+                    st.page_link("pages/alumnos.py", label="Alumnos")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.write("")
+                    st.write("")
+                if rol == "gestor":
+                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
+                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/documentacion.py", label="Documentación")
                 if st.button(logoutButton):
                     logout()
 

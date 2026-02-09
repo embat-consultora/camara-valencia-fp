@@ -71,4 +71,4 @@ if st.button("Enviar"):
             },
             {"practica_id": practica_id, "tipo_form": tipo_form})
     st.balloons()
-    st.success("¡Felicidades por terminar tus prácticas!")
+    st.success("¡Felicidades por terminar tu formación en Empresa!")

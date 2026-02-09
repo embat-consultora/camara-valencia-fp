@@ -6,7 +6,8 @@ from variables import feedbackResponseTabla, feedbackFormsTabla,forms
 # Leer parámetros de URL
 # -------------------------------
 st.set_page_config(page_title="Feedback Inicial", page_icon="📨")
-
+#http://localhost:8501/feedback_inicial?token=2a6aa3a62d6a47b1868793f78f6f1ce9&tipo=feedback_inicial
+#http://localhost:8501/?token=1f064716d453483fb2c9941bd8ff0139&tipo=feedback_inicial
 token = st.query_params.get("token")
 tipo_form = st.query_params.get("tipo")
 
@@ -45,7 +46,7 @@ st.title("Formulario de seguimiento – Primera semana")
 # -------- FORMULARIO DIRECTO (sin st.form) --------
 
 st.subheader("Datos generales")
-st.write("Información básica de la práctica y el alumno, ya precargada.")
+st.write("Información básica de la formación en Empresa y el alumno, ya precargada.")
 empresa_input = st.text_input("Empresa", value=empresa, disabled=True)
 alumno_input = st.text_input("Alumno", value=alumno, disabled=True)
 fecha_inicio_input = st.text_input("Fecha de inicio", value=fecha_inicio, disabled=True)
@@ -61,8 +62,8 @@ comodidad = st.slider("Me siento cómodo/a en el entorno de trabajo", 1, 5, 3)
 mejor = st.text_area("¿Qué fue lo mejor de tu primera semana?")
 
 st.subheader("Expectativas")
-st.write("Reflexiona sobre si la práctica cumple con tus expectativas y qué te gustaría aprender.")
-alineado = st.radio("¿Las prácticas cumplen tus expectativas?", ["Sí", "Parcialmente", "No"])
+st.write("Reflexiona sobre si la formación cumple con tus expectativas y qué te gustaría aprender.")
+alineado = st.radio("¿La formación cumple tus expectativas?", ["Sí", "Parcialmente", "No"])
 aprender = st.text_area("¿Qué te gustaría aprender?")
 
 st.subheader("Primeras alertas")
