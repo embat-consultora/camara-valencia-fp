@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getEqual, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
+from modules.data_base import getEqual, getTutores,getGestore, updateTutores, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -121,9 +121,14 @@ with tab_alumnos:
     except:
         nombres_gestores = []
 
+
+    try:
+        df_tutores_lista = getTutores() # Esta es la función que ya tienes
+        nombres_tutores_empresa = sorted(df_tutores_lista['nombre'].unique().tolist())
+    except:
+        nombres_tutores_empresa = []
     # --- FILTRO POR GESTOR (Visualización) ---
     if rol_usuario == "gestor":
-        
         if 'gestor' in df_raw.columns:
             gestorDb = getEqual(gestoresTabla, 'email', email_usuario)
             df_raw = df_raw[df_raw['gestor'] == gestorDb[0]['nombre']]
@@ -236,8 +241,10 @@ with tab_alumnos:
 
         gb.configure_column("tutor_empresa", 
             headerName="Tutor Empresa", 
-            editable=False,
+            editable=True,
             width=200,
+            cellEditor='agSelectCellEditor',
+            cellEditorParams={'values': nombres_tutores_empresa}, # Pasamos la lista aquí
             cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
         )
         gb.configure_column("puesto",
@@ -327,7 +334,7 @@ with tab_alumnos:
 # --- TAB OFERTAS (Todo el código igual, visible para ambos) ---
 with tab_ofertas:
     try:
-        df_gestores_all = getGestores()
+        df_gestores_all = getGestore()
         gestores_activos = df_gestores_all[df_gestores_all['activo'] == True]['nombre'].tolist()
     except:
         st.error("No se pudo cargar la lista de gestores.")
@@ -442,40 +449,76 @@ with tab_ofertas:
 # --- TAB CONFIGURACIÓN (Solo Admin) ---
 if rol_usuario == "admin":
     with tab_config:
-        st.subheader("Configuración de Gestores")
-        df_gestores = getGestores()
-        edited_g = st.data_editor(
-                df_gestores,
-                column_config={"id": None, "password": None, "nombre": "Nombre", "email": "Email", "activo": "Visible"},
-                num_rows="dynamic",
-                key="editor_gestores",
-                use_container_width=True
-            )
-        if st.button("Actualizar Gestores"):
-            cambios = st.session_state["editor_gestores"]
-            if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
-                try:
-                    for row in cambios["added_rows"]:
-                        nombre = row.get("nombre", "Sin Nombre").strip()
-                        email = row.get("email", "").strip()
-                        if not email or "@" not in email:
-                            st.error(f"Email inválido para {nombre}"); st.stop()
-                        anio_actual = datetime.now().year
-                        password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
-                        row["password_temp"] = password_auto
-                    
-                    updateGestores(cambios, df_gestores)
-                    if cambios["added_rows"]:
-                        st.warning("Usuarios creados:")
+        tabs = st.tabs(["Gestores", "Tutores"])
+        with tabs[0]:
+            df_gestores = getGestores()
+            edited_g = st.data_editor(
+                    df_gestores,
+                    column_config={"id": None, "password": "Password", "nombre": "Nombre", "email": "Email", "activo": "Visible"},
+                    num_rows="dynamic",
+                    key="editor_gestores",
+                    use_container_width=True
+                )
+            if st.button("Actualizar Gestores"):
+                cambios = st.session_state["editor_gestores"]
+                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+                    try:
                         for row in cambios["added_rows"]:
-                            st.code(f"Gestor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
-                        if st.button("Continuar"): st.rerun()
-                    else:
-                        st.success("✅ Guardado"); st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-
-
+                            nombre = row.get("nombre", "Sin Nombre").strip()
+                            email = row.get("email", "").strip()
+                            if not email or "@" not in email:
+                                st.error(f"Email inválido para {nombre}"); st.stop()
+                            anio_actual = datetime.now().year
+                            password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
+                            row["password_temp"] = password_auto
+                        
+                        updateGestores(cambios, df_gestores)
+                        if cambios["added_rows"]:
+                            st.warning("Usuarios creados:")
+                            for row in cambios["added_rows"]:
+                                st.code(f"Gestor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
+                            if st.button("Continuar"): st.rerun()
+                        else:
+                            st.success("✅ Guardado"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+         
+        with tabs[1]:
+            df_tutores = getTutores()
+            edited_t = st.data_editor(
+                               df_tutores,
+                               column_config={
+                                    "id": None, 
+                                    "nombre": "Nombre", 
+                                    "email": "Email", 
+                                    "password": "Password"
+                                },
+                                num_rows="dynamic",
+                                key="editor_tutores",
+                                use_container_width=True
+                            )
+            if st.button("Actualizar Tutores"):
+                cambios = st.session_state["editor_tutores"]
+                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+                    try:
+                        for row in cambios["added_rows"]:
+                            nombre = row.get("nombre", "Sin Nombre").strip()
+                            email = row.get("email", "").strip()
+                            if not email or "@" not in email:
+                                st.error(f"Email inválido para {nombre}"); st.stop()
+                            anio_actual = datetime.now().year
+                            password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
+                            row["password_temp"] = password_auto
+                        
+                        res = updateTutores(cambios, df_tutores)
+                        if cambios["added_rows"]:
+                            st.warning("Usuarios creados:")
+                            for row in cambios["added_rows"]:
+                                st.code(f"Tutor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
+                            if st.button("Continuar"): st.rerun()
+                        else:
+                            st.toast("✅ Guardado"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
 

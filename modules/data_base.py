@@ -15,7 +15,8 @@ from variables import (
     feedbackFormsTabla,
     forms,empresasTabla, practicaTabla, alumnosTabla,
     gestoresTabla,
-    usuariosTabla
+    usuariosTabla,
+    tutoresTabla
 )
 load_dotenv()
 
@@ -62,6 +63,8 @@ def get_alumnos_con_practicas_consolidado():
     response = (
         supabase.table(alumnosTabla)
         .select("*, practicas_fp(alumno, empresas(CIF, nombre,telefono, email_empresa), area, tutor)")
+        .eq("estado", "Sin Empresa")
+        .is_("practicas_fp.fecha_inicio", "null")
         .order("ciclo_formativo")
         .execute()
     )
@@ -93,10 +96,30 @@ def get_alumnos_con_practicas_consolidado():
         rows.append(row)
 
     return pd.DataFrame(rows)
-def getGestores():
-    res = supabase.table(gestoresTabla).select("*").order("nombre").execute()
-    return pd.DataFrame(res.data)
 
+def getGestore():
+    gestores = supabase.table(gestoresTabla).select("*").order("nombre").execute()
+    return pd.DataFrame(gestores.data)
+
+def getGestores():
+    gestores = supabase.table(gestoresTabla).select("email, nombre").order("nombre").execute()
+    usuarios = supabase.table(usuariosTabla).select("email, password").execute()
+    
+    df_gestores = pd.DataFrame(gestores.data)
+    df_usuarios = pd.DataFrame(usuarios.data)
+    
+    df_final = pd.merge(df_gestores, df_usuarios, on="email", how="inner")
+    return df_final
+
+def getTutores():
+    tutores = supabase.table(tutoresTabla).select("id, email, nombre").order("nombre").execute()
+    usuarios = supabase.table(usuariosTabla).select("email, password").execute()
+    
+    df_tutores = pd.DataFrame(tutores.data)
+    df_usuarios = pd.DataFrame(usuarios.data)
+    
+    df_final = pd.merge(df_tutores, df_usuarios, on="email", how="left")
+    return df_final
 def getEmpresasYOfertas():
     res = (
         supabase.table(empresasTabla)
@@ -105,8 +128,62 @@ def getEmpresasYOfertas():
         .execute()
     )
     return res.data
+
+def updateTutores(cambios, df_original):
+    for new_row in cambios["added_rows"]:
+        nombre = new_row.get("nombre", "").strip()
+        email = new_row.get("email", "").strip().lower()
+        password = new_row.get("password_temp") or new_row.get("password", "123456")
+        nif = "00000000"
+        if email and nombre:
+            try:
+                add(tutoresTabla, {
+                    "nif":nif,
+                    "nombre": nombre,
+                    "email": email,
+                })
+
+                # Insertamos en la tabla de USUARIOS
+                add("usuarios", {
+                    "email": email,
+                    "password": password,
+                    "rol": "tutor"
+                })
+            except Exception as e:
+                raise Exception(f"Error al crear el usuario {email}: {e}")
+
+    # 2. MANEJAR EDICIONES (Edited)
+    for idx, mods in cambios["edited_rows"].items():
+
+        fila_orig = df_original.iloc[int(idx)]
+        id_tutores = fila_orig["id"]
+        email_orig = fila_orig["email"]
+        
+        try:
+            cambios_tutor = {k: v for k, v in mods.items() if k in ["nombre", "email", "nif", "activo"]}
+            cambios_usuario = {k: v for k, v in mods.items() if k in ["password", "email"]}
+            if cambios_tutor:
+                update(tutoresTabla, mods, {"id": id_tutores})
+            if cambios_usuario:
+                update("usuarios", cambios_usuario, {"email": email_orig})
+                
+        except Exception as e:
+            raise Exception(f"Error al actualizar el gestor {id_tutores}: {e}")
+
+    # 3. MANEJAR BORRADOS (Deleted)
+    for idx in cambios["deleted_rows"]:
+        fila_orig = df_original.iloc[int(idx)]
+        id_tutor = fila_orig["id"]
+        email_tutor = fila_orig["email"]
+        
+        try:
+            delete(tutoresTabla, "id", id_tutor)
+            delete("usuarios", "email", email_tutor)
+        except Exception as e:
+            st.error(f"Error al eliminar {email_tutor}: {e}")
+        
+
 def updateGestores(cambios, df_original):
-    # 1. MANEJAR ALTAS (Added)
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         email = new_row.get("email", "").strip().lower()
@@ -114,8 +191,6 @@ def updateGestores(cambios, df_original):
         
         if email and nombre:
             try:
-                # Insertamos en la tabla de GESTORES
-                # Nota: Asumo que tu función se llama 'add' o 'insert' según tu librería
                 add(gestoresTabla, {
                     "nombre": nombre,
                     "email": email,
@@ -528,7 +603,6 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         curr_apellido = clean_str(row.get('apellido'))
         curr_horas = clean_int(row.get('horas_totales'))
         curr_gestor = clean_str(row.get('gestor'))
-
         # 4. EXTRAER VALORES ORIGINALES
         orig_comentarios = clean_str(row_orig.get('comentarios_centro'))
         orig_obs = clean_str(row_orig.get('observaciones_seguimiento'))

@@ -103,7 +103,6 @@ def dialog_fecha_fin(practica_id, email_alumno):
     
     if st.button("Confirmar", type="primary"):
         asignarFechasFormsFeedback(int(practica_id), datetime.now().date(), email_alumno, fecha_fin)
-        
         st.success("Fechas programadas correctamente.")
         st.toast("✅  La práctica ha pasado a estado INICIADA")
 
@@ -249,7 +248,6 @@ def mostrar_detalle():
     # ------------------------------------------
     st.divider()
     st.subheader("Seguimiento")
-
     estado_actual = st.session_state["estados"].get(practicaId, {})
     
     mostrar_fases(fasesPractica, faseColPractica, estado_actual)
@@ -275,6 +273,11 @@ def mostrar_detalle():
             estado_actual[col] = new_value
 
             if fase == fasesPractica[2] and checked:
+                payload_practica = {
+                        "id": int(practicaId),
+                        "fecha_inicio": new_value,
+                    }
+                upsert(practicaTabla, payload_practica, keys=["id"])
                 dialog_fecha_fin(practicaId, alumno['email_alumno'])
             st.session_state["estados"][practicaId] = estado_actual
             st.toast(f"✅  Estado actualizado")
