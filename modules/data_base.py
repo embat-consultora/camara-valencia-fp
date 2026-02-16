@@ -305,6 +305,31 @@ def delete(tableName,searchFor, searchValue):
     response = supabase.table(tableName).delete().eq(searchFor, searchValue).execute()
     return response
 
+
+def actualizar_cupo(cif_empresa, ciclo, cambio):
+    # 1. Traer la oferta actual
+    res = supabase.table(necesidadFP).select("id, ciclos_formativos").eq("empresa", cif_empresa).execute()
+
+    # 2. Modificar el JSON en Python
+    if res.data and len(res.data) > 0:
+        oferta_dict = res.data[0]
+        ciclos = oferta_dict.get('ciclos_formativos', {})
+        if ciclo in ciclos:
+                # Modificamos el valor de disponibles
+                actual = ciclos[ciclo].get('disponibles', 0)
+                
+                # Calculamos el nuevo valor (sin bajar de 0)
+                nuevo_valor = max(0, actual + cambio)
+                
+                # Actualizamos el diccionario localmente
+                ciclos[ciclo]['disponibles'] = nuevo_valor
+                
+                # Update en la tabla de ofertas usando el ID del diccionario extraído
+                supabase.table(necesidadFP) \
+                    .update({"ciclos_formativos": ciclos}) \
+                    .eq("id", oferta_dict['id']) \
+                    .execute()
+
 def getOrdered(tableName, searchFor, searchValue, orderByColumn):
     response = supabase.table(tableName).select('*').eq(searchFor, searchValue).order(orderByColumn).execute()
     return response.data
@@ -650,12 +675,17 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         antiguo_puesto= row_orig.get('puesto')
         nuevo_tutor = row.get('tutor')
         antiguo_tutor = row_orig.get('tutor')
+
         if nueva_empresa != empresa_antigua or nuevo_puesto != antiguo_puesto or nuevo_tutor != antiguo_tutor:
             if nueva_empresa == "⚠️ SIN ASIGNAR":
                 delete(practicaTabla, "alumno", dni)
                 upsert(alumnosTabla, {"dni": dni, "estado": "Sin Empresa"}, keys=["dni"])
+                actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
             else:
+                st.write(nueva_empresa)
+                st.write(row['ciclo_formativo'])
                 cif_empresa = mapa_nombres_id.get(nueva_empresa)
+                actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
                 if cif_empresa:
                     crearDraftPractica(
                         empresaCif=cif_empresa,

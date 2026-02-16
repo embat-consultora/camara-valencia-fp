@@ -104,20 +104,21 @@ if rol_usuario == "admin":
 
 # --- TAB ALUMNOS ---
 with tab_alumnos:
+    
     df_raw = get_alumnos_con_practicas_consolidado()
     df_raw = df_raw.rename(columns={'area': 'puesto', 'tutor': 'tutor_empresa'})
     if 'puesto' not in df_raw.columns:
         df_raw['puesto'] = None
     if 'tutor_empresa' not in df_raw.columns:
         df_raw['tutor_empresa'] = None
-
+    if 'cupos_disponibles' not in df_raw.columns:
+            df_raw['cupos_disponibles'] = None
     # Rellenar nulos con string vacío para evitar errores de renderizado en JS
     df_raw['puesto'] = df_raw['puesto'].fillna("")
     df_raw['tutor_empresa'] = df_raw['tutor_empresa'].fillna("")
     try:
         df_gestores_lista = getGestores()
-        # Solo gestores activos para asignar
-        nombres_gestores = df_gestores_lista[df_gestores_lista['activo'] == True]['nombre'].tolist()
+        nombres_gestores = df_gestores_lista['nombre'].tolist()
     except:
         nombres_gestores = []
 
@@ -146,17 +147,25 @@ with tab_alumnos:
 
     mapeo_ciclo_empresas = {}
 
-    for _, row in df_empresas_raw.iterrows():
+    for row in df_empresas:
         nombre_empresa = row['nombre']
-        oferta_fp = row.get('oferta_fp', [])
+        # Accedemos a la relación de oferta_fp
+        ofertas = row.get('oferta_fp', [])
         
-        if isinstance(oferta_fp, list) and len(oferta_fp) > 0:
-            puestos_data = oferta_fp[0].get('puestos', {})
-            for ciclo in puestos_data.keys():
+        for oferta in ofertas:
+            # Extraemos el JSON de ciclos_formativos
+            ciclos_data = oferta.get('ciclos_formativos', {})
+            
+            for ciclo, info in ciclos_data.items():
+                disponibles = info.get('disponibles', 0)
+                
                 if ciclo not in mapeo_ciclo_empresas:
                     mapeo_ciclo_empresas[ciclo] = []
-                if nombre_empresa not in mapeo_ciclo_empresas[ciclo]:
-                    mapeo_ciclo_empresas[ciclo].append(nombre_empresa)
+                
+                mapeo_ciclo_empresas[ciclo].append({
+                    "nombre": nombre_empresa,
+                    "disponibles": disponibles
+                })
 
     json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
 
@@ -169,14 +178,42 @@ with tab_alumnos:
         df_raw['ciclo_acronimo'] = df_raw['ciclo_formativo'].apply(crear_acronimo)
         cols_visibles = [
             "ciclo_acronimo", "apellido", "nombre","localidad", "vehiculo", "horas_totales", 
-            "nombre_empresa","puesto","tutor_empresa","telefono", "email_empresa", "gestor", "comentarios_centro", "anexos_creados", 
+            "nombre_empresa","puesto","cupos_disponibles","tutor_empresa","telefono", "email_empresa", "gestor", "comentarios_centro", "anexos_creados", 
             "anexos_enviados", "anexos_firmados", "doc_sao_entregada", "observaciones_seguimiento"
         ]
         
-        cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info", "cupos_disponibles"]
+        cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info"]
         cols_finales = cols_visibles + [c for c in cols_tecnicas if c in df_raw.columns]
         df_display = df_raw[cols_finales].copy()
 
+        def calcular_cupo_actual(row, dict_mapeo):
+            empresa = row.get('nombre_empresa')
+            ciclo = row.get('ciclo_formativo')
+            
+            # Si no tiene empresa o es la marca de "Sin asignar"
+            if not empresa or empresa == "⚠️ SIN ASIGNAR":
+                return None
+            
+            # Buscamos en el mapeo de ofertas (dict_mapeo que ya generaste)
+            # Estructura esperada: dict_mapeo[empresa][ciclo] -> { "disponibles": X, ... }
+            try:
+                if empresa in dict_mapeo and ciclo in dict_mapeo[empresa]:
+                    # Accedemos al primer puesto o sumamos disponibles si hay varios
+                    puestos = dict_mapeo[empresa][ciclo]
+                    if isinstance(puestos, list) and len(puestos) > 0:
+                        # Si tu dict_mapeo tiene la estructura de puestos:
+                        return puestos[0].get('disponibles', 0) 
+            except Exception as e:
+                return None
+            return None
+
+        # Creamos la columna físicamente en el DataFrame
+        df_display['cupos_disponibles'] = df_display.apply(lambda x: calcular_cupo_actual(x, dict_mapeo), axis=1)
+
+        # Ahora sí, asegúrate de incluirla en la lista de columnas visibles
+        if "cupos_disponibles" not in cols_visibles:
+            cols_visibles.append("cupos_disponibles")
+        st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de Carga Rápida")
         gb = GridOptionsBuilder.from_dataframe(df_display)
         gb.configure_default_column(editable=True, filter=True, resizable=True)
 
@@ -212,11 +249,15 @@ with tab_alumnos:
                 function(params) {{
                     const mapeoCiclos = {json_ciclo_empresas};
                     const cicloAlumno = params.data.ciclo_formativo;
+                    const empresaActual = params.data.nombre_empresa;
                     
-                    // Obtenemos solo las empresas que tienen ese ciclo
-                    let empresasValidas = mapeoCiclos[cicloAlumno] || [];
+                    let datosEmpresas = mapeoCiclos[cicloAlumno] || [];
                     
-                    // Añadimos la opción por defecto al principio
+                    // Filtrar: dejamos las que tienen cupo O la que ya tiene el alumno asignada
+                    let empresasValidas = datosEmpresas
+                        .filter(e => e.disponibles > 0 || e.nombre === empresaActual)
+                        .map(e => e.nombre);
+                    
                     return {{
                         values: ['⚠️ SIN ASIGNAR', ...empresasValidas]
                     }};
@@ -228,13 +269,30 @@ with tab_alumnos:
                     return {'backgroundColor': '#55efc4', 'color': 'black'};
                 }
             """),
-            onCellValueChanged=JsCode("""
-        function(params) {
-            // Limpia el puesto si cambia la empresa para evitar errores
-            params.data.puesto = null; 
-            params.api.refreshCells({rowNodes: [params.node], columns: ['puesto']});
-        }
-    """),
+            onCellValueChanged=JsCode(f"""
+                    function(params) {{
+                        // Usamos el JSON de ciclos que tiene los disponibles
+                        const mapeoCiclos = {json_ciclo_empresas}; 
+                        const nuevaEmpresa = params.data.nombre_empresa;
+                        const ciclo = params.data.ciclo_formativo;
+
+                        let totalCupos = 0;
+                        if (mapeoCiclos[ciclo]) {{
+                            const empData = mapeoCiclos[ciclo].find(e => e.nombre === nuevaEmpresa);
+                            if (empData) totalCupos = empData.disponibles;
+                        }}
+
+                        // Actualizamos el valor en la fila (esto dispara el cellRenderer de la otra columna)
+                        params.data.cupos_disponibles = totalCupos;
+                        params.data.puesto = null; 
+
+                        // Refrescamos ambas celdas para que el usuario vea el cambio visual
+                        params.api.refreshCells({{
+                            rowNodes: [params.node], 
+                            columns: ['cupos_disponibles', 'puesto']
+                        }});
+                    }}
+                """),
             editable=True,
             width=200
         )
@@ -299,6 +357,35 @@ with tab_alumnos:
     """),
             width=250
         )
+                
+        gb.configure_column(
+            "cupos_disponibles",
+            headerName="Plazas Libres",
+            width=130,
+            editable=False,
+            # 1. Definimos el estilo (Colores de fondo y texto)
+            cellStyle=JsCode("""
+                function(params) {
+                    if (params.value === null || params.value === undefined) return null;
+                    if (params.value <= 0) {
+                        return {'backgroundColor': '#ff7675', 'color': 'white', 'fontWeight': 'bold'};
+                    } else if (params.value <= 2) {
+                        return {'backgroundColor': '#fab1a0', 'color': 'black', 'fontWeight': 'bold'};
+                    } else {
+                        return {'backgroundColor': '#55efc4', 'color': 'black', 'fontWeight': 'bold'};
+                    }
+                }
+            """),
+            # 2. Definimos el texto con el icono (Sin HTML, solo strings)
+            valueFormatter=JsCode("""
+                function(params) {
+                    if (params.value === null || params.value === undefined) return '-';
+                    if (params.value <= 0) return '🔴 Agotado';
+                    if (params.value <= 2) return '🟠 ' + params.value + ' disp.';
+                    return '🟢 ' + params.value + ' disp.';
+                }
+            """)
+        )
         checkbox_cols = ["anexos_creados", "anexos_enviados", "anexos_firmados", "doc_sao_entregada"]
         for col in checkbox_cols:
             gb.configure_column(col, cellRenderer='checkboxRenderer', valueFormatter=si_no_js, width=100)
@@ -324,7 +411,6 @@ with tab_alumnos:
             df_grid = grid_response['data']
             with st.spinner("Guardando datos"):
                 try:
-                    # Esta función debe estar preparada para recibir la columna 'gestor' y guardarla en la tabla alumnos
                     guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
                     st.success("✅ ¡Cambios guardados correctamente!")
                     st.rerun()
