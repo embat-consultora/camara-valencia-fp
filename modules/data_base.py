@@ -102,7 +102,7 @@ def getGestore():
     return pd.DataFrame(gestores.data)
 
 def getGestores():
-    gestores = supabase.table(gestoresTabla).select("email, nombre").order("nombre").execute()
+    gestores = supabase.table(gestoresTabla).select("id, email, nombre").order("nombre").execute()
     usuarios = supabase.table(usuariosTabla).select("email, password").execute()
     
     df_gestores = pd.DataFrame(gestores.data)
@@ -212,7 +212,6 @@ def updateGestores(cambios, df_original):
         fila_orig = df_original.iloc[int(idx)]
         id_gestor = fila_orig["id"]
         email_orig = fila_orig["email"]
-        
         try:
             # Actualizamos la tabla de gestores
             update(gestoresTabla, mods, {"id": id_gestor})

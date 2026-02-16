@@ -472,7 +472,7 @@ if rol_usuario == "admin":
                             password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
                             row["password_temp"] = password_auto
                         
-                        updateGestores(cambios, df_gestores)
+                        des= updateGestores(cambios, df_gestores)
                         if cambios["added_rows"]:
                             st.warning("Usuarios creados:")
                             for row in cambios["added_rows"]:
