@@ -16,8 +16,9 @@ st.markdown(
 
 # -- aca el "email" es el CIF de la empresa
 cif = st.session_state.get("username", "000000")
-if "df_tutores" not in st.session_state:
-    st.session_state.df_tutores = None
+
+if "tutores" not in st.session_state:
+    st.session_state.tutores = None
 # --- Traer todas las empresas ---
 empresas = getEquals(empresasTabla, {"CIF": cif})
 if not empresas:
