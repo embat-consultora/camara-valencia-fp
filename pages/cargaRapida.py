@@ -1,11 +1,11 @@
 import streamlit as st
 from modules.data_base import (
-    getEquals, getOrdered, crearPractica, upsert
+    getEquals, upsertCustome, crearPractica, upsert
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from datetime import datetime
-from variables import (alumnosTabla, empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno)
+from variables import (alumnosTabla, empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla)
 import json
 # ----------------------------------------------
 # CONFIG
@@ -21,28 +21,7 @@ now = datetime.now().isoformat()
 # ----------------------------------------------
 # LÓGICA DE CARGA DE DATOS
 # ----------------------------------------------
-def fetch_alumnos_empresas():
-    alumnos = getOrdered(
-        alumnosTabla,
-        searchFor="estado",
-        searchValue="Sin Empresa",
-        orderByColumn="tipoPractica"
-    )
-    empresas = getEquals(empresasTabla, {})
-    return alumnos, empresas
 
-if "data_loaded" not in st.session_state:
-    st.session_state["data_loaded"] = False
-
-def load_data(force=False):
-    if not st.session_state["data_loaded"] or force:
-        with st.spinner("Actualizando datos..."):
-            alumnos, empresas = fetch_alumnos_empresas()
-            st.session_state["alumnos"] = alumnos
-            st.session_state["empresas"] = empresas
-            st.session_state["data_loaded"] = True
-
-load_data()
 st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una práctica.")
 
 # 1. DATOS DE LA EMPRESA
@@ -113,7 +92,11 @@ if st.button("🚀 Guardar y Vincular Práctica", use_container_width=True):
                     "telefono": new_emp_tel,
                     "email_empresa": new_emp_email
                 }, keys=["CIF"])
-
+                usuario = upsertCustome(usuariosTabla, {
+                            "email": new_emp_cif,
+                            "password": new_emp_cif,
+                            "rol": "empresa",
+                        }, keys=["email"])
                 # B. Alta Alumno
                 upsert(alumnosTabla, {
                     "dni": new_alu_dni,
@@ -141,12 +124,7 @@ if st.button("🚀 Guardar y Vincular Práctica", use_container_width=True):
                 )
 
                 st.success(f"✅ ¡Éxito! Práctica creada entre {new_emp_nombre} y {new_alu_nombre}.")
-                
-                # Limpiamos caché de sesión si usas una
-                if "data_loaded" in st.session_state:
-                    st.session_state["data_loaded"] = False
-                
-                st.rerun()
+                st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
 
             except Exception as e:
                 st.error(f"❌ Error en el proceso: {str(e)}")
