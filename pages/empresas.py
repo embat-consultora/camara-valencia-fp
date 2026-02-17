@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-from modules.data_base import get, getEqual, update, upsert
+from modules.data_base import get, getEqual, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla
+from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla, tutoresTabla
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -258,50 +258,161 @@ with tab1:
 # -------------------------------------------------------------------
 # TAB 2: Crear nueva empresa
 # -------------------------------------------------------------------
+
 with tab2:
-    st.subheader("➕ Nueva Empresa")
-    with st.form("nueva_empresa_form"):
-        nombre_empresa = st.text_input("Nombre de la empresa")
-        direccion = st.text_input("Dirección")
-        cp = st.text_input("Código Postal")
-        localidad = st.text_input("Localidad")
-        cif = st.text_input("CIF *")
-        nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario")
-        telefono_contacto = st.text_input("Teléfono de contacto")
-        email_contacto = st.text_input("Email de contacto")
-        nombre_responsable = st.text_input("Nombre del responsable legal")
-        nie_responsable = st.text_input("NIF del responsable legal")
-        horario = st.text_input("Horario Empresa")
-        pagina_web = st.text_input("Página web")
-        col1, col2 = st.columns(2)
-        submitted = st.form_submit_button("Crear Empresa")
-        if submitted:
-            if not cif or cif.strip() == "":
-                st.warning("⚠️ El campo CIF es obligatorio")
-            else:
-                try:
-                    upsert(
-                        empresasTabla,
-                        {
-                            "nombre": nombre_empresa,
-                            "direccion": direccion,
-                            "localidad": localidad,
-                            "codigo_postal": cp,
-                            "CIF": cif.strip(),
-                            "telefono": telefono_contacto,
-                            "email_empresa": email_contacto,
-                            "nombre_rellena": nombre_contacto,
-                            "responsable_legal": nombre_responsable,
-                            "nif_responsable_legal": nie_responsable,
-                            "horario": horario,
-                            "pagina_web": pagina_web,
-                        },
-                        keys=["CIF"],
-                    )
-                    st.success("✅ Empresa creada correctamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error al crear la empresa: {e}")
+    tabNuevo, tabBulk = st.tabs(["Nueva Empresa", "Carga Masiva (.csv)"])
+    with tabNuevo:
+        st.subheader("➕ Nueva Empresa")
+        with st.form("nueva_empresa_form"):
+            nombre_empresa = st.text_input("Nombre de la empresa")
+            direccion = st.text_input("Dirección")
+            cp = st.text_input("Código Postal")
+            localidad = st.text_input("Localidad")
+            cif = st.text_input("CIF *")
+            nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario")
+            telefono_contacto = st.text_input("Teléfono de contacto")
+            email_contacto = st.text_input("Email de contacto")
+            nombre_responsable = st.text_input("Nombre del responsable legal")
+            nie_responsable = st.text_input("NIF del responsable legal")
+            horario = st.text_input("Horario Empresa")
+            pagina_web = st.text_input("Página web")
+            col1, col2 = st.columns(2)
+            submitted = st.form_submit_button("Crear Empresa")
+            if submitted:
+                if not cif or cif.strip() == "":
+                    st.warning("⚠️ El campo CIF es obligatorio")
+                else:
+                    try:
+                        upsert(
+                            empresasTabla,
+                            {
+                                "nombre": nombre_empresa,
+                                "direccion": direccion,
+                                "localidad": localidad,
+                                "codigo_postal": cp,
+                                "CIF": cif.strip(),
+                                "telefono": telefono_contacto,
+                                "email_empresa": email_contacto,
+                                "nombre_rellena": nombre_contacto,
+                                "responsable_legal": nombre_responsable,
+                                "nif_responsable_legal": nie_responsable,
+                                "horario": horario,
+                                "pagina_web": pagina_web,
+                            },
+                            keys=["CIF"],
+                        )
+                        st.success("✅ Empresa creada correctamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al crear la empresa: {e}")
+
+    with tabBulk:
+        st.write("📥 Cargar Empresa desde CSV")
+        # 1. Excel de muestra
+        sample_df = pd.DataFrame({
+            "CIF": [""],# obligatorio
+            "nombre": [""],
+            "direccion": [""],
+            "codigo_postal": [""],
+            "localidad": [""],
+            "email_empresa": [""],
+            "telefono": [""],
+            "tutor": [""],
+            "tutor_email": [""],
+            "nif_tutor":[""]
+        })
+        sample_csv_path = Path(tempfile.gettempdir()) / "empresa_muestra.csv"
+        sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
+
+        with open(sample_csv_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar CSV de ejemplo",
+                data=f,
+                file_name="empresa_muestra.csv",
+                mime="text/csv"
+            )
+
+        st.info("Sube un archivo CSV. Solo el CIF es obligatorio. El resto de las columnas son opcionales. Intenta que ninguna fila quede vacia")
+
+        # 2. File uploader
+        uploaded_csv = st.file_uploader(
+            "Subir archivo CSV (.csv)",
+            type=["csv"],
+            key="upload_csv_empresa"
+        )
+
+        if uploaded_csv:
+            try:
+                # Leer TODO como string siempre → adiós floats y NaNs
+                df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
+
+                st.write("📄 **Vista previa del archivo cargado:**")
+                st.dataframe(df_csv.head(), use_container_width=True)
+
+                # Validar presencia de columna DNI
+                if "CIF" not in df_csv.columns:
+                    st.error("❌ El archivo debe incluir la columna 'CIF'.")
+                    st.stop()
+
+                if st.button("🚀 Subir empresas desde CSV"):
+                    creados = 0
+                    errores = []
+
+                    # Iterar filas
+                    for _, row in df_csv.iterrows():
+
+                        # 1️⃣ Saltar fila completamente vacía
+                        if not any(str(v).strip() for v in row.values):
+                            continue
+
+                        # 2️⃣ Normalizar DNI
+                        cif_raw = row.get("CIF", "").strip()
+                        cif = re.sub(r"\.0+$", "", cif_raw)  # eliminar .0 si CSV viene de Excel
+                        cif = cif.strip()
+
+                        if not cif:
+                            errores.append("Fila sin CIF — omitida.")
+                            continue
+
+                        # 3️⃣ Construir payload limpio
+                        data = {
+                            "CIF": cif,
+                            "nombre": row.get("nombre", "").strip(),
+                            "direccion": row.get("direccion", "").strip(),
+                            "codigo_postal": row.get("codigo_postal", "").strip(),
+                            "email_empresa": row.get("email_empresa", "").strip(),
+                            "localidad": row.get("localidad", "").strip(),
+                            "telefono": row.get("telefono", "").strip(),
+                        }
+
+                        data_tutor = {
+                            "nombre": row.get("tutor", "").strip(),
+                            "email": row.get("tutor_email", "").strip(),
+                            "nif":row.get("nif_tutor", "").strip(),
+                            "cif_empresa": cif,
+                        }
+                        # 4️⃣ Insert/update
+                        try:
+                            upsert(empresasTabla, data, keys=["CIF"])
+                            if data_tutor.get("nombre") and data_tutor.get("email"):
+                                upsertCustome(tutoresTabla, data_tutor, keys=["email"])
+                            creados += 1
+                        except Exception as e:
+                            errores.append(f"CIF {cif}: {e}")
+
+                    # Resultado del proceso
+                    st.success(f"🎉 {creados} empresas creadas o actualizadas correctamente.")
+
+                    if errores:
+                        st.warning("⚠️ Errores encontrados:")
+                        for err in errores:
+                            st.write("- " + err)
+
+                    #st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error leyendo el CSV: {e}")
+ 
 
 # -------------------------------------------------------------------
 # TAB 3: Formularios & Contacto

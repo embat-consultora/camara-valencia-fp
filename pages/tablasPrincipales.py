@@ -87,12 +87,19 @@ def extraer_ofertas_por_ciclo(df_empresas):
 rol_usuario = st.session_state.get("rol") 
 email_usuario = st.session_state.get("username")
 
+if "df_gestores" not in st.session_state:
+    st.session_state.df_gestores = None
+if "df_tutores" not in st.session_state:
+    st.session_state.df_tutores = None
+
 st.title("🚀 Panel de Gestión de Prácticas FP")
 
 # 1. Definimos qué pestañas se muestran según el rol
 nombres_tabs = ["🎓 Alumnos", "🏢 Ofertas por Ciclo"]
 if rol_usuario == "admin":
     nombres_tabs.append("⚙️ Configuración")
+
+
 
 tabs = st.tabs(nombres_tabs)
 
@@ -122,19 +129,18 @@ with tab_alumnos:
     except:
         nombres_gestores = []
 
-
     try:
         df_tutores_lista = getTutores() # Esta es la función que ya tienes
         nombres_tutores_empresa = sorted(df_tutores_lista['nombre'].unique().tolist())
     except:
         nombres_tutores_empresa = []
     # --- FILTRO POR GESTOR (Visualización) ---
-    if rol_usuario == "gestor":
-        if 'gestor' in df_raw.columns:
-            gestorDb = getEqual(gestoresTabla, 'email', email_usuario)
-            df_raw = df_raw[df_raw['gestor'] == gestorDb[0]['nombre']]
-        else:
-            st.warning("No se encontró columna de asignación para filtrar tus alumnos.")
+    # if rol_usuario == "gestor":
+    #     if 'gestor' in df_raw.columns:
+    #         gestorDb = getEqual(gestoresTabla, 'email', email_usuario)
+    #         df_raw = df_raw[df_raw['gestor'] == gestorDb[0]['nombre']]
+    #     else:
+    #         st.warning("No se encontró columna de asignación para filtrar tus alumnos.")
 
     df_empresas = getEmpresasYOfertas()
     df_empresas_raw = pd.DataFrame(df_empresas)
@@ -213,7 +219,8 @@ with tab_alumnos:
         # Ahora sí, asegúrate de incluirla en la lista de columnas visibles
         if "cupos_disponibles" not in cols_visibles:
             cols_visibles.append("cupos_disponibles")
-        st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de Carga Rápida")
+        if rol_usuario == "admin":
+            st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de Carga Rápida")
         gb = GridOptionsBuilder.from_dataframe(df_display)
         gb.configure_default_column(editable=True, filter=True, resizable=True)
 
@@ -416,7 +423,8 @@ with tab_alumnos:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error técnico: {e}")
-
+    else:
+        st.info("No tienes sugerencias de prácticas por el momento")
 # --- TAB OFERTAS (Todo el código igual, visible para ambos) ---
 with tab_ofertas:
     try:
@@ -537,9 +545,10 @@ if rol_usuario == "admin":
     with tab_config:
         tabs = st.tabs(["Gestores", "Tutores"])
         with tabs[0]:
-            df_gestores = getGestores()
+            if st.session_state.df_gestores is None:
+                st.session_state.df_gestores = getGestores()
             edited_g = st.data_editor(
-                    df_gestores,
+                    st.session_state.df_gestores,
                     column_config={"id": None, "password": "Password", "nombre": "Nombre", "email": "Email", "activo": "Visible"},
                     num_rows="dynamic",
                     key="editor_gestores",
@@ -558,26 +567,31 @@ if rol_usuario == "admin":
                             password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
                             row["password_temp"] = password_auto
                         
-                        des= updateGestores(cambios, df_gestores)
+                        des= updateGestores(cambios, st.session_state.df_gestores)
                         if cambios["added_rows"]:
                             st.warning("Usuarios creados:")
                             for row in cambios["added_rows"]:
                                 st.code(f"Gestor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
-                            if st.button("Continuar"): st.rerun()
+                            if st.button("Continuar"): 
+                                st.session_state.df_gestores = None
+                                st.rerun()
                         else:
                             st.success("✅ Guardado"); st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
          
         with tabs[1]:
-            df_tutores = getTutores()
+            if st.session_state.df_tutores is None:
+                st.session_state.df_tutores = getTutores()
             edited_t = st.data_editor(
-                               df_tutores,
+                               st.session_state.df_tutores,
                                column_config={
                                     "id": None, 
+                                    "nif": None,
                                     "nombre": "Nombre", 
                                     "email": "Email", 
-                                    "password": "Password"
+                                    "password": "Password",
+                                    "cif_empresa":"CIF Empresa"
                                 },
                                 num_rows="dynamic",
                                 key="editor_tutores",
@@ -596,15 +610,23 @@ if rol_usuario == "admin":
                             password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
                             row["password_temp"] = password_auto
                         
-                        res = updateTutores(cambios, df_tutores)
+                        res = updateTutores(cambios, st.session_state.df_tutores)
+                        
                         if cambios["added_rows"]:
                             st.warning("Usuarios creados:")
                             for row in cambios["added_rows"]:
                                 st.code(f"Tutor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
-                            if st.button("Continuar"): st.rerun()
+                            if st.button("Continuar"): 
+                                st.session_state.df_tutores = None
+                                st.rerun()
                         else:
                             st.toast("✅ Guardado"); st.rerun()
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        error_msg = str(e)
+                        if "23503" in error_msg:
+                            st.error("❌ Error: El CIF de la empresa no existe en la base de datos.")
+                            st.info("Asegúrate de que la empresa esté creada antes de asignar un tutor.")     
+                        else:
+                            st.error(f"⚠️ Ha ocurrido un error inesperado: {error_msg}")
 
 

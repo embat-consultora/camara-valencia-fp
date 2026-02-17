@@ -108,11 +108,11 @@ def getGestores():
     df_gestores = pd.DataFrame(gestores.data)
     df_usuarios = pd.DataFrame(usuarios.data)
     
-    df_final = pd.merge(df_gestores, df_usuarios, on="email", how="inner")
+    df_final = pd.merge(df_gestores, df_usuarios, on="email", how="left")
     return df_final
 
 def getTutores():
-    tutores = supabase.table(tutoresTabla).select("id, email, nombre").order("nombre").execute()
+    tutores = supabase.table(tutoresTabla).select("id, email, nombre, cif_empresa").order("nombre").execute()
     usuarios = supabase.table(usuariosTabla).select("email, password").execute()
     
     df_tutores = pd.DataFrame(tutores.data)
@@ -129,21 +129,23 @@ def getEmpresasYOfertas():
     )
     return res.data
 
-def updateTutores(cambios, df_original):
+def updateTutores(cambios, df_original, cif=None):
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
+        telefono = new_row.get("telefono", "").strip()
+        nif=new_row.get("nif", "").strip()
+        cif_final = cif or new_row.get("cif_empresa", "").strip()
         email = new_row.get("email", "").strip().lower()
         password = new_row.get("password_temp") or new_row.get("password", "123456")
-        nif = "00000000"
         if email and nombre:
             try:
                 add(tutoresTabla, {
                     "nif":nif,
                     "nombre": nombre,
                     "email": email,
+                    "cif_empresa":cif_final,
+                    "telefono":telefono
                 })
-
-                # Insertamos en la tabla de USUARIOS
                 add("usuarios", {
                     "email": email,
                     "password": password,
@@ -154,13 +156,12 @@ def updateTutores(cambios, df_original):
 
     # 2. MANEJAR EDICIONES (Edited)
     for idx, mods in cambios["edited_rows"].items():
-
         fila_orig = df_original.iloc[int(idx)]
         id_tutores = fila_orig["id"]
         email_orig = fila_orig["email"]
         
         try:
-            cambios_tutor = {k: v for k, v in mods.items() if k in ["nombre", "email", "nif", "activo"]}
+            cambios_tutor = {k: v for k, v in mods.items() if k in ["nombre", "email", "nif", "activo","telefono"]}
             cambios_usuario = {k: v for k, v in mods.items() if k in ["password", "email"]}
             if cambios_tutor:
                 update(tutoresTabla, mods, {"id": id_tutores})
@@ -336,6 +337,28 @@ def getOrdered(tableName, searchFor, searchValue, orderByColumn):
 
 def upsert(tableName, data,keys):
     response = supabase.table(tableName).upsert(data, on_conflict=keys).execute()
+    return response
+
+def upsertCustome(tableName, data, keys):
+    query = supabase.table(tableName).select("*")
+
+    for key in keys:
+        query = query.eq(key, data[key])
+    
+    existing_record = query.execute()
+
+    # 2. Lógica de decisión
+    if existing_record.data:
+        # Si existe, actualizamos
+        # Filtramos para asegurarnos de actualizar el registro correcto
+        update_query = supabase.table(tableName).update(data)
+        for key in keys:
+            update_query = update_query.eq(key, data[key])
+        
+        response = update_query.execute()
+    else:
+        response = supabase.table(tableName).insert(data).execute()
+        
     return response
 def saveAuthToken(data):
     return supabase.table('auth_tokens').insert(data).execute()
@@ -682,8 +705,6 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 upsert(alumnosTabla, {"dni": dni, "estado": "Sin Empresa"}, keys=["dni"])
                 actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
             else:
-                st.write(nueva_empresa)
-                st.write(row['ciclo_formativo'])
                 cif_empresa = mapa_nombres_id.get(nueva_empresa)
                 actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
                 if cif_empresa:

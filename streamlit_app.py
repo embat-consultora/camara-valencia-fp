@@ -12,12 +12,18 @@ with col2:
 env = os.getenv("SUPABASE_ENV")
 st.session_state["current_page"] = "streamlit_app"
 
-# ✅ Si ya está logueado por cualquier medio, redirige
 if st.session_state.get("logged_in"):
-    st.switch_page("pages/tablasPrincipales.py")
+    rol = st.session_state.get("rol", "admin")
+    if rol == 'admin':   
+        st.switch_page("pages/tablasPrincipales.py")
+    if rol == 'empresa':
+        st.switch_page("pages/empresaDetails.py")
+    if rol == 'gestor':
+        st.switch_page("pages/tablasPrincipales.py")
+    if rol == 'tutor':
+        st.switch_page("pages/practicas.py")
     st.stop()
 
-# ✅ Si viene del login con Google y no hay sesión cargada aún
 islogged =validate_get_user()
 if islogged:
     st.switch_page("pages/tablasPrincipales.py")

@@ -2,8 +2,8 @@ import streamlit as st
 from datetime import datetime
 import json
 from modules.forms_helper import required_ok, slug
-from modules.data_base import upsert,add
-from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla,localidades,sectorEmpresa
+from modules.data_base import upsert,add, upsertCustome
+from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
 # ---------------------------------
 # Config
 # ---------------------------------
@@ -232,7 +232,7 @@ if submit:
                 {"empresa": res_emp.data[0]["CIF"], "form_completo": datetime.now().isoformat()},
                 keys=["empresa"],
             )
-        tutor = upsert(tutoresTabla, {
+        tutor = upsertCustome(tutoresTabla, {
             "cif_empresa": res_emp.data[0]["CIF"],
             "nombre": nombre_tutor.strip(),
             "nif": nif_tutor.strip().upper(),
@@ -241,5 +241,10 @@ if submit:
         }, keys=["nif"])
         ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
         oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+        usuario = upsertCustome(usuariosTabla, {
+            "email": res_emp.data[0]["CIF"],
+            "password": res_emp.data[0]["CIF"],
+            "rol": "empresa",
+        }, keys=["email"])
 
     st.success("✅ ¡Formulario de empresa enviado correctamente!")

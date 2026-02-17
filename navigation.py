@@ -12,6 +12,7 @@ def load_env_once():
 def make_sidebar():
     load_env_once()
     rol = st.session_state.get("rol", "admin")
+    user = st.session_state.get("username")
     with st.sidebar:
             st.markdown(
             """
@@ -24,6 +25,8 @@ def make_sidebar():
             unsafe_allow_html=True
         )
             st.caption(f"Entorno: **{st.session_state['env']}**")
+            st.caption(f"Rol: **{rol}**")
+            st.caption(f"Usuario: **{user}**")
             st.title("Menú")
             st.write("")
             st.write("")
@@ -32,7 +35,6 @@ def make_sidebar():
                 if rol == "admin":
                     st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
                     st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
-                    # st.page_link("pages/dashboard.py", label="Panel de Control")
                     st.page_link("pages/practicas.py", label="Prácticas")
                     st.page_link("pages/matchs.py", label="Matchs")
                     st.page_link("pages/cargaRapida.py", label="Carga Rápida")
@@ -47,12 +49,15 @@ def make_sidebar():
                     st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
                     st.page_link("pages/practicas.py", label="Prácticas")
                     st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "tutor":
+                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "empresa":
+                    st.page_link("pages/empresaDetails.py", label="Mi Empresa")
                 if st.button(logoutButton):
                     logout()
 
             elif get_current_page_name() != "streamlit_app":
-                # If anyone tries to access a secret page without being logged in,
-                # redirect them to the login page
                 st.switch_page("streamlit_app.py")
 
 def logout():
