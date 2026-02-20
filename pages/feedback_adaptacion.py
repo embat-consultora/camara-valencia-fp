@@ -21,7 +21,6 @@ if feedback is None:
     st.stop()
 practica_id = feedback["practica_id"]
 feedback_form_id = feedback["feedback_form_id"]
-st.write(feedback_form_id)
 st.title("Feedback de adaptación")
 
 # Datos precargados
