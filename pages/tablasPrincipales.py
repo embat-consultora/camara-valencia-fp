@@ -184,8 +184,7 @@ with tab_alumnos:
         df_raw['ciclo_acronimo'] = df_raw['ciclo_formativo'].apply(crear_acronimo)
         cols_visibles = [
             "ciclo_acronimo", "apellido", "nombre","localidad", "vehiculo", "horas_totales", 
-            "nombre_empresa","puesto","cupos_disponibles","tutor_empresa","telefono", "email_empresa", "gestor", "comentarios_centro", "anexos_creados", 
-            "anexos_enviados", "anexos_firmados", "doc_sao_entregada", "observaciones_seguimiento"
+            "nombre_empresa","puesto","cupos_disponibles","tutor_empresa","telefono", "email_empresa", "gestor", "comentarios_centro", "observaciones_seguimiento"
         ]
         
         cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info"]
@@ -393,9 +392,6 @@ with tab_alumnos:
                 }
             """)
         )
-        checkbox_cols = ["anexos_creados", "anexos_enviados", "anexos_firmados", "doc_sao_entregada"]
-        for col in checkbox_cols:
-            gb.configure_column(col, cellRenderer='checkboxRenderer', valueFormatter=si_no_js, width=100)
 
         for col in cols_tecnicas:
             if col in df_display.columns:
@@ -543,13 +539,17 @@ with tab_ofertas:
 # --- TAB CONFIGURACIÓN (Solo Admin) ---
 if rol_usuario == "admin":
     with tab_config:
-        tabs = st.tabs(["Gestores", "Tutores"])
+        tabs = st.tabs(["Gestores", "Tutores Centro"])
         with tabs[0]:
             if st.session_state.df_gestores is None:
                 st.session_state.df_gestores = getGestores()
             edited_g = st.data_editor(
                     st.session_state.df_gestores,
-                    column_config={"id": None, "password": "Password", "nombre": "Nombre", "email": "Email", "activo": "Visible"},
+                    column_config={"id": None, "password": "Password", "nombre": "Nombre", "email": "Email", "ciclo": st.column_config.SelectboxColumn(
+                        "Ciclo",
+                        options=["Comercio Internacional","Desarrollo Aplicaciones Multiplataforma", "Desarrollo Aplicaciones Web", "Marketing y Publicidad", "Transporte y Logística"], 
+                        required=False
+                    ),"activo": "Visible"},
                     num_rows="dynamic",
                     key="editor_gestores",
                     use_container_width=True

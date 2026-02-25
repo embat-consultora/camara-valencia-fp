@@ -54,6 +54,7 @@ with col2:
     direccion = input_requerido("Dirección *", key="direccion_alumno")
     localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
     sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
+    nuss = st.text_input("NUSS", key="nuss_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
@@ -88,7 +89,8 @@ if not ciclo:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
 # Subida de CV
 st.subheader("Subir CV")
-cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX/ODT)", type=["pdf", "doc", "docx", "odt"], accept_multiple_files=False)
+st.caption("El nombre del archivo debe seguir el formato: Nombre_Apellidos_CV (ejemplo: Juan_Perez_12345678A.pdf)")
+cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX)", type=["pdf", "doc", "docx"], accept_multiple_files=False)
 cv_too_big = False
 if cv_file is not None:
     size_bytes = file_size_bytes(cv_file)
@@ -140,6 +142,7 @@ if submit:
                 "preferencias_fp": preferencias_seleccionadas,
                 "estado":estadosAlumno[0],
                 "tipoPractica": tipo_practica,
+                "nuss": nuss.strip()
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
         upsert(
@@ -150,19 +153,14 @@ if submit:
         # Subir CV a Drive como {dni}_cv.ext
         try:
             if cv_file:
-                original_name = cv_file.name
-                ext = ""
-                if "." in original_name:
-                    ext = "." + original_name.split(".")[-1].lower()
-                final_name = f"{payload['dni']}_cv{ext}"
 
-                tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
+                tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{cv_file.name}"
                 with open(tmp_path, "wb") as f:
                     f.write(cv_file.getbuffer())
                 
                 # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
                 folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
-                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,payload["dni"]+"-cv" )
+                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,cv_file.name )
                 if isinstance(res, dict):
                     file_id = res.get("id")
                     link = res.get("webViewLink") or res.get("webContentLink")

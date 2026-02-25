@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
+from modules.drive_helper import create_drive_folder_practica
 from variables import (
     practicaTabla,
     practicaEstadosTabla,
@@ -16,7 +17,8 @@ from variables import (
     forms,empresasTabla, practicaTabla, alumnosTabla,
     gestoresTabla,
     usuariosTabla,
-    tutoresTabla
+    tutoresTabla,
+    carpetaPractica
 )
 load_dotenv()
 
@@ -102,9 +104,9 @@ def getGestore():
     return pd.DataFrame(gestores.data)
 
 def getGestores():
-    gestores = supabase.table(gestoresTabla).select("id, email, nombre").order("nombre").execute()
+    gestores = supabase.table(gestoresTabla).select("id, email, nombre, ciclo").order("nombre").execute()
     usuarios = supabase.table(usuariosTabla).select("email, password").execute()
-    
+
     df_gestores = pd.DataFrame(gestores.data)
     df_usuarios = pd.DataFrame(usuarios.data)
     
@@ -667,22 +669,13 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                             curr_gestor != orig_gestor 
                             )
         
-        # Comparación de booleanos (anexos)
-        hubo_cambio_anexos = any(
-            clean_bool(row[col]) != clean_bool(row_orig[col]) 
-            for col in ["anexos_creados", "anexos_enviados", "anexos_firmados", "doc_sao_entregada"]
-        )
 
-        if hubo_cambio_texto or hubo_cambio_anexos:
+        if hubo_cambio_texto:
             datos_alumno = {
                 "dni": dni,
                 "nombre": curr_nombre,
                 "apellido": curr_apellido,
                 "horas_totales": curr_horas,
-                "anexos_creados": clean_bool(row['anexos_creados']),
-                "anexos_enviados": clean_bool(row['anexos_enviados']),
-                "anexos_firmados": clean_bool(row['anexos_firmados']),
-                "doc_sao_entregada": clean_bool(row['doc_sao_entregada']),
                 "comentarios_centro": curr_comentarios,
                 "observaciones_seguimiento": curr_obs,
                 "gestor": curr_gestor
@@ -711,6 +704,8 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                     crearDraftPractica(
                         empresaCif=cif_empresa,
                         alumnoDni=dni,
+                        alumnoNombre=curr_nombre,
+                        alumnoApellido=curr_apellido,
                         ciclo=row['ciclo_formativo'], 
                         area=nuevo_puesto if nuevo_puesto else "General",
                         proyecto= "No asignado aun",
@@ -721,7 +716,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                         oferta_id=row.get('oferta_id') 
                     )
 
-def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutor, fecha,ciclos_info,cupos_disp,oferta_id):
+def crearDraftPractica(empresaCif, alumnoDni, alumnoNombre, alumnoApellido, ciclo, area, proyecto, tutor, fecha,ciclos_info,cupos_disp,oferta_id):
         payload_practica = {
             "empresa": empresaCif,
             "alumno": alumnoDni,
@@ -754,6 +749,7 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutor, fech
             {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
             keys=["alumno"]
         )
+        create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
 
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):

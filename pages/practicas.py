@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -12,9 +12,11 @@ from modules.forms_helper import file_size_bytes
 from pathlib import Path
 from modules.feedback_helper import render_feedback_card
 import uuid
+import json
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
-    fasesPractica, faseColPractica, max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla
+    fasesPractica, faseColPractica, max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
+    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
@@ -149,14 +151,18 @@ if "practica_seleccionada" not in st.session_state:
 # ----------------------------------------------
 
 def mostrar_lista():
-    tab_listado, tab_dashboard = st.tabs(["📋 Listado de Prácticas", "📊 Dashboard de Feedback"])
-        
+    tab_listado, tab_anexos, tab_dashboard, tab_cargaRapida = st.tabs(["📋 Listado de Prácticas", "📃 Anexos", "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
+    with tab_anexos:
+        if rol_usuario == 'admin':
+            mostrar_anexos()       
     with tab_dashboard:
         if rol_usuario != 'tutor':
             mostrar_dashboard()
         else:
             st.info("El dashboard está disponible para Gestores y Administradores.")
-
+    with tab_cargaRapida:
+        if rol_usuario == 'admin':
+            mostrar_carga_rapida()       
     with tab_listado:
         st.subheader("Listado de Prácticas")
 
@@ -233,6 +239,201 @@ def mostrar_lista():
 # ----------------------------------------------
 # PAGINA: DETALLE
 # ----------------------------------------------
+
+def mostrar_carga_rapida():
+    st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una práctica.")
+
+    # 1. DATOS DE LA EMPRESA
+    st.subheader("🏢 Datos de la Empresa")
+    c1, c2 = st.columns(2)
+    new_emp_nombre = c1.text_input("Nombre Comercial / Razón Social", key="qr_emp_nom")
+    new_emp_cif = c2.text_input("CIF (Obligatorio)", key="qr_emp_cif").upper().strip()
+
+    c1_2, c2_2 = st.columns(2)
+    new_emp_tel = c1_2.text_input("Teléfono Empresa", key="qr_emp_tel")
+    new_emp_email = c2_2.text_input("Email Empresa", key="qr_emp_email")
+
+    st.divider()
+
+    # 2. DATOS DEL ALUMNO
+    st.subheader("🧑‍🎓 Datos del Alumno")
+    c3, c4, c5 = st.columns([1, 1, 1.5])
+    new_alu_dni = c3.text_input("DNI (Obligatorio)", key="qr_alu_dni").upper().strip()
+    new_alu_nombre = c4.text_input("Nombre", key="qr_alu_nom")
+    new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
+
+    new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
+
+    # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
+    st.subheader("📋 Configuración de la Práctica")
+    col_p1, col_p2 = st.columns(2)
+
+    # Obtenemos los tipos de práctica de tus variables
+    new_alu_tipo = col_p1.selectbox(
+        "Tipo de Práctica", 
+        options=tipoPracticas, 
+        key="qr_alu_tipo"
+    )
+
+    # Lógica de Ciclos Formativos (Basada en tu código de alumnos)
+    form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
+    ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
+    pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
+
+    ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
+    prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
+
+    new_alu_ciclo = col_p2.selectbox(
+        "Ciclo Formativo",
+        options=[""] + ciclos_opts,
+        key="qr_alu_ciclo"
+    )
+
+    new_alu_pref = []
+    if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
+        new_alu_pref = st.multiselect(
+            "Preferencias/Áreas",
+            options=prefs_opts_dict[new_alu_ciclo],
+            key="qr_alu_pref"
+        )
+
+    # 4. BOTÓN DE ACCIÓN
+    if st.button("🚀 Guardar y Vincular Práctica", use_container_width=True):
+        if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
+            st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
+        else:
+            with st.spinner("Procesando alta rápida..."):
+                try:
+                    # A. Alta Empresa
+                    upsert(empresasTabla, {
+                        "CIF": new_emp_cif,
+                        "nombre": new_emp_nombre,
+                        "telefono": new_emp_tel,
+                        "email_empresa": new_emp_email
+                    }, keys=["CIF"])
+                    usuario = upsertCustome(usuariosTabla, {
+                                "email": new_emp_cif,
+                                "password": new_emp_cif,
+                                "rol": "empresa",
+                            }, keys=["email"])
+                    # B. Alta Alumno
+                    upsert(alumnosTabla, {
+                        "dni": new_alu_dni,
+                        "nombre": new_alu_nombre,
+                        "apellido": new_alu_apellido,
+                        "email_alumno": new_alu_email,
+                        "tipoPractica": new_alu_tipo,
+                        "ciclo_formativo": new_alu_ciclo,
+                        "preferencias_fp": new_alu_pref,
+                        "estado": estadosAlumno[1]
+                    }, keys=["dni"])
+
+                    # C. Crear la Práctica (Vincular)
+                    # Usamos los parámetros que requiere tu función crearPractica
+                    crearPractica(
+                        empresaCif=new_emp_cif,
+                        alumnoDni=new_alu_dni,
+                        ciclo=new_alu_ciclo if new_alu_ciclo else "Autogestionado",
+                        area="General",
+                        proyecto="Alta Rápida",
+                        fecha=datetime.now().isoformat(),
+                        ciclos_info=None,
+                        cupos_disp=None,
+                        oferta_id=None
+                    )
+
+                    st.success(f"✅ ¡Éxito! Práctica creada entre {new_emp_nombre} y {new_alu_nombre}.")
+                    st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
+
+                except Exception as e:
+                    st.error(f"❌ Error en el proceso: {str(e)}")
+
+def mostrar_anexos():
+    if not practicas:
+        st.info("No tienes prácticas asignadas aun.")
+        return
+
+    # 1. Preparación de datos (Respetando TODOS tus campos y lógicas)
+    data_for_grid = []
+    for p in practicas:
+        pid = p["id"]
+        
+        # Lógica de estados original
+        estados_p = st.session_state.get("estados", {}).get(pid, {})
+        estado_actual = "Pendiente"
+        for fase in fasesPractica:
+            columna_fase = faseColPractica[fase]
+            if estados_p.get(columna_fase):
+                estado_actual = fase
+
+        # TRUCO MAESTRO: Convertimos el NULL (None) de Supabase en False
+        # Si no hacemos esto, el checkbox de Streamlit no se dibuja bien.
+        data_for_grid.append({
+            "ID": pid,
+            "Alumno": f"{p.get('alumnos', {}).get('nombre', '')} {p.get('alumnos', {}).get('apellido', '')}",
+            "Empresa": p.get('empresas', {}).get('nombre', '—'),
+            "Estado": estado_actual,
+            "Ciclo": p.get('ciclo_formativo', '—'),
+            # Usamos 'is True' para que solo sea True si es explícito en la BD
+            "Creado": True if p.get('anexos_creados') is True else False,
+            "Enviados": True if p.get('anexos_enviados') is True else False,
+            "Firmados": True if p.get('anexos_firmados') is True else False,
+            "DOC SAO": True if p.get('doc_sao_entregada') is True else False
+        })
+
+    # 2. Creamos el DataFrame
+    df_original = pd.DataFrame(data_for_grid)
+
+    st.subheader("📋 Gestión de Anexos")
+
+    # 3. El Editor con KEY DINÁMICA (para que refresque al guardar)
+    if "df_key" not in st.session_state:
+        st.session_state.df_key = 0
+
+    edited_df = st.data_editor(
+        df_original,
+        key=f"editor_anexos_{st.session_state.df_key}",
+        hide_index=True,
+        use_container_width=True,
+        # Bloqueamos lo que no queremos que toquen
+        disabled=["ID", "Alumno", "Empresa", "Estado", "Ciclo"],
+        column_config={
+            "ID": None,
+            "Creado": st.column_config.CheckboxColumn("Creado"),
+            "Enviados": st.column_config.CheckboxColumn("Enviados"),
+            "Firmados": st.column_config.CheckboxColumn("Firmados"),
+            "DOC SAO": st.column_config.CheckboxColumn("DOC SAO"),
+        }
+    )
+
+    # 4. Lógica de Guardado (Capturando cambios del session_state)
+    state_key = f"editor_anexos_{st.session_state.df_key}"
+    cambios = st.session_state[state_key].get("edited_rows")
+    
+    if cambios:
+        if st.button("💾 Guardar Cambios en Anexos"):
+            with st.spinner("Guardando en base de datos..."):
+                for row_idx_str, updated_cols in cambios.items():
+                    idx = int(row_idx_str)
+                    pid_db = int(df_original.at[idx, "ID"])
+                    
+                    payload_practica = {
+                        "id": pid_db,
+                        "anexos_creados": bool(edited_df.at[idx, "Creado"]),
+                        "anexos_enviados": bool(edited_df.at[idx, "Enviados"]),
+                        "anexos_firmados": bool(edited_df.at[idx, "Firmados"]),
+                        "doc_sao_entregada": bool(edited_df.at[idx, "DOC SAO"]),
+                    }
+                    
+                    try:
+                        upsert(practicaTabla, payload_practica, keys=["id"])
+                    except Exception as e:
+                        st.error(f"Error en ID {pid_db}: {e}")
+                
+                st.toast("✅ Anexos actualizados correctamente.")
+                st.session_state.df_key += 1
+                st.session_state["force_reload"] = True 
+                st.rerun()
 
 def mostrar_dashboard():
     st.subheader("📊 Seguimiento de Feedback")
@@ -313,6 +514,7 @@ def mostrar_dashboard():
                     st.success(f"Recordatorios enviados a {len(df_pendientes)} alumnos.")
             else:
                 st.warning("No hay nadie a quien reclamar.")
+
 def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
     with st.expander("Detalle"):
         col1, col2 = st.columns(2)
@@ -344,7 +546,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         col1, col2 = st.columns(2)
         with col1:
             clave_gestor = f"gestor_{alumno['id']}"
-            if rol_usuario == 'tutor':
+            if rol_usuario != 'admin':
                 st.write(f"**Gestor:** {gestor_actual}")
             else:
                 st.selectbox(
@@ -363,7 +565,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
         with col2:
             clave_tutor = f"tutor_{alumno['id']}"
-            if rol_usuario == 'tutor':
+            if rol_usuario != 'admin':
                 st.write(f"**Tutor:** {tutor_actual}")
             else:
                 st.selectbox(
@@ -516,74 +718,88 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual):
     pass
 
 def seccion_planificacion(alumno, empresa, practicaId):
-    if rol_usuario != 'tutor':
-        st.divider()
         st.subheader("📅 Planificación de Prácticas")
-
-        # 1. Preparar datos de Drive
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
-        files, folderId = list_drive_files(folder_name)
+        files = list_drive_files(folder_name)
+        archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
         
-        # Buscamos el archivo (ahora aceptando png, jpg, etc.)
-        archivo_calendario = next((f for f in files if "calendario" in f['name']), None)
-
-        col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
-        
-        with col_cal1:
-            url_generador = linkCalendar
-            st.link_button("🛠️ Generar Nuevo Calendario", url_generador, use_container_width=True)
-            
-            st.info("Sube el calendario en formato imagen (PNG/JPG).")
-            uploaded_cal = st.file_uploader(
-                "Subir imagen del Calendario",
-                type=["png", "jpg", "jpeg"],
-                key=f"cal_up_{practicaId}"
-            )
-            if uploaded_cal:
-                if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
-                    with st.spinner("Subiendo imagen..."):
-                        temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
-                        with open(temp_path, "wb") as f:
-                            f.write(uploaded_cal.getbuffer())
-                        upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
-                        st.success("Imagen guardada.")
-                        st.rerun()
-
-        with col_cal2:
-            if archivo_calendario:
-                st.write("🔍 **Vista Previa del Calendario:**")
+        if rol_usuario == 'admin':
+            col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
+            with col_cal1:
+                url_generador = linkCalendar
+                st.link_button("🛠️ Generar Nuevo Calendario", url_generador, use_container_width=True)
                 
-                # Obtenemos el ID del archivo
-                file_id = archivo_calendario.get('id')
-                
-                if file_id:
-                    # Construimos la URL de previsualización oficial de Google Drive
-                    preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
-                    
-                    # Usamos un contenedor de Streamlit para el estilo
-                    with st.container():
-                        st.markdown(
-                            f"""
-                            <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
-                                <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                
-                st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
-            else:
-                # Placeholder si no hay imagen
-                st.markdown(
-                    """
-                    <div style="border: 2px dashed #ccc; border-radius: 10px; height: 500px; display: flex; align-items: center; justify-content: center; color: #aaa;">
-                        Esperando archivo de calendario (PNG/JPG)...
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                st.info("Sube el calendario en formato imagen (PNG/JPG).")
+                uploaded_cal = st.file_uploader(
+                    "Subir imagen del Calendario",
+                    type=["png", "jpg", "jpeg"],
+                    key=f"cal_up_{practicaId}"
                 )
-        
-    pass
+                if uploaded_cal:
+                    if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                        with st.spinner("Subiendo imagen..."):
+                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
+                            with open(temp_path, "wb") as f:
+                                f.write(uploaded_cal.getbuffer())
+                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
+                            st.success("Imagen guardada.")
+                            st.rerun()
+
+            with col_cal2:
+                if archivo_calendario:
+                    st.write("🔍 **Vista Previa del Calendario:**")
+                    
+                    # Obtenemos el ID del archivo
+                    file_id = archivo_calendario.get('id')
+                    
+                    if file_id:
+                        # Construimos la URL de previsualización oficial de Google Drive
+                        preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                        
+                        # Usamos un contenedor de Streamlit para el estilo
+                        with st.container():
+                            st.markdown(
+                                f"""
+                                <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+                                    <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    
+                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+                else:
+                    st.markdown(
+                        """
+                        <div style="border: 2px dashed #ccc; border-radius: 10px; height: 500px; display: flex; align-items: center; justify-content: center; color: #aaa;">
+                            Esperando archivo de calendario (PNG/JPG)...
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+        if rol_usuario != 'admin':   
+            if archivo_calendario:
+                    file_id = archivo_calendario.get('id')
+                    
+                    if file_id:
+                        # Construimos la URL de previsualización oficial de Google Drive
+                        preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                        
+                        # Usamos un contenedor de Streamlit para el estilo
+                        with st.container():
+                            st.markdown(
+                                f"""
+                                <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+                                    <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    
+                        st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+            else:
+                st.write("No han subido calendario aun")
+        pass
 
 def seccion_documentos(alumno, empresa, practicaId):
     st.divider()
@@ -629,7 +845,6 @@ def seccion_documentos(alumno, empresa, practicaId):
 
     pass
 
-
 def mostrar_detalle():
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
@@ -651,6 +866,8 @@ def mostrar_detalle():
         st.divider()
         seccion_feedback_tutor(practicaId, p, tutor_actual)
         st.divider()
+        seccion_planificacion(alumno,empresa, practicaId)
+        st.divider()
         seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
         st.divider()
         seccion_feedback_candidato(practicaId, forms)
@@ -661,6 +878,8 @@ def mostrar_detalle():
         seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
         st.divider()
         seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
+        st.divider()
+        seccion_planificacion(alumno,empresa, practicaId)
         st.divider()
         seccion_feedback_tutor(practicaId, p, tutor_actual)
         st.divider()

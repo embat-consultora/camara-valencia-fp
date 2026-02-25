@@ -37,7 +37,6 @@ def make_sidebar():
                     st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
                     st.page_link("pages/practicas.py", label="Prácticas")
                     st.page_link("pages/matchs.py", label="Matchs")
-                    st.page_link("pages/cargaRapida.py", label="Carga Rápida")
                     
                     st.page_link("pages/empresas.py", label="Empresas")
                     st.page_link("pages/alumnos.py", label="Alumnos")
