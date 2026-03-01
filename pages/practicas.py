@@ -16,22 +16,9 @@ import json
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     fasesPractica, faseColPractica, max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
-    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla
+    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla,tutoresCentroTabla
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
-
-def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
-    nuevo_valor = st.session_state.get(key_widget)
-    if nuevo_valor:
-        try:
-            payload = {
-                columna_id: dni_o_id, 
-                campo_a_actualizar: nuevo_valor
-            }
-            upsert(tabla, payload, keys=[columna_id])
-            st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
-        except Exception as e:
-            st.error(f"Error al actualizar {label}: {e}")
 # ----------------------------------------------
 # CONFIG
 # ----------------------------------------------
@@ -52,16 +39,31 @@ if "feedbacks" not in st.session_state:
     st.session_state["feedbacks"] = []
 if "gestores" not in st.session_state:
     st.session_state["gestores"] = []
-
+if "tutorCentro" not in st.session_state:
+    st.session_state["tutorCentro"] = []
 rol_usuario = st.session_state.get("rol")
 # ----------------------------------------------
 # FETCH FUNCTIONS
 # ----------------------------------------------
 def fetch_practicas_tutores():
-    practicas = getPracticas(practicaTabla, {})
+    practicas = getPracticas(practicaTabla, {"status":"CONFIRMADA",})
     tutores = getEquals(tutoresTabla, {})
-    return practicas, tutores
+    tutoresCentro = getEquals(tutoresCentroTabla, {})
+    return practicas, tutores,tutoresCentro
 
+def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
+    nuevo_valor = st.session_state.get(key_widget)
+    if nuevo_valor:
+        try:
+            payload = {
+                columna_id: dni_o_id, 
+                campo_a_actualizar: nuevo_valor
+            }
+            upsert(tabla, payload, keys=[columna_id])
+            st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
+        except Exception as e:
+            st.error(f"Error al actualizar {label}: {e}")
+            
 # ----------------------------------------------
 # BOTÓN REFRESCAR
 # ----------------------------------------------
@@ -76,7 +78,7 @@ with col_refresh:
 # ----------------------------------------------
 def load_data(force=False):
     if force or "data_loaded" not in st.session_state or st.session_state.get("force_reload"):
-        practicas, tutores = fetch_practicas_tutores()
+        practicas, tutores, tutoresCentro = fetch_practicas_tutores()
         feedback =get(feedbackResponseTabla)
         estados = getEquals(practicaEstadosTabla, {})
         estados_map = {e["practicaId"]: e for e in estados}
@@ -103,8 +105,19 @@ def load_data(force=False):
             ]
             else:
                 practicas = []
+        if rol_usuario == "tutorCentro":
+            tutorCentroDatos = [t for t in tutoresCentro if t.get("email") == user_email]
+            tutorCentroNombre = tutorCentroDatos[0].get("nombre")
+            if tutorCentroDatos:
+                practicas = [
+                p for p in practicas 
+                if p.get("tutor_centro") is not None and p.get("tutor_centro") == tutorCentroNombre
+            ]
+            else:
+                practicas = []
         st.session_state["practicas"] = practicas
         st.session_state["tutores"] = tutores
+        st.session_state["tutorCentro"] = tutoresCentro
         st.session_state["gestores"] = gestores
         st.session_state["estados"] = estados_map
         st.session_state["feedbacks"] = feedback
@@ -116,6 +129,7 @@ load_data()
 practicas = st.session_state["practicas"]
 tutores = st.session_state["tutores"]
 gestores =  st.session_state["gestores"]
+tutoresCentro =st.session_state["tutorCentro"]
 
 ##--- DIALOG
 @st.dialog("Finalización de Práctica")
@@ -151,25 +165,40 @@ if "practica_seleccionada" not in st.session_state:
 # ----------------------------------------------
 
 def mostrar_lista():
-    tab_listado, tab_anexos, tab_dashboard, tab_cargaRapida = st.tabs(["📋 Listado de Prácticas", "📃 Anexos", "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
-    with tab_anexos:
-        if rol_usuario == 'admin':
-            mostrar_anexos()       
-    with tab_dashboard:
-        if rol_usuario != 'tutor':
-            mostrar_dashboard()
-        else:
-            st.info("El dashboard está disponible para Gestores y Administradores.")
-    with tab_cargaRapida:
-        if rol_usuario == 'admin':
-            mostrar_carga_rapida()       
-    with tab_listado:
-        st.subheader("Listado de Prácticas")
+    tabs_visibles = ["📋 Listado de Prácticas"]
 
+    if rol_usuario == 'admin':
+        tabs_visibles.extend(["📃 Anexos", "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
+    elif rol_usuario in ['gestor', 'tutor', 'tutorCentro']:
+        tabs_visibles.append("📊 Dashboard de Feedback")
+   
+    tabs = st.tabs(tabs_visibles)
+    with tabs[0]:
+        mostrar_lista_practicas()
+    
+    if "📃 Anexos" in tabs_visibles:
+        idx = tabs_visibles.index("📃 Anexos")
+        with tabs[idx]:
+            mostrar_anexos()
+
+    if "📊 Dashboard de Feedback" in tabs_visibles:
+        idx = tabs_visibles.index("📊 Dashboard de Feedback")
+        with tabs[idx]:
+            mostrar_dashboard()
+
+    if "⚡️ Carga Rápida" in tabs_visibles:
+        idx = tabs_visibles.index("⚡️ Carga Rápida")
+        with tabs[idx]:
+            mostrar_carga_rapida()
+    
+        
+# ----------------------------------------------
+# PAGINA: DETALLE
+# ----------------------------------------------
+def mostrar_lista_practicas():
         if not practicas:
             st.info("No tienes prácticas asignadas aun.")
             return
-
         data_for_grid = []
         for p in practicas:
             pid = p["id"]
@@ -193,8 +222,8 @@ def mostrar_lista():
         df = pd.DataFrame(data_for_grid)
 
         if df.empty:
-            st.info("No hay prácticas que coincidan con el filtro.")
-            return
+            st.info("No hay prácticas asignadas aun")
+            #return
 
         # 2. Configurar AgGrid
         gb = GridOptionsBuilder.from_dataframe(df)
@@ -235,10 +264,6 @@ def mostrar_lista():
             st.session_state.practica_seleccionada = selected_id
             st.session_state.page = "detalle"
             st.rerun()
-
-# ----------------------------------------------
-# PAGINA: DETALLE
-# ----------------------------------------------
 
 def mostrar_carga_rapida():
     st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una práctica.")
@@ -445,7 +470,9 @@ def mostrar_dashboard():
         fecha_fin_filtro = st.date_input("Hasta", value=datetime(2026, 6, 30))
 
     all_feedback_forms = get(feedbackFormsTabla) 
-    
+    ids_permitidos = [p["id"] for p in practicas]
+    all_feedback_forms = [f for f in all_feedback_forms if f.get("practica_id") in ids_permitidos
+]
     if not all_feedback_forms:
         st.info("No hay datos de envíos de feedback.")
         return
@@ -483,7 +510,6 @@ def mostrar_dashboard():
         st.write("### ⏳ Alumnos que no han respondido")
         # Filtramos los que se enviaron pero no tienen fecha_respuesta
         df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
-        
         if not df_pendientes.empty:
             listado_morosos = []
             for _, row in df_pendientes.iterrows():
@@ -497,10 +523,11 @@ def mostrar_dashboard():
                         "Formulario": row['tipo_form'].replace('_', ' ').title(),
                         "Fecha Envío": row['fecha_envio']
                     })
-            
-            st.table(pd.DataFrame(listado_morosos))
+                    st.table(pd.DataFrame(listado_morosos))
+                else:
+                    st.success("¡Todos los alumnos han respondido a sus formularios o no se han enviado aun!")
         else:
-            st.success("¡Todos los alumnos han respondido a sus formularios!")
+            st.success("¡Todos los alumnos han respondido a sus formularios o no se han enviado aun!")
 
     with col_p2:
         st.write("### ⚡ Acciones")
@@ -538,13 +565,13 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             lista_nombres_gestores = [g["nombre"] for g in gestores]
             if "No asignado" not in lista_nombres_gestores:
                 lista_nombres_gestores.insert(0, "No asignado")
-            gestor_actual = alumno.get("gestor")
+            gestor_actual = p.get("gestor")
             try:
                 indice_gestor = lista_nombres_gestores.index(gestor_actual) if gestor_actual in lista_nombres_gestores else 0
             except:
                 indice_gestor = 0
-        col1, col2 = st.columns(2)
-        with col1:
+        colGestor, colTutor, colTCentro = st.columns(3)
+        with colGestor:
             clave_gestor = f"gestor_{alumno['id']}"
             if rol_usuario != 'admin':
                 st.write(f"**Gestor:** {gestor_actual}")
@@ -558,23 +585,42 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     # Pasamos la KEY en lugar del valor
                     args=(alumnosTabla, alumno['dni'], "gestor", "dni", clave_gestor, "Gestor")
                 )
+        
         lista_nombres_tutores = [g["nombre"] for g in tutores]
         if "No asignado" not in lista_nombres_tutores:
             lista_nombres_tutores.insert(0, "No asignado")
         tutor_actual = p.get("tutor") 
         indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
-        with col2:
+        with colTutor:
             clave_tutor = f"tutor_{alumno['id']}"
             if rol_usuario != 'admin':
-                st.write(f"**Tutor:** {tutor_actual}")
+                st.write(f"**Tutor Empresa:** {tutor_actual}")
             else:
                 st.selectbox(
-                    "**Tutor Asignado**",
+                    "**Tutor Empresa**",
                     options=lista_nombres_tutores,
                     index=indice_tutor,
                     key=clave_tutor,
                     on_change=handle_update,
                     args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor")
+                )
+        lista_nombres_tutoresCentro = [g["nombre"] for g in tutoresCentro]
+        if "No asignado" not in lista_nombres_tutoresCentro:
+            lista_nombres_tutoresCentro.insert(0, "No asignado")
+        tutorc_actual = p.get("tutor_centro") 
+        indice_tutorc = lista_nombres_tutoresCentro.index(tutorc_actual) if tutorc_actual in lista_nombres_tutoresCentro else 0
+        with colTCentro:
+            clave_tutorc = f"tutor_centro_{alumno['id']}"
+            if rol_usuario != 'admin':
+                st.write(f"**Tutor Centro:** {tutorc_actual}")
+            else:
+                st.selectbox(
+                    "**Tutor Centro**",
+                    options=lista_nombres_tutoresCentro,
+                    index=indice_tutorc,
+                    key=clave_tutorc,
+                    on_change=handle_update,
+                    args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutor, "TutorCentro")
                 )
 
         pass

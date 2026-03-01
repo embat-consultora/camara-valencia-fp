@@ -90,12 +90,11 @@ if st.button("💾 Crear práctica"):
                 fecha=now,
                 ciclos_info=None,
                 cupos_disp=None,
-                oferta_id=None
+                oferta_id=None,
+                status="CONFIRMADA"
             )
 
             st.success("Práctica creada 🎉")
-
-            # 🔥 Refrescar datos desde BD
             load_data(force=True)
             st.rerun()
 

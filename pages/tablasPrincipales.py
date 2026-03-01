@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getEqual, getTutores,getGestore, updateTutores, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
+from modules.data_base import getTutores,getGestore, updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 from datetime import datetime
-from variables import gestoresTabla
 # Configuración inicial
 apply_page_config()
 make_sidebar()
@@ -87,23 +86,34 @@ def extraer_ofertas_por_ciclo(df_empresas):
 rol_usuario = st.session_state.get("rol") 
 email_usuario = st.session_state.get("username")
 
+
 if "df_gestores" not in st.session_state:
     st.session_state.df_gestores = None
 if "df_tutores" not in st.session_state:
     st.session_state.df_tutores = None
+if "practicas_data" not in st.session_state:
+    st.session_state.practicas_data = None
+if "data_loaded" not in st.session_state:
+    st.session_state["data_loaded"] = False
+if "force_reload" not in st.session_state:
+    st.session_state["force_reload"] = False
+if "grid_version" not in st.session_state:
+    st.session_state.grid_version = 0
+
+def load_data():
+    if st.session_state["data_loaded"] or not st.session_state["force_reload"]:
+        with st.spinner("Cargando datos desde la base..."):
+            st.session_state["practicas_data"] = get_alumnos_con_practicas_consolidado()
+            st.session_state["data_loaded"] = True
+            st.session_state["force_reload"] = False
 
 st.title("🚀 Panel de Gestión de Prácticas FP")
-
-# 1. Definimos qué pestañas se muestran según el rol
+load_data()
 nombres_tabs = ["🎓 Alumnos", "🏢 Ofertas por Ciclo"]
 if rol_usuario == "admin":
     nombres_tabs.append("⚙️ Configuración")
-
-
-
 tabs = st.tabs(nombres_tabs)
 
-# Asignamos las pestañas a variables para facilitar el acceso
 tab_alumnos = tabs[0]
 tab_ofertas = tabs[1]
 if rol_usuario == "admin":
@@ -111,18 +121,19 @@ if rol_usuario == "admin":
 
 # --- TAB ALUMNOS ---
 with tab_alumnos:
-    
-    df_raw = get_alumnos_con_practicas_consolidado()
-    df_raw = df_raw.rename(columns={'area': 'puesto', 'tutor': 'tutor_empresa'})
+    df_raw = st.session_state.practicas_data
+
+    df_raw = df_raw.rename(columns={'area': 'puesto', 'tutorCentro': 'tutor_centro'})
     if 'puesto' not in df_raw.columns:
         df_raw['puesto'] = None
-    if 'tutor_empresa' not in df_raw.columns:
-        df_raw['tutor_empresa'] = None
+    if 'asignado' not in df_raw.columns:
+        df_raw['asignado'] = None
+    if 'tutor_centro' not in df_raw.columns:
+        df_raw['tutor_centro'] = None
     if 'cupos_disponibles' not in df_raw.columns:
             df_raw['cupos_disponibles'] = None
-    # Rellenar nulos con string vacío para evitar errores de renderizado en JS
     df_raw['puesto'] = df_raw['puesto'].fillna("")
-    df_raw['tutor_empresa'] = df_raw['tutor_empresa'].fillna("")
+    df_raw['tutor_centro'] = df_raw['tutor_centro'].fillna("")
     try:
         df_gestores_lista = getGestores()
         nombres_gestores = df_gestores_lista['nombre'].tolist()
@@ -131,17 +142,9 @@ with tab_alumnos:
 
     try:
         df_tutores_lista = getTutores() # Esta es la función que ya tienes
-        nombres_tutores_empresa = sorted(df_tutores_lista['nombre'].unique().tolist())
+        nombres_tutores_centro = sorted(df_tutores_lista['nombre'].unique().tolist())
     except:
-        nombres_tutores_empresa = []
-    # --- FILTRO POR GESTOR (Visualización) ---
-    # if rol_usuario == "gestor":
-    #     if 'gestor' in df_raw.columns:
-    #         gestorDb = getEqual(gestoresTabla, 'email', email_usuario)
-    #         df_raw = df_raw[df_raw['gestor'] == gestorDb[0]['nombre']]
-    #     else:
-    #         st.warning("No se encontró columna de asignación para filtrar tus alumnos.")
-
+        nombres_tutores_centro = []
     df_empresas = getEmpresasYOfertas()
     df_empresas_raw = pd.DataFrame(df_empresas)
     lista_empresas_db = ["⚠️ SIN ASIGNAR"] + df_empresas_raw["nombre"].tolist()
@@ -184,10 +187,10 @@ with tab_alumnos:
         df_raw['ciclo_acronimo'] = df_raw['ciclo_formativo'].apply(crear_acronimo)
         cols_visibles = [
             "ciclo_acronimo", "apellido", "nombre","localidad", "vehiculo", "horas_totales", 
-            "nombre_empresa","puesto","cupos_disponibles","tutor_empresa","telefono", "email_empresa", "gestor", "comentarios_centro", "observaciones_seguimiento"
+            "nombre_empresa","asignado", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro", "observaciones_seguimiento","telefono", "email_empresa"
         ]
-        
-        cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info"]
+       
+        cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info","practica_id"]
         cols_finales = cols_visibles + [c for c in cols_tecnicas if c in df_raw.columns]
         df_display = df_raw[cols_finales].copy()
 
@@ -219,7 +222,7 @@ with tab_alumnos:
         if "cupos_disponibles" not in cols_visibles:
             cols_visibles.append("cupos_disponibles")
         if rol_usuario == "admin":
-            st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de Carga Rápida")
+            st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de  Prácticas -> Carga Rápida")
         gb = GridOptionsBuilder.from_dataframe(df_display)
         gb.configure_default_column(editable=True, filter=True, resizable=True)
 
@@ -243,7 +246,6 @@ with tab_alumnos:
             width=120,
             cellEditor='agSelectCellEditor',
             cellEditorParams={'values': nombres_gestores},
-            # Solo el admin puede reasignar gestores, o el gestor si quieres permitirlo
             editable=(rol_usuario == "admin") 
         )
 
@@ -303,12 +305,20 @@ with tab_alumnos:
             width=200
         )
 
-        gb.configure_column("tutor_empresa", 
-            headerName="Tutor Empresa", 
+        gb.configure_column("asignado", 
+            headerName="Asignar", 
             editable=True,
             width=200,
             cellEditor='agSelectCellEditor',
-            cellEditorParams={'values': nombres_tutores_empresa}, # Pasamos la lista aquí
+            cellEditorParams={'values': ["Asignar"]},
+            cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
+        )
+        gb.configure_column("tutor_centro", 
+            headerName="Tutor Centro", 
+            editable=True,
+            width=200,
+            cellEditor='agSelectCellEditor',
+            cellEditorParams={'values': nombres_tutores_centro}, # Pasamos la lista aquí
             cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
         )
         gb.configure_column("puesto",
@@ -344,20 +354,20 @@ with tab_alumnos:
                 const puestoEncontrado = listaPuestos.find(p => p.nombre === puestoNombre);
                 
                 if (puestoEncontrado) {{
-                    // ASIGNAMOS EL TUTOR AL CAMPO 'tutor_empresa'
+                    // ASIGNAMOS EL TUTOR AL CAMPO 'tutor'
                     console.log("¡Puesto encontrado! Info:", puestoEncontrado);
-                    params.data.tutor_empresa = puestoEncontrado.tutor;
+                    params.data.tutor = puestoEncontrado.tutor;
                     console.log(puestoEncontrado.tutor)
 
                 }} else {{
-                    params.data.tutor_empresa = null;
+                    params.data.tutor = null;
                 }}
             }}
             
             // Forzamos el refresco de la celda del tutor para que se vea el cambio
             params.api.refreshCells({{
                 rowNodes: [params.node], 
-                columns: ['tutor_empresa']
+                columns: ['tutor']
             }});
         }}
     """),
@@ -406,16 +416,19 @@ with tab_alumnos:
             update_mode=GridUpdateMode.MODEL_CHANGED,
             theme='balham',
             height=600,
-            key="grid_alumnos_master_v1"
+            key=f"grid_alumnos_v_{st.session_state.grid_version}"
             
         )
-        
         if st.button("💾 Guardar Cambios Alumnos", type="primary", use_container_width=True):
             df_grid = grid_response['data']
             with st.spinner("Guardando datos"):
                 try:
+                    
                     guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
                     st.success("✅ ¡Cambios guardados correctamente!")
+                    st.session_state["force_reload"] = True
+                    load_data()
+                    st.session_state.grid_version += 1
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error técnico: {e}")
@@ -583,20 +596,13 @@ if rol_usuario == "admin":
         with tabs[1]:
             if st.session_state.df_tutores is None:
                 st.session_state.df_tutores = getTutores()
-            edited_t = st.data_editor(
-                               st.session_state.df_tutores,
-                               column_config={
-                                    "id": None, 
-                                    "nif": None,
-                                    "nombre": "Nombre", 
-                                    "email": "Email", 
-                                    "password": "Password",
-                                    "cif_empresa":"CIF Empresa"
-                                },
-                                num_rows="dynamic",
-                                key="editor_tutores",
-                                use_container_width=True
-                            )
+            edited_g = st.data_editor(
+                    st.session_state.df_tutores,
+                    column_config={"id": None, "nombre": "Nombre", "email": "Email","telefono": "Teléfono"},
+                    num_rows="dynamic",
+                    key="editor_tutores",
+                    use_container_width=True
+                )
             if st.button("Actualizar Tutores"):
                 cambios = st.session_state["editor_tutores"]
                 if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
@@ -610,7 +616,7 @@ if rol_usuario == "admin":
                             password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
                             row["password_temp"] = password_auto
                         
-                        res = updateTutores(cambios, st.session_state.df_tutores)
+                        res = updateTutoresCentro(cambios, st.session_state.df_tutores)
                         
                         if cambios["added_rows"]:
                             st.warning("Usuarios creados:")

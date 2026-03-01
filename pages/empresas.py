@@ -5,7 +5,7 @@ from modules.data_base import get, getEqual, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla, tutoresTabla
+from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -104,11 +104,15 @@ with tab1:
         selected_name = st.selectbox("Seleccionar empresa", list(empresa_options.keys()))
         empresa_id = empresa_options[selected_name]
         empresa = df_empresas[df_empresas["id"] == empresa_id].iloc[0].to_dict()
-
         with st.expander(f"✏️ Editar empresa: {empresa['nombre']}", expanded=False):
             new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
             new_direccion = st.text_input("Dirección", empresa.get("direccion", ""))
-            new_localidad = st.text_input("Localidad", empresa.get("localidad", ""))
+            try:
+                current_loc = empresa.get("localidad", "")
+                default_index_loc = localidades.index(current_loc)
+            except (ValueError, TypeError):
+                default_index_loc = 10
+            new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc, key=f"localidad_emp_{empresa_id}")
             new_cif = st.text_input("CIF", empresa.get("CIF", ""))
             new_telefono = st.text_input("Teléfono", empresa.get("telefono", ""))
             new_email = st.text_input("Email", empresa.get("email_empresa", ""))
@@ -216,43 +220,6 @@ with tab1:
                 'No hay necesidades FP registradas para esta empresa. '
                 f"Mandale el link para que nos avise: [Formulario]({base_url}forms?form=1)"
             )
-            # if st.button("Crear Oferta Autogestionada"):
-            #     contrato = st.radio("Contrato Laboral",["Sí", "No"],horizontal=True)
-            #     vehiculo = st.radio("Vehiculo",["Sí", "No"],horizontal=True)
-            #     form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-            #     ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-            #     pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
-            #     ofertaPayload={
-            #             "contrato": contrato,
-            #             "vehiculo": vehiculo,
-            #             "ciclos_formativos": cantidades,
-            #             "puestos": puestos_seleccionados,
-            #             "requisitos": requisitos.strip(),
-            #             "estado": estados[0],
-            #             "nombre_tutor": nombre_tutor.strip(),
-            #             "nif_tutor": nif_tutor.strip(),
-            #             "email_tutor": email_tutor.strip().lower(),
-            #             "telefono_tutor": telefono_tutor.strip(),
-            #             "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
-            #             "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
-            #             "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
-            #             "nombre_rellena_form": nombre_contacto.strip(),
-            #             "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
-            #         }
-            #     try:
-            #         upsert(
-            #             necesidadFP,
-            #             {
-            #                 "empresa": empresa["CIF"],
-            #                 "estado": "Nuevo"
-            #             },
-            #             keys=["empresa", "created_at"]
-            #         )
-            #         st.success("Oferta FP creada correctamente")
-            #         st.rerun()
-            #     except Exception as e:
-            #         st.error(f"Error al crear la oferta FP: {e}")
-
 
 
 # -------------------------------------------------------------------
@@ -267,7 +234,7 @@ with tab2:
             nombre_empresa = st.text_input("Nombre de la empresa")
             direccion = st.text_input("Dirección")
             cp = st.text_input("Código Postal")
-            localidad = st.text_input("Localidad")
+            localidad = st.selectbox("Localidad *", options=localidades)
             cif = st.text_input("CIF *")
             nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario")
             telefono_contacto = st.text_input("Teléfono de contacto")
@@ -301,7 +268,13 @@ with tab2:
                             },
                             keys=["CIF"],
                         )
+                        usuario = upsertCustome(usuariosTabla, {
+                            "email": cif.strip(),
+                            "password": cif.strip(),
+                            "rol": "empresa",
+                        }, keys=["email"])
                         st.success("✅ Empresa creada correctamente")
+
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error al crear la empresa: {e}")
@@ -394,8 +367,17 @@ with tab2:
                         # 4️⃣ Insert/update
                         try:
                             upsert(empresasTabla, data, keys=["CIF"])
+                            usuario = upsertCustome(usuariosTabla, {
+                            "email": data.get("CIF"),
+                            "password": data.get("CIF"),
+                            "rol": "empresa",
+                        }, keys=["email"])
                             if data_tutor.get("nombre") and data_tutor.get("email"):
                                 upsertCustome(tutoresTabla, data_tutor, keys=["email"])
+                                upsertCustome(usuariosTabla, {
+                                "email": data_tutor.get("email"),
+                                "password": data_tutor.get("nif") if data_tutor.get("nif") else "123456",
+                                "rol": "tutor",}, keys=["email"])
                             creados += 1
                         except Exception as e:
                             errores.append(f"CIF {cif}: {e}")

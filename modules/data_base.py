@@ -18,7 +18,8 @@ from variables import (
     gestoresTabla,
     usuariosTabla,
     tutoresTabla,
-    carpetaPractica
+    carpetaPractica,
+    tutoresCentroTabla
 )
 load_dotenv()
 
@@ -62,35 +63,71 @@ def update_oferta_complex(oferta_id, df_editado, gestores_activos):
     
     return res
 def get_alumnos_con_practicas_consolidado():
-    response = (
-        supabase.table(alumnosTabla)
-        .select("*, practicas_fp(alumno, empresas(CIF, nombre,telefono, email_empresa), area, tutor)")
+    sinEmpresa = (
+        supabase.table("alumnos")
+        .select("""
+        *,
+        practicas_fp!left(
+            id,
+            alumno,
+            status,
+            area,
+            tutor_centro,
+            tutor,
+            gestor,
+            empresas(CIF, nombre, telefono, email_empresa)
+        )
+    """)
         .eq("estado", "Sin Empresa")
-        .is_("practicas_fp.fecha_inicio", "null")
-        .order("ciclo_formativo")
         .execute()
     )
 
-    if not response.data:
+    draft = (
+        supabase.table("alumnos")
+        .select("""
+            *,
+            practicas_fp!inner(
+                id,
+                alumno,
+                status,
+                area,
+                tutor_centro,
+                tutor,
+                gestor,
+                empresas(CIF, nombre, telefono, email_empresa)
+            )
+            """)
+        .eq("practicas_fp.status", "BORRADOR")
+        .execute()
+    )
+
+    ids = set()
+    final = []
+    for item in sinEmpresa.data + draft.data:
+        if item["id"] not in ids:
+            ids.add(item["id"])
+            final.append(item)
+
+    if not final:
         return pd.DataFrame()
     rows = []
-    for item in response.data:
+    for item in final:
         # Extraemos la primera práctica si existe
         practicas = item.get("practicas_fp", [])
         practica = practicas[0] if practicas else {}
-        empresa = practica.get("empresas", {}) if practica else {}
-        
+        empresa = practica.get("empresas", {}) if practica else None
         row = {
-            **item,  # Incluye todos los campos de alumnos (dni, nombre, ciclo, etc.)
-            "practica_id": practica.get("id"),
-            "id_empresa": empresa.get("CIF"),
-            "nombre_empresa": empresa.get("nombre", "⚠️ SIN ASIGNAR"),
-            "email_empresa": empresa.get("email_empresa"),
-            "telefono_empresa": empresa.get("telefono"),
-            "area": practica.get("area"),
-            "tutor": practica.get("tutor")
+            **item,
+            "practica_id": practica.get("id") if practica else None,
+            "id_empresa": empresa.get("CIF") if isinstance(empresa, dict) else "⚠️ SIN ASIGNAR",
+            "nombre_empresa": empresa.get("nombre") if isinstance(empresa, dict) else "⚠️ SIN ASIGNAR",
+            "email_empresa": empresa.get("email_empresa") if isinstance(empresa, dict) else None,
+            "telefono_empresa": empresa.get("telefono") if isinstance(empresa, dict) else None,
+            "area": practica.get("area") if practica else None,
+            "tutor_centro": practica.get("tutor_centro") if practica else None,
+            "tutor": practica.get("tutor") if practica else None,
+            "gestor": practica.get("gestor") if practica else None,
         }
-        
         # Eliminamos el objeto anidado para que no ensucie el DataFrame
         if "practicas_fp" in row: 
             del row["practicas_fp"]
@@ -110,18 +147,23 @@ def getGestores():
     df_gestores = pd.DataFrame(gestores.data)
     df_usuarios = pd.DataFrame(usuarios.data)
     
-    df_final = pd.merge(df_gestores, df_usuarios, on="email", how="left")
-    return df_final
+    if df_gestores.empty:
+        return pd.DataFrame(columns=["id","nombre","email","ciclo"])
+    else:
+        df_final = pd.merge(df_gestores, df_usuarios, on="email", how="left")
+        return df_final
 
 def getTutores():
-    tutores = supabase.table(tutoresTabla).select("id, email, nombre, cif_empresa").order("nombre").execute()
+    tutores = supabase.table(tutoresCentroTabla).select("id, email, nombre,telefono").order("nombre").execute()
     usuarios = supabase.table(usuariosTabla).select("email, password").execute()
     
     df_tutores = pd.DataFrame(tutores.data)
     df_usuarios = pd.DataFrame(usuarios.data)
-    
-    df_final = pd.merge(df_tutores, df_usuarios, on="email", how="left")
-    return df_final
+    if df_tutores.empty:
+        return pd.DataFrame(columns=["id","nombre","email","telefono"])
+    else:
+        df_final = pd.merge(df_tutores, df_usuarios, on="email", how="left")
+        return df_final
 def getEmpresasYOfertas():
     res = (
         supabase.table(empresasTabla)
@@ -186,17 +228,70 @@ def updateTutores(cambios, df_original, cif=None):
             st.error(f"Error al eliminar {email_tutor}: {e}")
         
 
+
+def updateTutoresCentro(cambios, df_original):
+    for new_row in cambios["added_rows"]:
+        nombre = new_row.get("nombre", "").strip()
+        telefono = new_row.get("telefono", "").strip()
+        email = new_row.get("email", "").strip().lower()
+        password = new_row.get("password_temp") or new_row.get("password", "123456")
+        if email and nombre:
+            try:
+                add(tutoresCentroTabla, {
+                    "nombre": nombre,
+                    "email": email,
+                    "telefono":telefono
+                })
+                add("usuarios", {
+                    "email": email,
+                    "password": password,
+                    "rol": "tutorCentro"
+                })
+            except Exception as e:
+                raise Exception(f"Error al crear el usuario {email}: {e}")
+
+    # 2. MANEJAR EDICIONES (Edited)
+    for idx, mods in cambios["edited_rows"].items():
+        fila_orig = df_original.iloc[int(idx)]
+        id_tutores = fila_orig["id"]
+        email_orig = fila_orig["email"]
+        
+        try:
+            cambios_tutor = {k: v for k, v in mods.items() if k in ["nombre", "email", "nif", "activo","telefono"]}
+            cambios_usuario = {k: v for k, v in mods.items() if k in ["password", "email"]}
+            if cambios_tutor:
+                update(tutoresCentroTabla, mods, {"id": id_tutores})
+            if cambios_usuario:
+                update("usuarios", cambios_usuario, {"email": email_orig})
+                
+        except Exception as e:
+            raise Exception(f"Error al actualizar el gestor {id_tutores}: {e}")
+
+    # 3. MANEJAR BORRADOS (Deleted)
+    for idx in cambios["deleted_rows"]:
+        fila_orig = df_original.iloc[int(idx)]
+        id_tutor = fila_orig["id"]
+        email_tutor = fila_orig["email"]
+        
+        try:
+            delete(tutoresCentroTabla, "id", id_tutor)
+            delete("usuarios", "email", email_tutor)
+        except Exception as e:
+            st.error(f"Error al eliminar {email_tutor}: {e}")
+        
+
 def updateGestores(cambios, df_original):
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         email = new_row.get("email", "").strip().lower()
         password = new_row.get("password_temp") 
-        
+        ciclo = new_row.get("ciclo", "").strip()
         if email and nombre:
             try:
                 add(gestoresTabla, {
                     "nombre": nombre,
                     "email": email,
+                    "ciclo":ciclo,
                     "activo": new_row.get("activo", True)
                 })
 
@@ -215,6 +310,7 @@ def updateGestores(cambios, df_original):
         fila_orig = df_original.iloc[int(idx)]
         id_gestor = fila_orig["id"]
         email_orig = fila_orig["email"]
+
         try:
             # Actualizamos la tabla de gestores
             update(gestoresTabla, mods, {"id": id_gestor})
@@ -615,31 +711,22 @@ def getTodosEmpresaOfertas():
     return response.data
 
 def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
-    # 1. Aseguramos que el original sea un diccionario indexado por DNI para acceso rápido
     original_dict = df_original.set_index('dni').to_dict('index')
-    
     for _, row in df_updated.iterrows():
         dni = row['dni']
-        
-        # Si por alguna razón el DNI no está en el original, saltamos
+        practicaId = None
+
+        if pd.notna(row.get('practica_id')):
+            practicaId = int(float(row['practica_id']))
         if dni not in original_dict:
             continue
-            
         row_orig = original_dict[dni]
-
-        # 2. LIMPIEZA Y NORMALIZACIÓN DE VALORES
         def clean_str(val):
             if pd.isna(val) or val is None: return ""
             return str(val).strip()
 
-        def clean_bool(val):
-            if isinstance(val, str):
-                return "true" in val.lower() or "✅" in val
-            return bool(val)
-
         def clean_int(val):
             try:
-                # Maneja nulos, strings vacíos y decimales antes de convertir a entero
                 if pd.isna(val) or str(val).strip() == "": return 0
                 return int(float(val))
             except:
@@ -652,6 +739,8 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         curr_apellido = clean_str(row.get('apellido'))
         curr_horas = clean_int(row.get('horas_totales'))
         curr_gestor = clean_str(row.get('gestor'))
+        curr_asignado = clean_str(row.get('asignado'))
+        curr_practica = clean_str(row.get('practica_id'))
         # 4. EXTRAER VALORES ORIGINALES
         orig_comentarios = clean_str(row_orig.get('comentarios_centro'))
         orig_obs = clean_str(row_orig.get('observaciones_seguimiento'))
@@ -659,18 +748,17 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         orig_apellido = clean_str(row_orig.get('apellido'))
         orig_horas = clean_int(row_orig.get('horas_totales'))
         orig_gestor = clean_str(row_orig.get('gestor'))
+        orig_asignado = clean_str(row_orig.get('asignado'))
         # 5. DETECCIÓN DE CAMBIOS EXPLÍCITA
         # He añadido curr_horas != orig_horas aquí para que el IF se active si cambian las horas
-        hubo_cambio_texto = (curr_comentarios != orig_comentarios or 
-                            curr_obs != orig_obs or
-                            curr_nombre != orig_nombre or 
-                            curr_apellido != orig_apellido or
-                            curr_horas != orig_horas or
-                            curr_gestor != orig_gestor 
-                            )
-        
+        hubo_cambio_alumno = (curr_nombre != orig_nombre or 
+                      curr_apellido != orig_apellido or
+                      curr_horas != orig_horas or
+                      curr_comentarios != orig_comentarios or
+                      curr_obs != orig_obs or
+                      curr_gestor != orig_gestor)
 
-        if hubo_cambio_texto:
+        if hubo_cambio_alumno:
             datos_alumno = {
                 "dni": dni,
                 "nombre": curr_nombre,
@@ -680,54 +768,68 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 "observaciones_seguimiento": curr_obs,
                 "gestor": curr_gestor
             }
-            
-            # Ejecutar el guardado
             upsert(alumnosTabla, datos_alumno, keys=["dni"])
+
 
         # 6. LÓGICA DE ASIGNACIÓN DE EMPRESA
         nueva_empresa = row.get('nombre_empresa')
         empresa_antigua = row_orig.get('nombre_empresa')
         nuevo_puesto = row.get('puesto')
         antiguo_puesto= row_orig.get('puesto')
-        nuevo_tutor = row.get('tutor')
-        antiguo_tutor = row_orig.get('tutor')
-
-        if nueva_empresa != empresa_antigua or nuevo_puesto != antiguo_puesto or nuevo_tutor != antiguo_tutor:
-            if nueva_empresa == "⚠️ SIN ASIGNAR":
-                delete(practicaTabla, "alumno", dni)
-                upsert(alumnosTabla, {"dni": dni, "estado": "Sin Empresa"}, keys=["dni"])
-                actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
-            else:
-                cif_empresa = mapa_nombres_id.get(nueva_empresa)
-                actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
+   
+        nuevo_tutorCentro = row.get('tutor_centro')
+        antiguo_tutorCentro = row_orig.get('tutor_centro')
+        cambio_logistica = (nueva_empresa != empresa_antigua or 
+                    nuevo_puesto != antiguo_puesto or 
+                    nuevo_tutorCentro != antiguo_tutorCentro or
+                    curr_gestor != orig_gestor)
+        if cambio_logistica:
+            cif_empresa = mapa_nombres_id.get(nueva_empresa) if nueva_empresa != "⚠️ SIN ASIGNAR" else None
+        
+            if nueva_empresa != empresa_antigua:
+                if empresa_antigua != "⚠️ SIN ASIGNAR":
+                    actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
                 if cif_empresa:
-                    crearDraftPractica(
-                        empresaCif=cif_empresa,
-                        alumnoDni=dni,
-                        alumnoNombre=curr_nombre,
-                        alumnoApellido=curr_apellido,
-                        ciclo=row['ciclo_formativo'], 
-                        area=nuevo_puesto if nuevo_puesto else "General",
-                        proyecto= "No asignado aun",
-                        tutor= nuevo_tutor if nuevo_tutor else "Nin asignar",
-                        fecha=datetime.now().isoformat(),
-                        ciclos_info=None, 
-                        cupos_disp=0, 
-                        oferta_id=row.get('oferta_id') 
-                    )
+                    actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
+            
+            practica_res = crearDraftPractica(
+                empresaCif=cif_empresa,
+                alumnoDni=dni,
+                ciclo=row['ciclo_formativo'], 
+                area=nuevo_puesto if nuevo_puesto else "General",
+                proyecto= "No asignado aun",
+                tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else "Sin asignar",
+                fecha=datetime.now().isoformat(),
+                ciclos_info=None, 
+                cupos_disp=0, 
+                oferta_id=row.get('oferta_id'),
+                status="BORRADOR",
+                practicaId=practicaId,
+                gestor=curr_gestor
+            )
+            practicaId = practica_res[0].get("id")
+        if curr_asignado != orig_asignado:
+            if practicaId and nueva_empresa != "⚠️ SIN ASIGNAR":
+                update(practicaTabla, {"status": "CONFIRMADA"}, {"id": practicaId})
+                upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
+            else:
+                st.warning(f"No se puede confirmar la práctica de {curr_nombre} sin una empresa asignada.")
 
-def crearDraftPractica(empresaCif, alumnoDni, alumnoNombre, alumnoApellido, ciclo, area, proyecto, tutor, fecha,ciclos_info,cupos_disp,oferta_id):
+def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro, fecha,ciclos_info,cupos_disp,oferta_id, status, practicaId=None, gestor=None):
         payload_practica = {
             "empresa": empresaCif,
             "alumno": alumnoDni,
             "ciclo_formativo": ciclo,
             "area": area,
-            "tutor": tutor,
+            "tutor_centro": tutorCentro,
             "proyecto": proyecto,
-            "oferta": oferta_id
+            "oferta": oferta_id,
+            "status": status,
+            "gestor": gestor
         }
-        add(practicaTabla, payload_practica)
-
+        if practicaId:
+            payload_practica["id"] = practicaId
+        response = upsert(practicaTabla, payload_practica, keys=["id"])
         upsert(
         alumnosTabla,
         {"dni": alumnoDni, "estado": estadosAlumno[1]},
@@ -749,7 +851,8 @@ def crearDraftPractica(empresaCif, alumnoDni, alumnoNombre, alumnoApellido, cicl
             {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
             keys=["alumno"]
         )
-        create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
+        return response.data
+        #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
 
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
