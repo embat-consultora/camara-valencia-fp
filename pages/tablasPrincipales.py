@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getTutores,getGestore, updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
+from modules.data_base import getTutores,getGestore, getTutoresEmpresa,updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -423,7 +423,6 @@ with tab_alumnos:
             df_grid = grid_response['data']
             with st.spinner("Guardando datos"):
                 try:
-                    
                     guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
                     st.success("✅ ¡Cambios guardados correctamente!")
                     st.session_state["force_reload"] = True
@@ -438,13 +437,12 @@ with tab_alumnos:
 with tab_ofertas:
     try:
         df_gestores_all = getGestore()
-        gestores_activos = df_gestores_all[df_gestores_all['activo'] == True]['nombre'].tolist()
+        gestores_activos_df = df_gestores_all[df_gestores_all['activo'] == True]
     except:
         st.error("No se pudo cargar la lista de gestores.")
-        gestores_activos = []
+        gestores_activos_df = []
         
-    df_raw_ofertas = getOfertasTabla() # Renombrado para no chocar con df_raw de alumnos
-    
+    df_raw_ofertas = getOfertasTabla()
     if df_raw_ofertas.empty:
         st.info("No hay ofertas registradas.")
     else:
@@ -454,21 +452,22 @@ with tab_ofertas:
             puestos_info = record.get('puestos', {}) or {}
             empresa = record.get('empresas', {}) or {}
             seguimiento_full = record.get('seguimiento_gestores', {}) or {}
-            tutores_full = record.get('tutores_por_puesto', {}) or {}
-            
+            tutores_full = empresa.get("tutores", {}) or {}
             for nombre_ciclo, datos_alumnos in ciclos_info.items():
+                gestores_ciclo = gestores_activos_df[
+                    gestores_activos_df['ciclo'].str.upper() == nombre_ciclo
+                ]['nombre'].tolist()
                 areas_del_ciclo = puestos_info.get(nombre_ciclo, [{"area": "General", "proyecto": ""}])
                 for area_item in areas_del_ciclo:
                     nombre_area = area_item.get('area', 'General')
                     seg_especifico = seguimiento_full.get(nombre_ciclo, {}).get(nombre_area, {})
-                    tutor_especifico = tutores_full.get(nombre_ciclo, {}).get(nombre_area, {})
-
                     fila = {
                         "id": record.get('id'),
                         "Empresa": empresa.get('nombre', 'N/A'),
                         "Teléfono": empresa.get('telefono', ''),
                         "Dirección": empresa.get('direccion', ''),
                         "Localidad": empresa.get('localidad', ''),
+                        "Horario": empresa.get('horario', ''),
                         "Ciclo": nombre_ciclo,
                         "Alumnos Pedidos": datos_alumnos.get('alumnos', 0),
                         "Área": nombre_area,
@@ -476,10 +475,11 @@ with tab_ofertas:
                         "Requisitos": record.get('requisitos', ''),
                         "Contrato": record.get('contrato', ''),
                         "Vehículo": record.get('vehiculo', ''),
-                        "Nombre Tutor": tutor_especifico.get('nombre', record.get('nombre_tutor', '')),
-                        "Email Tutor": tutor_especifico.get('email', record.get('email_tutor', '')),
+                        "Nombre Tutor": tutores_full[0].get('nombre', record.get('nombre_tutor', '')),
+                        "Email Tutor": tutores_full[0].get('email', record.get('email_tutor', '')),
+                        "Teléfono Tutor": tutores_full[0].get('telefono', record.get('telefono', '')),
                     }
-                    for gestor in gestores_activos:
+                    for gestor in gestores_ciclo:
                         fila[f"Prop. {gestor}"] = seg_especifico.get(gestor, "")
                     rows_list.append(fila)
 
@@ -489,24 +489,57 @@ with tab_ofertas:
             sub_tabs = st.tabs(lista_ciclos)
             for i, nombre_ciclo in enumerate(lista_ciclos):
                 with sub_tabs[i]:
-                    df_ciclo_tab = df_final[df_final['Ciclo'] == nombre_ciclo].reset_index(drop=True)
+                    # 1. Filtramos las filas que pertenecen a este ciclo
+                    df_ciclo_raw = df_final[df_final['Ciclo'] == nombre_ciclo].copy()
+                    
+                    columnas_fijas = [
+                        "id", "Empresa", "Teléfono", "Localidad", "Horario"
+                        "Alumnos Pedidos", "Área", "Proyecto", "Requisitos", 
+                        "Contrato", "Vehículo", "Nombre Tutor", "Email Tutor","Telefono Tutor"
+                    ]
+                    
+                    # 3. Identificamos SOLO los gestores de este ciclo específico
+                    gestores_del_ciclo = gestores_activos_df[
+                        gestores_activos_df['ciclo'].str.upper() == nombre_ciclo.upper()
+                    ]['nombre'].tolist()
+                    
+                    # Creamos la lista de nombres de columnas de gestores permitidos
+                    columnas_gestores_permitidas = [f"Prop. {g}" for g in gestores_del_ciclo]
+                    
+                    # 4. FILTRADO CRÍTICO DE COLUMNAS: Solo las fijas + los gestores de este ciclo
+                    # Esto elimina cualquier columna de "Prop. Gestor" que no sea de este ciclo
+                    columnas_finales = [c for c in columnas_fijas if c in df_ciclo_raw.columns] + \
+                                    [c for c in columnas_gestores_permitidas if c in df_ciclo_raw.columns]
+                    
+                    # Re-creamos el DataFrame solo con esas columnas
+                    df_ciclo_tab = df_ciclo_raw[columnas_finales].reset_index(drop=True)
+
+                    # 5. Configuración de columnas para el editor
                     col_config_oferta = {
-                        "id": None, 
+                        "id": None, # Ocultamos el ID
                         "Empresa": st.column_config.TextColumn(disabled=True),
                         "Teléfono": st.column_config.TextColumn(disabled=True),
                         "Localidad": st.column_config.TextColumn(disabled=True),
+                        "Horarios": st.column_config.TextColumn(disabled=True),
+                        "Nombre Tutor": st.column_config.TextColumn(disabled=True),
+                        "Email Tutor": st.column_config.TextColumn(disabled=True),
+                        "Telefono Tutor": st.column_config.TextColumn(disabled=True),
                         "Alumnos Pedidos": st.column_config.NumberColumn("Cant.", disabled=True),
                         "Área": st.column_config.TextColumn(disabled=True),
                     }
-                    for g in gestores_activos:
-                        col_config_oferta[f"Prop. {g}"] = st.column_config.TextColumn(f"🙋 {g}")
+                    
+                    # Formateamos solo las columnas de los gestores que SI están presentes
+                    for g in gestores_del_ciclo:
+                        col_name = f"Prop. {g}"
+                        if col_name in df_ciclo_tab.columns:
+                            col_config_oferta[col_name] = st.column_config.TextColumn(f"🙋 {g}")
 
+                    # 6. Renderizado
                     edited_data = st.data_editor(
                         df_ciclo_tab,
                         column_config=col_config_oferta,
                         key=f"editor_ofertas_{nombre_ciclo}",
                         use_container_width=True,
-                        num_rows="fixed",
                         hide_index=True
                     )
 
@@ -527,7 +560,7 @@ with tab_ofertas:
                                 if nombre_ciclo not in tutores_db: tutores_db[nombre_ciclo] = {}
                                 if area_actual not in tutores_db[nombre_ciclo]: tutores_db[nombre_ciclo][area_actual] = {}
 
-                                for g in gestores_activos:
+                                for g in gestores_ciclo:
                                     col_name = f"Prop. {g}"
                                     val = nuevos_valores.get(col_name, fila_editor.get(col_name, ""))
                                     seguimiento_db[nombre_ciclo][area_actual][g] = val

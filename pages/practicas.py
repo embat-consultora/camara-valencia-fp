@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -16,7 +16,7 @@ import json
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     fasesPractica, faseColPractica, max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
-    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla,tutoresCentroTabla
+    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # ----------------------------------------------
@@ -41,12 +41,17 @@ if "gestores" not in st.session_state:
     st.session_state["gestores"] = []
 if "tutorCentro" not in st.session_state:
     st.session_state["tutorCentro"] = []
+if "page" not in st.session_state:
+    st.session_state.page = "lista"
+if "practica_seleccionada" not in st.session_state:
+    st.session_state.practica_seleccionada = None
 rol_usuario = st.session_state.get("rol")
 # ----------------------------------------------
 # FETCH FUNCTIONS
 # ----------------------------------------------
 def fetch_practicas_tutores():
-    practicas = getPracticas(practicaTabla, {"status":"CONFIRMADA",})
+    practicas = getPracticas(practicaTabla,  conditions=None,
+    in_filters={"status": [estados[0], estados[1], estados[2], estados[3],estados[4]]})    
     tutores = getEquals(tutoresTabla, {})
     tutoresCentro = getEquals(tutoresCentroTabla, {})
     return practicas, tutores,tutoresCentro
@@ -63,7 +68,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
-            
+
 # ----------------------------------------------
 # BOTÓN REFRESCAR
 # ----------------------------------------------
@@ -76,56 +81,54 @@ with col_refresh:
 # ----------------------------------------------
 # CARGA DE DATOS
 # ----------------------------------------------
-def load_data(force=False):
-    if force or "data_loaded" not in st.session_state or st.session_state.get("force_reload"):
-        practicas, tutores, tutoresCentro = fetch_practicas_tutores()
-        feedback =get(feedbackResponseTabla)
-        estados = getEquals(practicaEstadosTabla, {})
-        estados_map = {e["practicaId"]: e for e in estados}
-        user_email = st.session_state.get("username")
-        gestores = get(gestoresTabla)
-        if rol_usuario == "gestor":
-            gestorDatos = [g for g in gestores if g.get("email") == user_email]
-            gestorNombre = gestorDatos[0].get("nombre")
-            if gestorDatos:
-                practicas = [
-                p for p in practicas 
-                if p.get("alumnos") is not None and p.get("alumnos").get("gestor") == gestorNombre
-            ]
-            else:
-                practicas = []
-        if rol_usuario == "tutor":
-
-            tutorDatos = [t for t in tutores if t.get("email") == user_email]
-            tutorNombre = tutorDatos[0].get("nombre")
-            if tutorDatos:
-                practicas = [
-                p for p in practicas 
-                if p.get("tutor") is not None and p.get("tutor") == tutorNombre
-            ]
-            else:
-                practicas = []
-        if rol_usuario == "tutorCentro":
-            tutorCentroDatos = [t for t in tutoresCentro if t.get("email") == user_email]
-            tutorCentroNombre = tutorCentroDatos[0].get("nombre")
-            if tutorCentroDatos:
-                practicas = [
-                p for p in practicas 
-                if p.get("tutor_centro") is not None and p.get("tutor_centro") == tutorCentroNombre
-            ]
-            else:
-                practicas = []
-        st.session_state["practicas"] = practicas
-        st.session_state["tutores"] = tutores
-        st.session_state["tutorCentro"] = tutoresCentro
-        st.session_state["gestores"] = gestores
-        st.session_state["estados"] = estados_map
-        st.session_state["feedbacks"] = feedback
-        st.session_state["data_loaded"] = True
-        st.session_state["force_reload"] = False
+def load_data():
+    practicas, tutores, tutoresCentro = fetch_practicas_tutores()
+    feedback =get(feedbackResponseTabla)
+    estados = getEquals(practicaEstadosTabla, {})
+    estados_map = {e["practicaId"]: e for e in estados}
+    user_email = st.session_state.get("username")
+    gestores = get(gestoresTabla)
+    if rol_usuario == "gestor":
+        gestorDatos = [g for g in gestores if g.get("email") == user_email]
+        gestorNombre = gestorDatos[0].get("nombre")
+        if gestorDatos:
+            practicas = [
+            p for p in practicas 
+            if p.get("alumnos") is not None and p.get("alumnos").get("gestor") == gestorNombre
+        ]
+            
+        else:
+            practicas = []
+    if rol_usuario == "tutor":
+        tutorDatos = [t for t in tutores if t.get("email") == user_email]
+        tutorNombre = tutorDatos[0].get("nombre")
+        if tutorDatos:
+            practicas = [
+            p for p in practicas 
+            if p.get("tutor") is not None and p.get("tutor") == tutorNombre
+        ]
+        else:
+            practicas = []
+    if rol_usuario == "tutorCentro":
+        tutorCentroDatos = [t for t in tutoresCentro if t.get("email") == user_email]
+        tutorCentroNombre = tutorCentroDatos[0].get("nombre")
+        if tutorCentroDatos:
+            practicas = [
+            p for p in practicas 
+            if p.get("tutor_centro") is not None and p.get("tutor_centro") == tutorCentroNombre
+        ]
+        else:
+            practicas = []
+    st.session_state["practicas"] = practicas
+    st.session_state["tutores"] = tutores
+    st.session_state["tutorCentro"] = tutoresCentro
+    st.session_state["gestores"] = gestores
+    st.session_state["estados"] = estados_map
+    st.session_state["feedbacks"] = feedback
+    st.session_state["data_loaded"] = True
+    st.session_state["force_reload"] = False
 
 load_data()
-
 practicas = st.session_state["practicas"]
 tutores = st.session_state["tutores"]
 gestores =  st.session_state["gestores"]
@@ -145,30 +148,56 @@ def dialog_fecha_fin(practica_id, email_alumno):
         st.toast("✅  La práctica ha pasado a estado INICIADA")
 
         st.rerun()
+
+@st.dialog("Cancelacion de Práctica")
+def dialog_cancelacion(practica_id, dni_alumno):
+    st.write(f"Por favor, indica el motivo de la cancelación")
+    motivo = st.text_input("", placeholder="Ej: El alumno no ha pasado la entrevista, la empresa ya no puede acoger, etc.")
+    
+    if st.button("Confirmar", type="primary"):
+        cancelarPractica(int(practica_id),dni_alumno, motivo)
+        st.toast("✅  La práctica ha pasado a estado CANCELADA")
+
+        st.rerun()
 # ----------------------------------------------
 # HELPER
 # ----------------------------------------------
 def tutores_por_empresa(empresa_id, lista_tutores):
     return [t for t in lista_tutores if t.get("cif_empresa") == empresa_id]
 
-# ----------------------------------------------
-# RUTEO
-# ----------------------------------------------
-if "page" not in st.session_state:
-    st.session_state.page = "lista"
 
-if "practica_seleccionada" not in st.session_state:
-    st.session_state.practica_seleccionada = None
+
+def contarAnexos(practicas: list) -> int:
+    total_missing = 0
+    for p in practicas:
+        estados_p = p.get("status", {})    
+        if estados_p != "Nuevo":
+                continue
+        anexos_creados = p.get("anexos_creados")
+        anexos_enviados = p.get("anexos_enviados")
+        anexos_firmados = p.get("anexos_firmados")
+        doc_sao_entregada = p.get("doc_sao_entregada")
+
+        if not all([
+            anexos_creados,
+            anexos_enviados,
+            anexos_firmados,
+            doc_sao_entregada
+        ]):
+            total_missing += 1
+
+    return total_missing
 
 # ----------------------------------------------
 # PAGINA: LISTA
 # ----------------------------------------------
-
 def mostrar_lista():
     tabs_visibles = ["📋 Listado de Prácticas"]
-
+    label_anexos = "📃 Anexos"
     if rol_usuario == 'admin':
-        tabs_visibles.extend(["📃 Anexos", "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
+        missing_count = contarAnexos(practicas)  
+        label_anexos = f"📃 Anexos  🔴 ({missing_count})" if missing_count > 0 else "📃 Anexos"
+        tabs_visibles.extend([label_anexos, "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
     elif rol_usuario in ['gestor', 'tutor', 'tutorCentro']:
         tabs_visibles.append("📊 Dashboard de Feedback")
    
@@ -176,8 +205,8 @@ def mostrar_lista():
     with tabs[0]:
         mostrar_lista_practicas()
     
-    if "📃 Anexos" in tabs_visibles:
-        idx = tabs_visibles.index("📃 Anexos")
+    if label_anexos in tabs_visibles:
+        idx = tabs_visibles.index(label_anexos)
         with tabs[idx]:
             mostrar_anexos()
 
@@ -202,19 +231,14 @@ def mostrar_lista_practicas():
         data_for_grid = []
         for p in practicas:
             pid = p["id"]
-            # Lógica de estados simplificada para el grid
-            estados_p = st.session_state["estados"].get(pid, {})
-            estado_actual = "Pendiente"
-            for fase in fasesPractica:
-                    columna_fase = faseColPractica[fase]
-                    if estados_p.get(columna_fase):
-                        estado_actual = fase
-
+            estados_p = p.get("status", {})
+            if estados_p == estados[4]:
+                continue
             data_for_grid.append({
                 "ID": pid,
                 "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
                 "Empresa": p.get('empresas', {}).get('nombre'),
-                "Estado": estado_actual,
+                "Estado": estados_p,
                 "Ciclo": p.get('ciclo_formativo', '—'),
                 "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar')
             })
@@ -223,7 +247,7 @@ def mostrar_lista_practicas():
 
         if df.empty:
             st.info("No hay prácticas asignadas aun")
-            #return
+            return
 
         # 2. Configurar AgGrid
         gb = GridOptionsBuilder.from_dataframe(df)
@@ -364,7 +388,8 @@ def mostrar_carga_rapida():
                         fecha=datetime.now().isoformat(),
                         ciclos_info=None,
                         cupos_disp=None,
-                        oferta_id=None
+                        oferta_id=None,
+                        status= "Nuevo",
                     )
 
                     st.success(f"✅ ¡Éxito! Práctica creada entre {new_emp_nombre} y {new_alu_nombre}.")
@@ -378,26 +403,18 @@ def mostrar_anexos():
         st.info("No tienes prácticas asignadas aun.")
         return
 
-    # 1. Preparación de datos (Respetando TODOS tus campos y lógicas)
     data_for_grid = []
     for p in practicas:
         pid = p["id"]
         
-        # Lógica de estados original
-        estados_p = st.session_state.get("estados", {}).get(pid, {})
-        estado_actual = "Pendiente"
-        for fase in fasesPractica:
-            columna_fase = faseColPractica[fase]
-            if estados_p.get(columna_fase):
-                estado_actual = fase
-
-        # TRUCO MAESTRO: Convertimos el NULL (None) de Supabase en False
-        # Si no hacemos esto, el checkbox de Streamlit no se dibuja bien.
+        estados_p = p.get("status", {})
+        if estados_p != "Nuevo":
+            continue
         data_for_grid.append({
             "ID": pid,
             "Alumno": f"{p.get('alumnos', {}).get('nombre', '')} {p.get('alumnos', {}).get('apellido', '')}",
             "Empresa": p.get('empresas', {}).get('nombre', '—'),
-            "Estado": estado_actual,
+            "Estado": estados_p,
             "Ciclo": p.get('ciclo_formativo', '—'),
             # Usamos 'is True' para que solo sea True si es explícito en la BD
             "Creado": True if p.get('anexos_creados') is True else False,
@@ -410,8 +427,6 @@ def mostrar_anexos():
     df_original = pd.DataFrame(data_for_grid)
 
     st.subheader("📋 Gestión de Anexos")
-
-    # 3. El Editor con KEY DINÁMICA (para que refresque al guardar)
     if "df_key" not in st.session_state:
         st.session_state.df_key = 0
 
@@ -431,7 +446,7 @@ def mostrar_anexos():
         }
     )
 
-    # 4. Lógica de Guardado (Capturando cambios del session_state)
+
     state_key = f"editor_anexos_{st.session_state.df_key}"
     cambios = st.session_state[state_key].get("edited_rows")
     
@@ -565,7 +580,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             lista_nombres_gestores = [g["nombre"] for g in gestores]
             if "No asignado" not in lista_nombres_gestores:
                 lista_nombres_gestores.insert(0, "No asignado")
-            gestor_actual = p.get("gestor")
+            gestor_actual = alumno.get("gestor")
             try:
                 indice_gestor = lista_nombres_gestores.index(gestor_actual) if gestor_actual in lista_nombres_gestores else 0
             except:
@@ -620,7 +635,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     index=indice_tutorc,
                     key=clave_tutorc,
                     on_change=handle_update,
-                    args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutor, "TutorCentro")
+                    args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutorc, "TutorCentro")
                 )
 
         pass
@@ -628,8 +643,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
 def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alumno):
     st.subheader("Seguimiento")
     estado_actual = st.session_state["estados"].get(practicaId, {})
-    
     mostrar_fases(fasesPractica, faseColPractica, estado_actual)
+
     cols = st.columns(len(fasesPractica))
     if rol_usuario != 'tutor':
         for i, fase in enumerate(fasesPractica):
@@ -656,9 +671,13 @@ def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alu
                     payload_practica = {
                             "id": int(practicaId),
                             "fecha_inicio": new_value,
+                            "status": estados[2]
                         }
                     upsert(practicaTabla, payload_practica, keys=["id"])
                     dialog_fecha_fin(practicaId, alumno['email_alumno'])
+                if fase == fasesPractica[4] and checked:
+                    dialog_cancelacion(practicaId, alumno['dni'])
+                    
                 st.session_state["estados"][practicaId] = estado_actual
                 st.toast(f"✅  Estado actualizado")
     
@@ -706,62 +725,145 @@ def seccion_feedback_candidato(practicaId, forms):
     pass
 
 def seccion_feedback_tutor(practicaId, p, tutor_actual):
-    st.subheader("Seguimiento del Tutor")
+    st.subheader("Seguimiento del Tutor Empresa")
+    with st.expander(f"Tutor Centro: {tutor_actual}"):
+        historial_feedback = p.get("feedback_tutor")
+        if not isinstance(historial_feedback, list):
+            historial_feedback = []
 
-    historial_feedback = p.get("feedback_tutor")
-    if not isinstance(historial_feedback, list):
-        historial_feedback = []
-
-    # 2. ESPACIO PARA NUEVO FEEDBACK (Solo para Tutores)
-    if rol_usuario == 'tutor':
-        with st.container(border=True):
-            st.markdown("##### Añadir nueva observación")
-            nuevo_comentario = st.text_area(
-                "Describe el progreso del alumno hoy:",
-                placeholder="Ej: El alumno ha empezado a manejar las herramientas de diseño con autonomía...",
-                key=f"input_fb_{practicaId}"
-            )
-            
-            if st.button("💾 Publicar Comentario", use_container_width=True):
-                if nuevo_comentario.strip():
-                    # Crear el nuevo registro
-                    nuevo_registro = {
-                        "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "tutor": tutor_actual, 
-                        "mensaje": nuevo_comentario.strip()
-                    }
-                    
-                    # Añadir al historial existente
-                    historial_feedback.append(nuevo_registro)
-                    
-                    try:
-                        upsert(practicaTabla, {
-                            "id": int(practicaId),
-                            "feedback_tutor": historial_feedback
-                        }, keys=["id"])
+        # 2. ESPACIO PARA NUEVO FEEDBACK (Solo para Tutores)
+        if rol_usuario == 'tutor':
+            with st.container(border=True):
+                st.markdown("##### Añadir nueva observación")
+                nuevo_comentario = st.text_area(
+                    "Describe el progreso del alumno hoy:",
+                    placeholder="Ej: El alumno ha empezado a manejar las herramientas de diseño con autonomía...",
+                    key=f"input_fb_{practicaId}"
+                )
+                
+                if st.button("💾 Publicar Comentario", use_container_width=True):
+                    if nuevo_comentario.strip():
+                        # Crear el nuevo registro
+                        nuevo_registro = {
+                            "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                            "tutor": tutor_actual, 
+                            "mensaje": nuevo_comentario.strip()
+                        }
                         
-                        st.toast("✅ Comentario guardado")
-                        # Actualizar el objeto p para mostrarlo sin esperar recarga manual
-                        p["feedback_tutor"] = historial_feedback
-                        st.rerun() 
-                    except Exception as e:
-                        st.error(f"Error al guardar: {e}")
-                else:
-                    st.warning("Escribe algo antes de guardar.")
+                        # Añadir al historial existente
+                        historial_feedback.append(nuevo_registro)
+                        
+                        try:
+                            upsert(practicaTabla, {
+                                "id": int(practicaId),
+                                "feedback_tutor": historial_feedback
+                            }, keys=["id"])
+                            
+                            st.toast("✅ Comentario guardado")
+                            # Actualizar el objeto p para mostrarlo sin esperar recarga manual
+                            p["feedback_tutor"] = historial_feedback
+                            st.rerun() 
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                    else:
+                        st.warning("Escribe algo antes de guardar.")
 
-    # 3. VISUALIZACIÓN DEL HISTORIAL (Para Tutor y Gestor)
-    # Lo mostramos en un contenedor con scroll si hay muchos
-    if historial_feedback:
-        st.markdown("##### Historial de observaciones")
-        
-        # Mostramos de más reciente a más antiguo para que lo último esté arriba
-        for fb in reversed(historial_feedback):
-            with st.chat_message("user", avatar="👨‍🏫"):
-                st.markdown(f"**{fb['tutor']}** - <span style='color:gray; font-size:0.8rem;'>{fb['fecha']}</span>", unsafe_allow_html=True)
-                st.write(fb['mensaje'])
-    else:
-        st.info("No hay feedback registrado todavía en esta práctica.")
-    pass
+        # 3. VISUALIZACIÓN DEL HISTORIAL (Para Tutor y Gestor)
+        # Lo mostramos en un contenedor con scroll si hay muchos
+        if historial_feedback:
+            with st.expander("Historial de observaciones"):
+                for fb in reversed(historial_feedback):
+                    with st.chat_message("user", avatar="👨‍🏫"):
+                        st.markdown(f"**{fb['tutor']}** - <span style='color:gray; font-size:0.8rem;'>{fb['fecha']}</span>", unsafe_allow_html=True)
+                        st.write(fb['mensaje'])
+        else:
+            st.info("No hay feedback registrado todavía en esta práctica.")
+        pass
+
+def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
+    puede_editar = rol_usuario == "tutorCentro"
+    ultimo_feedback = p.get("feedback_tutor_centro")
+    if "contratadoOtraEmpresa" not in st.session_state:
+        st.session_state.contratadoOtraEmpresa = ultimo_feedback.get("contratadoOtraEmpresa", False)
+    st.subheader("Seguimiento del Tutor Centro")
+    with st.expander(f"Tutor Centro: {tutor_actual}"):
+        colContrata, colEstudio,colEmpresa = st.columns(3)
+        with colContrata:
+            lo_contratan = st.checkbox("¿Lo contratan?" ,value=ultimo_feedback.get("contratado", False),
+                disabled=not puede_editar)
+        with colEstudio:    
+            sigue_estudiando = st.checkbox("¿Sigue estudiando?",
+                value=ultimo_feedback.get("sigueEstudiando", False),
+                disabled=not puede_editar)
+            que_estudia = None
+            donde_estudia = None
+            if sigue_estudiando:
+                que_estudia = st.text_input("¿Qué estudia?",
+                    value=ultimo_feedback.get("estudios", ""),
+                    disabled=not puede_editar)
+                donde_estudia = st.text_input("¿Dónde estudia?",
+                    value=ultimo_feedback.get("lugarEstudios", ""),
+                    disabled=not puede_editar)
+        with colEmpresa:
+            otra_empresa = st.checkbox("¿Contratado por otra empresa?",
+                disabled=not puede_editar, key="contratadoOtraEmpresa")
+            nombre_empresa = None
+
+            if otra_empresa:
+                nombre_empresa = st.text_input("Nombre de la empresa",
+                    value=ultimo_feedback.get("nombreEmpresa", ""),
+                    disabled=not puede_editar)
+
+
+        st.write("**Seguimiento**")
+        if "fp_contacto" not in st.session_state:
+            st.session_state.fp_contacto = ultimo_feedback.get("programaFP", False)
+
+        if "fp_pyme_contacto" not in st.session_state:
+            st.session_state.fp_pyme_contacto = ultimo_feedback.get("FPPYME", False)
+
+        with st.expander("1° Contacto - Comentarios "):
+            comentarios_contacto1 = st.text_area("1° Contacto - Comentarios ",
+            value=ultimo_feedback.get("primerContacto", ""),
+            disabled=not puede_editar)
+            fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
+                disabled=not puede_editar, key="fp_contacto")
+            fp_pyme = st.checkbox("¿Quiere participar en FP PYME?",
+                disabled=not puede_editar, key="fp_pyme_contacto")
+        with st.expander("2° Contacto - Comentarios "):
+            comentarios_contacto2 = st.text_area("2° Contacto - Comentarios",
+                value=ultimo_feedback.get("segundoContacto", ""),
+                disabled=not puede_editar)       
+
+        if puede_editar:
+            if st.button("💾 Guardar", use_container_width=True):
+                nuevo_registro = {
+                    "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "tutorCentro": tutor_actual, 
+                    "contratado": lo_contratan,
+                    "sigueEstudiando": sigue_estudiando,
+                    "estudios":que_estudia,
+                    "lugarEstudios": donde_estudia,
+                    "contratadoOtraEmpresa": otra_empresa,
+                    "nombreEmpresa": nombre_empresa,
+                    "primerContacto": comentarios_contacto1.strip(),
+                    "programaFP": fp,
+                    "FPPYME": fp_pyme,
+                    "segundoContacto": comentarios_contacto2.strip()
+                }
+                
+                try:
+                    upsert(practicaTabla, {
+                        "id": int(practicaId),
+                        "feedback_tutor_centro": nuevo_registro
+                    }, keys=["id"])
+                    
+                    st.toast("✅ Seguimiento guardado")
+                    p["feedback_tutor_centro"] = nuevo_registro
+                    st.rerun() 
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
+
 
 def seccion_planificacion(alumno, empresa, practicaId):
         st.subheader("📅 Planificación de Prácticas")
@@ -906,6 +1008,7 @@ def mostrar_detalle():
     empresa = p["empresas"]
     alumno = p["alumnos"]
     tutor_actual = p.get("tutor") 
+    tutorCentro_actual = p.get("tutor_centro") 
     st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
     if rol_usuario == 'tutor':
         seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
@@ -917,15 +1020,15 @@ def mostrar_detalle():
         seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
         st.divider()
         seccion_feedback_candidato(practicaId, forms)
-        # Los tutores quizás no ven la sección de documentos (según tu código previo)
         
     else:
-        # ORDEN ADMIN/GESTOR: Detalle -> Seguimiento -> Feedback Tutor -> Feedback Candidato -> Documentos
         seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
         st.divider()
         seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
         st.divider()
         seccion_planificacion(alumno,empresa, practicaId)
+        st.divider()
+        seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
         st.divider()
         seccion_feedback_tutor(practicaId, p, tutor_actual)
         st.divider()

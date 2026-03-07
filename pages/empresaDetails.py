@@ -46,7 +46,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.error(f"Error al actualizar {label}: {e}")
 
 def fetch_practicas_tutores():
-    practicas = getPracticas(practicaTabla, {"status":"CONFIRMADA","empresa": cif})
+    practicas = getPracticas(practicaTabla, {"status":"Nuevo","empresa": cif})
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
@@ -231,18 +231,13 @@ def mostrarLista():
         data_for_grid = []
         for p in practicas:
             pid = p["id"]
-            estados_p =  next((item for item in st.session_state["estados"] if item["practicaId"] == pid), {})
-            estado_actual = "Pendiente"
-            for fase in fasesPractica:
-                    columna_fase = faseColPractica[fase]
-                    if estados_p.get(columna_fase):
-                        estado_actual = fase
+            estados_p =  p.get("status", [])
 
             data_for_grid.append({
                 "ID": pid,
                 "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
                 "Empresa": p.get('empresas', {}).get('nombre'),
-                "Estado": estado_actual,
+                "Estado": estados_p,
                 "Ciclo": p.get('ciclo_formativo', '—'),
                 "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar')
             })

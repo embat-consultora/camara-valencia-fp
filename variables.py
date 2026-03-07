@@ -9,7 +9,7 @@ amarillo=""
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
-estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelado"]
+estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelada", "Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
 forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre"]
 #fases

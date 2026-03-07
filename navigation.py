@@ -30,7 +30,6 @@ def make_sidebar():
             st.title("Menú")
             st.write("")
             st.write("")
-
             if st.session_state.get("logged_in", False):
                 if rol == "admin":
                     st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
@@ -49,6 +48,9 @@ def make_sidebar():
                     st.page_link("pages/practicas.py", label="Prácticas")
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "tutor":
+                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "tutorCentro":
                     st.page_link("pages/practicas.py", label="Prácticas")
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "empresa":

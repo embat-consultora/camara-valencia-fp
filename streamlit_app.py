@@ -22,6 +22,8 @@ if st.session_state.get("logged_in"):
         st.switch_page("pages/tablasPrincipales.py")
     if rol == 'tutor':
         st.switch_page("pages/practicas.py")
+    if rol == 'tutorCentro':
+        st.switch_page("pages/practicas.py")
     st.stop()
 
 islogged =validate_get_user()

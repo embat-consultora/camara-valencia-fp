@@ -97,7 +97,7 @@ def get_alumnos_con_practicas_consolidado():
                 empresas(CIF, nombre, telefono, email_empresa)
             )
             """)
-        .eq("practicas_fp.status", "BORRADOR")
+        .eq("practicas_fp.status", "Borrador")
         .execute()
     )
 
@@ -112,7 +112,6 @@ def get_alumnos_con_practicas_consolidado():
         return pd.DataFrame()
     rows = []
     for item in final:
-        # Extraemos la primera práctica si existe
         practicas = item.get("practicas_fp", [])
         practica = practicas[0] if practicas else {}
         empresa = practica.get("empresas", {}) if practica else None
@@ -153,6 +152,9 @@ def getGestores():
         df_final = pd.merge(df_gestores, df_usuarios, on="email", how="left")
         return df_final
 
+def getTutoresEmpresa():
+    tutores = supabase.table(tutoresTabla).select("id, email, nombre,telefono, empresas(nombre)").execute()
+    return tutores
 def getTutores():
     tutores = supabase.table(tutoresCentroTabla).select("id, email, nombre,telefono").order("nombre").execute()
     usuarios = supabase.table(usuariosTabla).select("email, password").execute()
@@ -338,7 +340,7 @@ def updateGestores(cambios, df_original):
             raise Exception(f"Error al eliminar el gestor {email_gestor}: {e}")
         
 def getOfertasTabla():
-    response = supabase.table(necesidadFP).select("*, empresas(*), tutores(*)").execute()
+    response = supabase.table(necesidadFP).select("*, empresas(*, tutores(*))").execute()
     return pd.DataFrame(response.data)
 
 def updateOfertasTabla(update_payload, id_oferta):
@@ -789,6 +791,11 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
             if nueva_empresa != empresa_antigua:
                 if empresa_antigua != "⚠️ SIN ASIGNAR":
                     actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
+                else:
+                    datos_alumno = {
+                        "dni": dni,
+                        "estado":"Sin Empresa"}
+                    upsert(alumnosTabla, datos_alumno, keys=["dni"])
                 if cif_empresa:
                     actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
             
@@ -803,14 +810,18 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 ciclos_info=None, 
                 cupos_disp=0, 
                 oferta_id=row.get('oferta_id'),
-                status="BORRADOR",
+                status="Borrador",
                 practicaId=practicaId,
                 gestor=curr_gestor
             )
             practicaId = practica_res[0].get("id")
         if curr_asignado != orig_asignado:
             if practicaId and nueva_empresa != "⚠️ SIN ASIGNAR":
-                update(practicaTabla, {"status": "CONFIRMADA"}, {"id": practicaId})
+                datos_alumno = {
+                "dni": dni,
+                "estado":"Asignado"}
+                upsert(alumnosTabla, datos_alumno, keys=["dni"])
+                update(practicaTabla, {"status": "Nuevo"}, {"id": practicaId})
                 upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
             else:
                 st.warning(f"No se puede confirmar la práctica de {curr_nombre} sin una empresa asignada.")
@@ -854,8 +865,24 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
         return response.data
         #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
+def cancelarPractica(practicaId, alumnoDni, motivo):
+    payload_practica = {"id": int(practicaId),"status": "CANCELADA","motivo": motivo}
+    try:
+        resp = upsert(practicaTabla, payload_practica, keys=["id"])
+        dateToday = datetime.now().isoformat()
+        if resp:
+                respAl = update(alumnosTabla,{"estado": "Sin Empresa"},{"dni":alumnoDni})
+                if respAl:
+                 upsert(
+                    alumnoEstadosTabla,
+                    {"alumno": alumnoDni, 'fp_cancelada': dateToday, 'fp_asignada': None,'match_fp': None, 'email_enviado': None,'fp_enprogreso': None,'fp_finalizada': None},
+                    keys=["alumno"])
 
-def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id):
+    except Exception as e:
+            st.error(f"Error procesando la cancelación de la práctica: {e}")
+
+
+def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id, status:None):
     registro_existente = getEquals(practicaTabla, {"alumno": alumnoDni})
     payload_practica = {
         "empresa": empresaCif,
@@ -863,7 +890,8 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
         "ciclo_formativo": ciclo,
         "area": area,
         "proyecto": proyecto,
-        "oferta": oferta_id
+        "oferta": oferta_id,
+        "status":status
     }
 
     if registro_existente:
