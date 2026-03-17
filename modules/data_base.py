@@ -5,7 +5,6 @@ import os
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
-from modules.drive_helper import create_drive_folder_practica
 from variables import (
     practicaTabla,
     practicaEstadosTabla,
