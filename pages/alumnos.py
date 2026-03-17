@@ -39,12 +39,28 @@ tab1, tab2, tab3 = st.tabs(["🔍 Buscar / Visualizar", "➕ Nuevo Alumno", "�
 # TAB 1: Buscar / Visualizar / Editar
 # -------------------------------------------------------------------
 with tab1:
-    col1, col2, col3= st.columns([3, 2,2])
+    col1, filtroanio, filtrocurso, total,descargar= st.columns([2,2,2,2,2])
     with col1:
         search = st.text_input("Buscar alumnos")
-    with col2:
+    if search:
+        mask = df_alumnos.astype(str).apply(
+            lambda row: row.str.contains(search, case=False, na=False).any(),
+            axis=1
+        )
+        df_alumnos = df_alumnos[mask]
+    with filtroanio:
+        anios = sorted(df_alumnos["anio"].dropna().unique())
+        selected_anio = st.selectbox("Filtrar por año", options=["Todos"] + anios, index=0)
+        if selected_anio != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["anio"] == selected_anio]     
+    with filtrocurso:
+        cursos = sorted(df_alumnos["curso"].dropna().unique())
+        selected_curso = st.selectbox("Filtrar por curso", options=["Todos"] + cursos, index=0)
+        if selected_curso != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["curso"] == selected_curso]
+    with total:
         st.metric("Total alumnos", len(df_alumnos))
-    with col3:
+    with descargar:
         import tempfile
         from pathlib import Path
 
@@ -52,20 +68,15 @@ with tab1:
         temp_dir = Path(tempfile.gettempdir())
         temp_path = temp_dir / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         df_alumnos.to_excel(temp_path, index=False)
-        
+        st.write("Exportar datos:")
         with open(temp_path, "rb") as f:
             st.download_button(
-                label="⬇️ Descargar alumnos (.xlsx)",
+                label="⬇️",
                 data=f,
                 file_name=temp_path.name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-    if search:
-        mask = df_alumnos.astype(str).apply(
-            lambda row: row.str.contains(search, case=False, na=False).any(),
-            axis=1
-        )
-        df_alumnos = df_alumnos[mask]
+   
 
     # Vista resumida
     cols_map = {
@@ -139,6 +150,7 @@ with tab1:
                 new_localidad = st.text_input("Localidad", alumno.get("localidad", ""))
                 new_dni = st.text_input("dni", alumno.get("dni", ""))
                 new_nia = st.text_input("NIA", alumno.get("NIA", ""))
+                new_nuss = st.text_input("NUSS", alumno.get("nuss", ""))
                 new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
                 new_email = st.text_input("Email", alumno.get("email_alumno", ""))
                 tipo_opts = tipoPracticas

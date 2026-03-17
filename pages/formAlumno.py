@@ -49,12 +49,14 @@ with col1:
     email = input_requerido("Email *", key="email_alumno")
     dni = input_requerido("DNI/NIE *", key="dni_alumno")
     cp = input_requerido("Código Postal *", key="cp_alumno")
+    ano = st.selectbox("Año *", ("2024-2025","2025-2026", "2026-2027","2027-2028"), key="ano_alumno")
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
     direccion = input_requerido("Dirección *", key="direccion_alumno")
     localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
     sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
     nuss = st.text_input("NUSS", key="nuss_alumno")
+    curso = st.selectbox("Curso *", ("1ro","2do"), key="curso_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
@@ -112,6 +114,7 @@ if not required_ok(dni): missing.append("DNI/NIE")
 if not required_ok(direccion): missing.append("Dirección")
 if not required_ok(cp): missing.append("CP")
 if not required_ok(localidad): missing.append("Localidad")
+
 if vehiculo not in ("Sí", "No"): missing.append("Dispones de vehículo")
 if not ciclo: missing.append("Ciclo formativo")
 if cv_file is None: missing.append("CV")
@@ -142,7 +145,9 @@ if submit:
                 "preferencias_fp": preferencias_seleccionadas,
                 "estado":estadosAlumno[0],
                 "tipoPractica": tipo_practica,
-                "nuss": nuss.strip()
+                "nuss": nuss.strip(),
+                "anio": ano.strip(),
+                "curso": curso.strip()
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
         upsert(
