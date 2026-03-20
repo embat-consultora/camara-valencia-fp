@@ -726,7 +726,8 @@ def seccion_feedback_candidato(practicaId, forms):
 
 def seccion_feedback_tutor(practicaId, p, tutor_actual):
     st.subheader("Seguimiento del Tutor Empresa")
-    with st.expander(f"Tutor Centro: {tutor_actual}"):
+    nombre_tutor = tutor_actual or "Sin Asignar"
+    with st.expander(f"Tutor Centro: {nombre_tutor}"):
         historial_feedback = p.get("feedback_tutor")
         if not isinstance(historial_feedback, list):
             historial_feedback = []
@@ -782,7 +783,7 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual):
 
 def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
     puede_editar = rol_usuario == "tutorCentro"
-    ultimo_feedback = p.get("feedback_tutor_centro")
+    ultimo_feedback = p.get("feedback_tutor_centro") or {}
     if "contratadoOtraEmpresa" not in st.session_state:
         st.session_state.contratadoOtraEmpresa = ultimo_feedback.get("contratadoOtraEmpresa", False)
     st.subheader("Seguimiento del Tutor Centro")
