@@ -777,7 +777,8 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         empresa_antigua = row_orig.get('nombre_empresa')
         nuevo_puesto = row.get('puesto')
         antiguo_puesto= row_orig.get('puesto')
-   
+        nueva_direccion = row.get('direccion')
+        nueva_localidad= row.get('localidad')
         nuevo_tutorCentro = row.get('tutor_centro')
         antiguo_tutorCentro = row_orig.get('tutor_centro')
         cambio_logistica = (nueva_empresa != empresa_antigua or 
@@ -811,7 +812,9 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 oferta_id=row.get('oferta_id'),
                 status="Borrador",
                 practicaId=practicaId,
-                gestor=curr_gestor
+                gestor=curr_gestor,
+                direccion=nueva_direccion,
+                localidad=nueva_localidad
             )
             practicaId = practica_res[0].get("id")
         if curr_asignado != orig_asignado:
@@ -825,7 +828,8 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
             else:
                 st.warning(f"No se puede confirmar la práctica de {curr_nombre} sin una empresa asignada.")
 
-def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro, fecha,ciclos_info,cupos_disp,oferta_id, status, practicaId=None, gestor=None):
+def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro, fecha,ciclos_info,cupos_disp,oferta_id, status, 
+                       practicaId=None, gestor=None,direccion=None, localidad=None):
         payload_practica = {
             "empresa": empresaCif,
             "alumno": alumnoDni,
@@ -835,7 +839,9 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
             "proyecto": proyecto,
             "oferta": oferta_id,
             "status": status,
-            "gestor": gestor
+            "gestor": gestor,
+            "direccion": direccion,
+            "localidad": localidad
         }
         if practicaId:
             payload_practica["id"] = practicaId

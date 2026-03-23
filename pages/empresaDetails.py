@@ -46,7 +46,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.error(f"Error al actualizar {label}: {e}")
 
 def fetch_practicas_tutores():
-    practicas = getPracticas(practicaTabla, {"status":"Nuevo","empresa": cif})
+    practicas = getPracticas(practicaTabla, {"empresa": cif})
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
@@ -322,9 +322,9 @@ def seccion_detalle(alumno, empresa, p, oferta):
         with col2:
             st.write(f"**Empresa:** {empresa['nombre']}")
             st.write(f"**CIF:** {empresa['CIF']}")
-            direccion = oferta.get("direccion_empresa") or "No especificado"
-            st.write(f"**Dirección práctica:** {direccion}")
-            localidad = oferta.get("localidad_empresa") or "No especificado"
+            direccion = oferta.get("direccion_empresa") or empresa['direccion']
+            st.write(f"**Dirección práctica:** {direccion}") 
+            localidad = oferta.get("localidad_empresa") or empresa['localidad']
             st.write(f"**Localidad:** {localidad}")
 
             lista_nombres_tutores = [g["nombre"] for g in tutores]

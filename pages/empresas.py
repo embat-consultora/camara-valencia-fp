@@ -42,7 +42,7 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 with tab1:
     col1, col2, col3,col4= st.columns([3, 2,2,2])
     with col1:
-        search = st.text_input("🔍 Buscar por nombre de empresa")
+        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:

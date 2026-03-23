@@ -573,9 +573,11 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         with col2:
             st.write(f"**Empresa:** {empresa['nombre']}")
             st.write(f"**CIF:** {empresa['CIF']}")
-            direccion = oferta.get("direccion_empresa") or "No especificado"
+            st.write(f"**Teléfono:** {empresa['telefono']}")
+            st.write(f"**Email:** {empresa['email_empresa']}")
+            direccion = oferta.get("direccion_empresa") or  empresa['direccion']
             st.write(f"**Dirección práctica:** {direccion}")
-            localidad = oferta.get("localidad_empresa") or "No especificado"
+            localidad = oferta.get("localidad_empresa") or  empresa['localidad'] 
             st.write(f"**Localidad:** {localidad}")
             lista_nombres_gestores = [g["nombre"] for g in gestores]
             if "No asignado" not in lista_nombres_gestores:

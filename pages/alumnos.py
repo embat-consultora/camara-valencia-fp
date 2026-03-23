@@ -41,7 +41,7 @@ tab1, tab2, tab3 = st.tabs(["🔍 Buscar / Visualizar", "➕ Nuevo Alumno", "�
 with tab1:
     col1, filtroanio, filtrocurso, total,descargar= st.columns([2,2,2,2,2])
     with col1:
-        search = st.text_input("Buscar alumnos")
+        search = st.text_input("Buscar alumnos", placeholder="Buscar alumno")
     if search:
         mask = df_alumnos.astype(str).apply(
             lambda row: row.str.contains(search, case=False, na=False).any(),
