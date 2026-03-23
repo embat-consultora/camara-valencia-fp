@@ -621,90 +621,129 @@ with tab_ofertas:
                                     st.error(f"Error: {e}")
                             st.rerun()
 
-# --- TAB CONFIGURACIÓN (Solo Admin) ---
+# --- TAB CONFIGURACIÓN (Solo Admin) ----
+
+@st.fragment
+def fragment_gestion_gestores():
+    if "gestores_guardados" not in st.session_state:
+        st.session_state.gestores_guardados = False
+    if st.session_state.df_gestores is None:
+        st.session_state.df_gestores = getGestores()
+    
+    with st.form("form_gestores_internal"):
+        edited_g = st.data_editor(
+            st.session_state.df_gestores,
+            column_config={
+                "id": None, 
+                "password": "Password", 
+                "nombre": "Nombre", 
+                "email": "Email", 
+                "ciclo": st.column_config.SelectboxColumn(
+                    "Ciclo",
+                    options=["Comercio Internacional","Desarrollo Aplicaciones Multiplataforma", "Desarrollo Aplicaciones Web", "Marketing y Publicidad", "Transporte y Logística"], 
+                    required=False
+                ),
+                "activo": "Visible"
+            },
+            num_rows="dynamic",
+            key="editor_gestores",
+            use_container_width=True,
+            disabled=st.session_state.gestores_guardados
+        )
+        submit_btn = st.form_submit_button("Actualizar Gestores",disabled=st.session_state.gestores_guardados)
+
+    if submit_btn:
+        cambios = st.session_state["editor_gestores"]
+        if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+            try:
+                for row in cambios["added_rows"]:
+                    nombre = row.get("nombre", "Sin Nombre").strip()
+                    email = row.get("email", "").strip()
+                    if not email or "@" not in email:
+                        st.error(f"Email inválido para {nombre}")
+                        st.stop()
+                    anio_actual = datetime.now().year
+                    password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
+                    row["password_temp"] = password_auto
+                
+                updateGestores(cambios, st.session_state.df_gestores)
+                st.session_state.df_gestores = None
+                st.session_state.gestores_guardados = True
+                st.rerun(scope="fragment")
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+    if st.session_state.gestores_guardados:
+        st.success("✅ Datos guardados en la base de datos.")   
+        cambios_last = st.session_state.get("editor_gestores", {})
+        if cambios_last.get("added_rows"):
+            st.warning("⚠️ Copia las credenciales antes de finalizar:")
+            for row in cambios_last["added_rows"]:
+                st.code(f"Gestor: {row['nombre']} | Pass: {row['password_temp']}")
+
+        if st.button("Finalizar y Refrescar Tabla", type="primary"):
+            st.session_state.gestores_guardados = False
+            st.rerun(scope="fragment")
+@st.fragment
+def fragment_gestion_tutores():
+    if "tutores_guardados" not in st.session_state:
+        st.session_state.tutores_guardados = False
+    if st.session_state.df_tutores is None:
+        st.session_state.df_tutores = getTutores()
+
+    with st.form("form_tutores_internal"):
+        edited_t = st.data_editor(
+            st.session_state.df_tutores,
+            column_config={"id": None, "nombre": "Nombre", "email": "Email","telefono": "Teléfono"},
+            num_rows="dynamic",
+            key="editor_tutores",
+            use_container_width=True,
+            disabled=st.session_state.tutores_guardados
+        )
+        submit_btn = st.form_submit_button("Actualizar Tutores",disabled=st.session_state.tutores_guardados)
+
+    if submit_btn:
+        cambios = st.session_state["editor_tutores"]
+        if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+            try:
+                for row in cambios["added_rows"]:
+                    nombre = row.get("nombre", "Sin Nombre").strip()
+                    email = row.get("email", "").strip()
+                    if not email or "@" not in email:
+                        st.error(f"Email inválido para {nombre}")
+                        st.stop()
+                    anio_actual = datetime.now().year
+                    password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
+                    row["password_temp"] = password_auto
+                
+                updateTutoresCentro(cambios, st.session_state.df_tutores)
+                st.session_state.df_tutores = None
+                st.session_state.tutores_guardados = True
+                st.rerun(scope="fragment")
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    if st.session_state.tutores_guardados:
+        st.success("✅ Datos guardados en la base de datos.")   
+        cambios_last = st.session_state.get("editor_tutores", {})
+        if cambios_last.get("added_rows"):
+            st.warning("⚠️ Copia las credenciales antes de finalizar:")
+            for row in cambios_last["added_rows"]:
+                st.code(f"Tutor: {row['nombre']} | Pass: {row['password_temp']}")
+
+        if st.button("Finalizar y Refrescar Tabla", type="primary"):
+            st.session_state.tutores_guardados = False
+            st.rerun(scope="fragment")
+
+# --- TAB CONFIGURACIÓN (Llamada a fragmentos) ---
 if rol_usuario == "admin":
     with tab_config:
-        tabs = st.tabs(["Gestores", "Tutores Centro"])
-        with tabs[0]:
-            if st.session_state.df_gestores is None:
-                st.session_state.df_gestores = getGestores()
-            edited_g = st.data_editor(
-                    st.session_state.df_gestores,
-                    column_config={"id": None, "password": "Password", "nombre": "Nombre", "email": "Email", "ciclo": st.column_config.SelectboxColumn(
-                        "Ciclo",
-                        options=["Comercio Internacional","Desarrollo Aplicaciones Multiplataforma", "Desarrollo Aplicaciones Web", "Marketing y Publicidad", "Transporte y Logística"], 
-                        required=False
-                    ),"activo": "Visible"},
-                    num_rows="dynamic",
-                    key="editor_gestores",
-                    use_container_width=True
-                )
-            if st.button("Actualizar Gestores"):
-                cambios = st.session_state["editor_gestores"]
-                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
-                    try:
-                        for row in cambios["added_rows"]:
-                            nombre = row.get("nombre", "Sin Nombre").strip()
-                            email = row.get("email", "").strip()
-                            if not email or "@" not in email:
-                                st.error(f"Email inválido para {nombre}"); st.stop()
-                            anio_actual = datetime.now().year
-                            password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
-                            row["password_temp"] = password_auto
-                        
-                        des= updateGestores(cambios, st.session_state.df_gestores)
-                        if cambios["added_rows"]:
-                            st.warning("Usuarios creados:")
-                            for row in cambios["added_rows"]:
-                                st.code(f"Gestor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
-                            if st.button("Continuar"): 
-                                st.session_state.df_gestores = None
-                                st.rerun()
-                        else:
-                            st.success("✅ Guardado"); st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+        tabs_config_inner = st.tabs(["Gestores", "Tutores Centro"])
+        with tabs_config_inner[0]:
+            fragment_gestion_gestores()
          
-        with tabs[1]:
-            if st.session_state.df_tutores is None:
-                st.session_state.df_tutores = getTutores()
-            edited_g = st.data_editor(
-                    st.session_state.df_tutores,
-                    column_config={"id": None, "nombre": "Nombre", "email": "Email","telefono": "Teléfono"},
-                    num_rows="dynamic",
-                    key="editor_tutores",
-                    use_container_width=True
-                )
-            if st.button("Actualizar Tutores"):
-                cambios = st.session_state["editor_tutores"]
-                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
-                    try:
-                        for row in cambios["added_rows"]:
-                            nombre = row.get("nombre", "Sin Nombre").strip()
-                            email = row.get("email", "").strip()
-                            if not email or "@" not in email:
-                                st.error(f"Email inválido para {nombre}"); st.stop()
-                            anio_actual = datetime.now().year
-                            password_auto = f"{nombre.replace(' ', '')}{anio_actual}"
-                            row["password_temp"] = password_auto
-                        
-                        res = updateTutoresCentro(cambios, st.session_state.df_tutores)
-                        
-                        if cambios["added_rows"]:
-                            st.warning("Usuarios creados:")
-                            for row in cambios["added_rows"]:
-                                st.code(f"Tutor: {row['nombre']} | Usuario: {row['email']} | Pass: {row['password_temp']}")
-                            if st.button("Continuar"): 
-                                st.session_state.df_tutores = None
-                                st.rerun()
-                        else:
-                            st.toast("✅ Guardado"); st.rerun()
-                    except Exception as e:
-                        error_msg = str(e)
-                        if "23503" in error_msg:
-                            st.error("❌ Error: El CIF de la empresa no existe en la base de datos.")
-                            st.info("Asegúrate de que la empresa esté creada antes de asignar un tutor.")     
-                        else:
-                            st.error(f"⚠️ Ha ocurrido un error inesperado: {error_msg}")
+        with tabs_config_inner[1]:
+            fragment_gestion_tutores()
 
 
