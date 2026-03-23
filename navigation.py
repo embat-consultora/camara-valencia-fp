@@ -34,7 +34,7 @@ def make_sidebar():
                 if rol == "admin":
                     st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
                     st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
-                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/matchs.py", label="Matchs")
                     
                     st.page_link("pages/empresas.py", label="Empresas")
@@ -45,13 +45,13 @@ def make_sidebar():
                 if rol == "gestor":
                     st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
                     st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
-                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "tutor":
-                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "tutorCentro":
-                    st.page_link("pages/practicas.py", label="Prácticas")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "empresa":
                     st.page_link("pages/empresaDetails.py", label="Mi Empresa")

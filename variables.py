@@ -13,13 +13,13 @@ estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelada", "Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
 forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre"]
 #fases
-fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-fasesPractica = ["Documentación Pedida", "Documentación Firmada", "Pasantía en progreso", "Finalizada", "Cancelada"]
+fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Formación en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Formación en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesPractica = ["Documentación Pedida", "Documentación Firmada", "Formación en progreso", "Finalizada", "Cancelada"]
 faseColPractica = {
     "Documentación Pedida": "documentacion_pedida",
     "Documentación Firmada": "documentacion_firmada",
-    "Pasantía en progreso": "en_progreso",
+    "Formación en progreso": "en_progreso",
     "Finalizada": "finalizada",
     "Cancelada": "cancelada"
 }
@@ -29,7 +29,7 @@ fase2colEmpresa = {
     "Documentación Completa": "documentacion_completa",
     "Match en progreso": "match_fp",
     "Alumnos asignados": "fp_asignada",
-    "Pasantía en progreso": "fp_enprogreso",
+    "Formación en progreso": "fp_enprogreso",
     "Finalizada": "fp_finalizada",
     "Evaluación Enviada": "evaluacion_enviada"
 }
@@ -51,6 +51,7 @@ contactoEmpresaTabla="contacto_empresas"
 alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
+practicaCanceladaTabla="practicas_canceladas"
 practicaEstadosTabla="practica_estados"
 tutoresTabla="tutores"
 tutoresCentroTabla="tutor_centro"
@@ -68,7 +69,7 @@ bodyEmailsEmpresa= f"""Hola,
 
 Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
-Llena esta formulario si tiene alguna pasantia u oferta: {"{{form_link}}"}
+Llena esta formulario si tiene alguna formación u oferta: {"{{form_link}}"}
 
 Saludos,
 Andrea
@@ -77,7 +78,7 @@ bodyEmailsAlumno= f"""Hola,
 
 Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
-Llena esta formulario si te interesaría participar en alguna pasantía: {"{{form_link}}"}
+Llena esta formulario si te interesaría participar en alguna Formación: {"{{form_link}}"}
 
 Saludos,
 Andrea

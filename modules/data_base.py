@@ -17,8 +17,8 @@ from variables import (
     gestoresTabla,
     usuariosTabla,
     tutoresTabla,
-    carpetaPractica,
-    tutoresCentroTabla
+    tutoresCentroTabla,
+    practicaCanceladaTabla
 )
 load_dotenv()
 
@@ -80,7 +80,6 @@ def get_alumnos_con_practicas_consolidado():
         .eq("estado", "Sin Empresa")
         .execute()
     )
-
     draft = (
         supabase.table("alumnos")
         .select("""
@@ -100,6 +99,7 @@ def get_alumnos_con_practicas_consolidado():
         .execute()
     )
 
+
     ids = set()
     final = []
     for item in sinEmpresa.data + draft.data:
@@ -107,8 +107,9 @@ def get_alumnos_con_practicas_consolidado():
             ids.add(item["id"])
             final.append(item)
 
-    if not final:
-        return pd.DataFrame()
+    # if not final:
+    #     return pd.DataFrame()
+    
     rows = []
     for item in final:
         practicas = item.get("practicas_fp", [])
@@ -126,12 +127,14 @@ def get_alumnos_con_practicas_consolidado():
             "tutor": practica.get("tutor") if practica else None,
             "gestor": practica.get("gestor") if practica else None,
         }
-        # Eliminamos el objeto anidado para que no ensucie el DataFrame
-        if "practicas_fp" in row: 
-            del row["practicas_fp"]
-            
-        rows.append(row)
 
+        if "practicas_fp" in row: 
+            del row["practicas_fp"]  
+        rows.append(row)
+    
+
+        if not rows:
+            return pd.DataFrame()
     return pd.DataFrame(rows)
 
 def getGestore():
@@ -785,39 +788,77 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                     nuevo_puesto != antiguo_puesto or 
                     nuevo_tutorCentro != antiguo_tutorCentro or
                     curr_gestor != orig_gestor)
+        newCif=None
         if cambio_logistica:
-            cif_empresa = mapa_nombres_id.get(nueva_empresa) if nueva_empresa != "⚠️ SIN ASIGNAR" else None
-        
-            if nueva_empresa != empresa_antigua:
+            print("Detectado cambio logístico en la fila del alumno con DNI:", dni)
+            print(f"Practica: {curr_practica}")
+            if empresa_antigua != nueva_empresa:
+                print(f"Empresa Antigua: {empresa_antigua} | Empresa Nueva: {nueva_empresa}")
                 if empresa_antigua != "⚠️ SIN ASIGNAR":
-                    actualizar_cupo(empresa_antigua, row['ciclo_formativo'], +1)
-                else:
-                    datos_alumno = {
-                        "dni": dni,
-                        "estado":"Sin Empresa"}
+                    cif_antiguo = mapa_nombres_id.get(empresa_antigua)
+                    if cif_antiguo:
+                        actualizar_cupo(cif_antiguo, row['ciclo_formativo'], +1)
+                        print(f"se deberia haber actualizado el cupo para {cif_antiguo}")
+                    
+                if nueva_empresa == "⚠️ SIN ASIGNAR":
+                    newCif = None
+                    datos_alumno = {"dni": dni, "estado": "Sin Empresa"}
                     upsert(alumnosTabla, datos_alumno, keys=["dni"])
-                if cif_empresa:
-                    actualizar_cupo(cif_empresa, row['ciclo_formativo'], -1)
-            
-            practica_res = crearDraftPractica(
-                empresaCif=cif_empresa,
-                alumnoDni=dni,
-                ciclo=row['ciclo_formativo'], 
-                area=nuevo_puesto if nuevo_puesto else "General",
-                proyecto= "No asignado aun",
-                tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else "Sin asignar",
-                fecha=datetime.now().isoformat(),
-                ciclos_info=None, 
-                cupos_disp=0, 
-                oferta_id=row.get('oferta_id'),
-                status="Borrador",
-                practicaId=practicaId,
-                gestor=curr_gestor,
-                direccion=nueva_direccion,
-                localidad=nueva_localidad
-            )
-            practicaId = practica_res[0].get("id")
+                    print("Alumno reseteado a 'Sin Empresa'")
+                    practica_res = crearDraftPractica(
+                                                empresaCif=newCif,
+                                                alumnoDni=dni,
+                                                ciclo="No asignado aun",
+                                                area="No asignado aun",
+                                                proyecto= "No asignado aun",
+                                                tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
+                                                oferta_id=None,
+                                                status="Borrador",
+                                                practicaId=practicaId,
+                                                gestor=curr_gestor if curr_gestor else orig_gestor,
+                                                direccion="No asignado aun",
+                                                localidad="No asignado aun"
+                                            )
+                    practicaId = practica_res[0].get("id")
+                if nueva_empresa != "⚠️ SIN ASIGNAR":
+                    cif_nuevo = mapa_nombres_id.get(nueva_empresa)
+                    newCif = cif_nuevo
+                    if cif_nuevo:
+                        practica_res = crearDraftPractica(
+                                            empresaCif=newCif,
+                                            alumnoDni=dni,
+                                            ciclo=row['ciclo_formativo'], 
+                                            area=nuevo_puesto if nuevo_puesto else antiguo_puesto,
+                                            proyecto= "No asignado aun",
+                                            tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
+                                            oferta_id=row.get('oferta_id'),
+                                            status="Borrador",
+                                            practicaId=practicaId,
+                                            gestor=curr_gestor if curr_gestor else orig_gestor,
+                                            direccion=nueva_direccion,
+                                            localidad=nueva_localidad
+                                        )
+                        practicaId = practica_res[0].get("id")
+            else:
+                practica_res = crearDraftPractica(
+                    empresaCif=newCif,
+                    alumnoDni=dni,
+                    ciclo=row['ciclo_formativo'], 
+                    area=nuevo_puesto if nuevo_puesto else antiguo_puesto,
+                    proyecto= "No asignado aun",
+                    tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
+                    oferta_id=row.get('oferta_id'),
+                    status="Borrador",
+                    practicaId=practicaId,
+                    gestor=curr_gestor if curr_gestor else orig_gestor,
+                    direccion=nueva_direccion,
+                    localidad=nueva_localidad
+                )
+                practicaId = practica_res[0].get("id")
+        
         if curr_asignado != orig_asignado:
+            print(f"Cambio estado de practica {practicaId}")
+            cif_nuevo = mapa_nombres_id.get(nueva_empresa)
             if practicaId and nueva_empresa != "⚠️ SIN ASIGNAR":
                 datos_alumno = {
                 "dni": dni,
@@ -825,10 +866,12 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 upsert(alumnosTabla, datos_alumno, keys=["dni"])
                 update(practicaTabla, {"status": "Nuevo"}, {"id": practicaId})
                 upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
+                print(f"Restando cupo (-1) en: {nueva_empresa} ({cif_nuevo})")
+                actualizar_cupo(cif_nuevo, row['ciclo_formativo'], -1)
             else:
                 st.warning(f"No se puede confirmar la práctica de {curr_nombre} sin una empresa asignada.")
 
-def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro, fecha,ciclos_info,cupos_disp,oferta_id, status, 
+def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro ,oferta_id, status, 
                        practicaId=None, gestor=None,direccion=None, localidad=None):
         payload_practica = {
             "empresa": empresaCif,
@@ -846,34 +889,20 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
         if practicaId:
             payload_practica["id"] = practicaId
         response = upsert(practicaTabla, payload_practica, keys=["id"])
-        upsert(
-        alumnosTabla,
-        {"dni": alumnoDni, "estado": estadosAlumno[1]},
-        keys=["dni"])
-
-        if ciclos_info != None:
-            ciclos_info[ciclo]["disponibles"] = max(cupos_disp - 1, 0)
-            upsert(
-                necesidadFP,
-                {
-                    "id": oferta_id,
-                    "empresa": empresaCif,
-                    "ciclos_formativos": ciclos_info,
-                },
-                keys=["id"],
-            )
-        upsert(
-            alumnoEstadosTabla,
-            {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
-            keys=["alumno"]
-        )
+       
         return response.data
         #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
-def cancelarPractica(practicaId, alumnoDni, motivo):
-    payload_practica = {"id": int(practicaId),"status": "CANCELADA","motivo": motivo}
+def cancelarPractica(practicaId, alumnoDni, cif, ciclo, motivo):
+    payload_practica = {"id": int(practicaId),"status": "Cancelada","motivo": motivo}
+    payload_practica_cancelada = {"alumno":alumnoDni, "empresa": cif, "ciclo": ciclo, "motivo": motivo}
     try:
         resp = upsert(practicaTabla, payload_practica, keys=["id"])
+        upsert(
+                    practicaEstadosTabla,
+                    {"practicaId": int(practicaId), 'cancelada': None, 'documentacion_pedida': None,'documentacion_firmada': None, 'en_progreso': None,'finalizada': None},
+                    keys=["practicaId"])
+        resp = add(practicaCanceladaTabla, payload_practica_cancelada)
         dateToday = datetime.now().isoformat()
         if resp:
                 respAl = update(alumnosTabla,{"estado": "Sin Empresa"},{"dni":alumnoDni})
@@ -882,6 +911,8 @@ def cancelarPractica(practicaId, alumnoDni, motivo):
                     alumnoEstadosTabla,
                     {"alumno": alumnoDni, 'fp_cancelada': dateToday, 'fp_asignada': None,'match_fp': None, 'email_enviado': None,'fp_enprogreso': None,'fp_finalizada': None},
                     keys=["alumno"])
+                actualizar_cupo(cif, ciclo, +1)
+
 
     except Exception as e:
             st.error(f"Error procesando la cancelación de la práctica: {e}")

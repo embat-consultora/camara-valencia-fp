@@ -24,10 +24,10 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # ----------------------------------------------
 apply_page_config()
 make_sidebar()
-st.set_page_config(page_title="Prácticas", page_icon="🚀")
+st.set_page_config(page_title="Formaciones", page_icon="🚀")
 
 now = datetime.now().isoformat()
-st.title("🚀 Prácticas")
+st.title("🚀 Formaciones")
 
 if "practicas" not in st.session_state:
     st.session_state["practicas"] = []
@@ -135,9 +135,9 @@ gestores =  st.session_state["gestores"]
 tutoresCentro =st.session_state["tutorCentro"]
 
 ##--- DIALOG
-@st.dialog("Finalización de Práctica")
+@st.dialog("Finalización de Formación")
 def dialog_fecha_fin(practica_id, email_alumno):
-    st.write(f"Por favor, indica cuándo finalizará la práctica:")
+    st.write(f"Por favor, indica cuándo finalizará la Formación:")
     
     # Input de fecha
     fecha_fin = st.date_input("Fecha de finalización prevista", value=datetime.now().date() + timedelta(days=90))
@@ -145,19 +145,19 @@ def dialog_fecha_fin(practica_id, email_alumno):
     if st.button("Confirmar", type="primary"):
         asignarFechasFormsFeedback(int(practica_id), datetime.now().date(), email_alumno, fecha_fin)
         st.success("Fechas programadas correctamente.")
-        st.toast("✅  La práctica ha pasado a estado INICIADA")
+        st.toast("✅  La Formación ha pasado a estado INICIADA")
 
         st.rerun()
 
-@st.dialog("Cancelacion de Práctica")
-def dialog_cancelacion(practica_id, dni_alumno):
+@st.dialog("Cancelación de Formación")
+def dialog_cancelacion(practica_id, dni_alumno, empresa, ciclo):
     st.write(f"Por favor, indica el motivo de la cancelación")
     motivo = st.text_input("", placeholder="Ej: El alumno no ha pasado la entrevista, la empresa ya no puede acoger, etc.")
     
     if st.button("Confirmar", type="primary"):
-        cancelarPractica(int(practica_id),dni_alumno, motivo)
-        st.toast("✅  La práctica ha pasado a estado CANCELADA")
-
+        cancelarPractica(int(practica_id),dni_alumno, empresa, ciclo, motivo)
+        st.toast("✅  La Formación ha pasado a estado CANCELADA")
+        st.session_state.page = "lista"
         st.rerun()
 # ----------------------------------------------
 # HELPER
@@ -192,7 +192,7 @@ def contarAnexos(practicas: list) -> int:
 # PAGINA: LISTA
 # ----------------------------------------------
 def mostrar_lista():
-    tabs_visibles = ["📋 Listado de Prácticas"]
+    tabs_visibles = ["📋 Listado de Formaciones"]
     label_anexos = "📃 Anexos"
     if rol_usuario == 'admin':
         missing_count = contarAnexos(practicas)  
@@ -226,7 +226,7 @@ def mostrar_lista():
 # ----------------------------------------------
 def mostrar_lista_practicas():
         if not practicas:
-            st.info("No tienes prácticas asignadas aun.")
+            st.info("No tienes formaciones asignadas aun.")
             return
         data_for_grid = []
         for p in practicas:
@@ -246,7 +246,7 @@ def mostrar_lista_practicas():
         df = pd.DataFrame(data_for_grid)
 
         if df.empty:
-            st.info("No hay prácticas asignadas aun")
+            st.info("No hay formaciones asignadas aun")
             return
 
         # 2. Configurar AgGrid
@@ -290,7 +290,7 @@ def mostrar_lista_practicas():
             st.rerun()
 
 def mostrar_carga_rapida():
-    st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una práctica.")
+    st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
 
     # 1. DATOS DE LA EMPRESA
     st.subheader("🏢 Datos de la Empresa")
@@ -314,12 +314,12 @@ def mostrar_carga_rapida():
     new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
 
     # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
-    st.subheader("📋 Configuración de la Práctica")
+    st.subheader("📋 Configuración de la Formación")
     col_p1, col_p2 = st.columns(2)
 
     # Obtenemos los tipos de práctica de tus variables
     new_alu_tipo = col_p1.selectbox(
-        "Tipo de Práctica", 
+        "Tipo de Formación", 
         options=tipoPracticas, 
         key="qr_alu_tipo"
     )
@@ -347,7 +347,7 @@ def mostrar_carga_rapida():
         )
 
     # 4. BOTÓN DE ACCIÓN
-    if st.button("🚀 Guardar y Vincular Práctica", use_container_width=True):
+    if st.button("🚀 Guardar y Vincular Formación", use_container_width=True):
         if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
             st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
         else:
@@ -392,7 +392,7 @@ def mostrar_carga_rapida():
                         status= "Nuevo",
                     )
 
-                    st.success(f"✅ ¡Éxito! Práctica creada entre {new_emp_nombre} y {new_alu_nombre}.")
+                    st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
                     st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
 
                 except Exception as e:
@@ -400,7 +400,7 @@ def mostrar_carga_rapida():
 
 def mostrar_anexos():
     if not practicas:
-        st.info("No tienes prácticas asignadas aun.")
+        st.info("No tienes formaciones asignadas aun.")
         return
 
     data_for_grid = []
@@ -576,7 +576,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             st.write(f"**Teléfono:** {empresa['telefono']}")
             st.write(f"**Email:** {empresa['email_empresa']}")
             direccion = oferta.get("direccion_empresa") or  empresa['direccion']
-            st.write(f"**Dirección práctica:** {direccion}")
+            st.write(f"**Dirección Formación:** {direccion}")
             localidad = oferta.get("localidad_empresa") or  empresa['localidad'] 
             st.write(f"**Localidad:** {localidad}")
             lista_nombres_gestores = [g["nombre"] for g in gestores]
@@ -642,13 +642,14 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
 
         pass
 
-def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alumno):
+def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa,ciclo, alumno):
     st.subheader("Seguimiento")
     estado_actual = st.session_state["estados"].get(practicaId, {})
+
     mostrar_fases(fasesPractica, faseColPractica, estado_actual)
 
     cols = st.columns(len(fasesPractica))
-    if rol_usuario != 'tutor':
+    if rol_usuario != 'tutor' and rol_usuario != 'tutorCentro':
         for i, fase in enumerate(fasesPractica):
             col = faseColPractica[fase]
             valor = bool(estado_actual.get(col))
@@ -678,7 +679,7 @@ def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alu
                     upsert(practicaTabla, payload_practica, keys=["id"])
                     dialog_fecha_fin(practicaId, alumno['email_alumno'])
                 if fase == fasesPractica[4] and checked:
-                    dialog_cancelacion(practicaId, alumno['dni'])
+                    dialog_cancelacion(practicaId, alumno['dni'],empresa['CIF'],ciclo)
                     
                 st.session_state["estados"][practicaId] = estado_actual
                 st.toast(f"✅  Estado actualizado")
@@ -726,10 +727,10 @@ def seccion_feedback_candidato(practicaId, forms):
         render_feedback_card(progreso_feedback[forms[2]], "Cierre")
     pass
 
-def seccion_feedback_tutor(practicaId, p, tutor_actual):
+def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
     st.subheader("Seguimiento del Tutor Empresa")
     nombre_tutor = tutor_actual or "Sin Asignar"
-    with st.expander(f"Tutor Centro: {nombre_tutor}"):
+    with st.expander(f"Tutor Centro: {nombre_tutor}", expanded=abierto):
         historial_feedback = p.get("feedback_tutor")
         if not isinstance(historial_feedback, list):
             historial_feedback = []
@@ -780,7 +781,7 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual):
                         st.markdown(f"**{fb['tutor']}** - <span style='color:gray; font-size:0.8rem;'>{fb['fecha']}</span>", unsafe_allow_html=True)
                         st.write(fb['mensaje'])
         else:
-            st.info("No hay feedback registrado todavía en esta práctica.")
+            st.info("No hay feedback registrado todavía en esta formación.")
         pass
 
 def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
@@ -825,18 +826,14 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
         if "fp_pyme_contacto" not in st.session_state:
             st.session_state.fp_pyme_contacto = ultimo_feedback.get("FPPYME", False)
 
-        with st.expander("1° Contacto - Comentarios "):
-            comentarios_contacto1 = st.text_area("1° Contacto - Comentarios ",
+        with st.expander("Comentarios "):
+            comentarios_contacto1 = st.text_area("Comentarios ",
             value=ultimo_feedback.get("primerContacto", ""),
             disabled=not puede_editar)
             fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
                 disabled=not puede_editar, key="fp_contacto")
             fp_pyme = st.checkbox("¿Quiere participar en FP PYME?",
-                disabled=not puede_editar, key="fp_pyme_contacto")
-        with st.expander("2° Contacto - Comentarios "):
-            comentarios_contacto2 = st.text_area("2° Contacto - Comentarios",
-                value=ultimo_feedback.get("segundoContacto", ""),
-                disabled=not puede_editar)       
+                disabled=not puede_editar, key="fp_pyme_contacto")     
 
         if puede_editar:
             if st.button("💾 Guardar", use_container_width=True):
@@ -851,8 +848,7 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
                     "nombreEmpresa": nombre_empresa,
                     "primerContacto": comentarios_contacto1.strip(),
                     "programaFP": fp,
-                    "FPPYME": fp_pyme,
-                    "segundoContacto": comentarios_contacto2.strip()
+                    "FPPYME": fp_pyme
                 }
                 
                 try:
@@ -869,7 +865,7 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
 
 
 def seccion_planificacion(alumno, empresa, practicaId):
-        st.subheader("📅 Planificación de Prácticas")
+        st.subheader("📅 Planificación de Formación")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
@@ -999,9 +995,9 @@ def seccion_documentos(alumno, empresa, practicaId):
 def mostrar_detalle():
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
-
+    ciclo = p.get("ciclo_formativo", "—")
     if not p:
-        st.error("Práctica no encontrada.")
+        st.error("Formación no encontrada.")
         return
 
     p["oferta_fp"] = p.get("oferta_fp") or {}
@@ -1016,24 +1012,22 @@ def mostrar_detalle():
     if rol_usuario == 'tutor':
         seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
         st.divider()
-        seccion_feedback_tutor(practicaId, p, tutor_actual)
+        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, ciclo, alumno)
+        st.divider()
+        seccion_feedback_tutor(practicaId, p, tutor_actual, True)
         st.divider()
         seccion_planificacion(alumno,empresa, practicaId)
-        st.divider()
-        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
-        st.divider()
-        seccion_feedback_candidato(practicaId, forms)
-        
+
     else:
         seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
         st.divider()
-        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno)
+        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa,ciclo, alumno)
         st.divider()
         seccion_planificacion(alumno,empresa, practicaId)
         st.divider()
         seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
         st.divider()
-        seccion_feedback_tutor(practicaId, p, tutor_actual)
+        seccion_feedback_tutor(practicaId, p, tutor_actual, False)
         st.divider()
         seccion_feedback_candidato(practicaId, forms)
         st.divider()

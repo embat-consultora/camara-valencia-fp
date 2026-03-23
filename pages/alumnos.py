@@ -155,7 +155,7 @@ with tab1:
                 new_email = st.text_input("Email", alumno.get("email_alumno", ""))
                 tipo_opts = tipoPracticas
                 new_tipo_practica = st.selectbox(
-                    "Tipo de Práctica",
+                    "Tipo de Formación",
                     options=tipo_opts,
                     index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
                 )
@@ -196,7 +196,7 @@ with tab1:
                 }
                 icono = estado_map.get(estado_actual, "⚪")
                 st.write(f"**Estado actual:** {icono} {estado_actual}")
-                st.write(f"**Tipo de Práctica:**  {tipo_practica}")
+                st.write(f"**Tipo de Formación:**  {tipo_practica}")
                 form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
                 ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
                 pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
@@ -234,16 +234,10 @@ with tab1:
                 else:
                     default_index = 0
 
-                estado = st.selectbox("Estado", options=estadosAlumno, index=default_index)
-                motivo_cancelacion = None
-                if estado == "Cancelado":
-                    motivo_cancelacion = st.text_area("Motivo de cancelación", value=alumno.get("motivo") or "")
 
                 if st.button("💾 Guardar preferencias"):
                     data_to_update = {
                         "dni": alumno["dni"],
-                        "estado": estado,
-                        "motivo": motivo_cancelacion,
                         "ciclo_formativo": selected_ciclo,
                         "preferencias_fp": selected_pref,
                         "vehiculo": "Sí" if vehiculo_selected else "No",
@@ -335,7 +329,7 @@ with tab2:
             new_email = st.text_input("Email")
             tipo_opts = tipoPracticas
             new_tipo_practica = st.selectbox(
-                "Tipo de Práctica",
+                "Tipo de Formación",
                 options=tipo_opts,
                 index=0
             )
@@ -354,7 +348,7 @@ with tab2:
                         "codigo_postal": new_codigoPostal,
                         "telefono": new_telefono,
                         "email_alumno": new_email,
-                        "estado": "Activo",
+                        "estado": "Sin Empresa",
                         "tipoPractica": new_tipo_practica
                     }, keys=["dni"]
                 )
@@ -429,7 +423,6 @@ with tab2:
                             errores.append("Fila sin DNI — omitida.")
                             continue
 
-                        # 3️⃣ Construir payload limpio
                         data = {
                             "dni": dni,
                             "nombre": row.get("nombre", "").strip(),
@@ -440,7 +433,7 @@ with tab2:
                             "NIA": row.get("NIA", "").strip(),
                             "telefono": row.get("telefono", "").strip(),
                             "email_alumno": row.get("email_alumno", "").strip(),
-                            "estado": "Activo",
+                            "estado": "Sin Empresa",
                             "tipoPractica": row.get("tipoPractica", "").strip(),
                         }
 

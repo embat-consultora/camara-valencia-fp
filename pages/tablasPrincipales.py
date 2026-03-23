@@ -13,8 +13,6 @@ import json
 
 def extraer_ofertas_por_ciclo(df_empresas):
     mapping = {}
-    
-    # df_empresas es la lista de diccionarios (res.data)
     for empresa_dict in df_empresas:
         nombre_empresa = empresa_dict.get('nombre')
         dir_empresa = empresa_dict.get('direccion', '')
@@ -31,8 +29,6 @@ def extraer_ofertas_por_ciclo(df_empresas):
             continue
 
         for oferta in ofertas_json:
-            # 1. Tutor General (Fallback)
-            # Nota: Usamos 'tutores' porque así viene de tu select de Supabase
             t_data = oferta.get('tutores')
             if isinstance(t_data, dict):
                 tutor_general = t_data.get('nombre', 'Sin tutor')
@@ -50,43 +46,46 @@ def extraer_ofertas_por_ciclo(df_empresas):
             dir_oferta = oferta.get('direccion_empresa') or dir_empresa
             loc_oferta = oferta.get('localidad_empresa') or loc_empresa
             data_puestos = oferta.get('puestos', {})
-            
+            data_ciclos = oferta.get('ciclos_formativos', {})
             if isinstance(data_puestos, dict):
                 for ciclo, lista_proyectos in data_puestos.items():
                     if ciclo not in puestos_por_ciclo:
                         puestos_por_ciclo[ciclo] = []
-                    
+                    ciclo_data = data_ciclos.get(ciclo)
+                    disponibles = ciclo_data.get("disponibles", 0)
                     for p in lista_proyectos:
-                        # Sacamos el nombre del puesto (prioridad 'area' luego 'proyecto')
-                        nombre_puesto = p.get('area') or p.get('proyecto') or "General"
-                        
-                        # Buscamos el tutor específico en el JSONB
+                    
+                        nombre_puesto = p.get('proyecto') or "General"
+                        nombre_area = p.get('area') or "General"
                         tutor_puesto = tutores_especificos.get(ciclo, {}).get(nombre_puesto, {}).get('nombre')
                         
                         # Añadimos el objeto limpio
                         puestos_por_ciclo[ciclo].append({
                             "nombre": nombre_puesto,
                             "tutor": tutor_puesto if tutor_puesto else tutor_general,
-                            "direccion": dir_oferta,    # <--- Agregado
-                            "localidad": loc_oferta
+                            "direccion": dir_oferta, 
+                            "localidad": loc_oferta,
+                            "area": nombre_area,
+                            "disponibles":disponibles
                         })
-
+     
         # --- LIMPIEZA DE DUPLICADOS CON PRIORIDAD ---
         for ciclo in puestos_por_ciclo:
-            mejores_puestos = {} # Usamos un dict para sobreescribir
+            mejores_puestos = {}
             
             for item in puestos_por_ciclo[ciclo]:
                 nombre = item['nombre']
                 tutor = item['tutor']
                 direccion = item['direccion']
                 localidad = item['localidad']
-                
+                disponibles = item['disponibles']
                 # Si el puesto no está, o si el nuevo tutor es mejor que "Sin tutor", lo guardamos
                 if nombre not in mejores_puestos or (tutor != "Sin tutor" and mejores_puestos[nombre] == "Sin tutor"):
                     mejores_puestos[nombre] = {
                         "tutor": tutor,
                         "direccion": direccion,
-                        "localidad": localidad
+                        "localidad": localidad,
+                        "disponibles": disponibles
                     }
             
             # Convertimos de nuevo al formato de lista de dicts que espera el JS
@@ -95,7 +94,8 @@ def extraer_ofertas_por_ciclo(df_empresas):
                     "nombre": n, 
                     "tutor": v['tutor'], 
                     "direccion": v['direccion'], 
-                    "localidad": v['localidad']
+                    "localidad": v['localidad'],
+                    "disponibles": v['disponibles']
                 } for n, v in mejores_puestos.items()
             ]
 
@@ -128,7 +128,7 @@ def load_data():
             st.session_state["data_loaded"] = True
             st.session_state["force_reload"] = False
 
-st.title("🚀 Panel de Gestión de Prácticas FP")
+st.title("🚀 Panel de Gestión de Formaciones")
 load_data()
 nombres_tabs = ["🎓 Alumnos", "🏢 Ofertas por Ciclo"]
 if rol_usuario == "admin":
@@ -223,6 +223,7 @@ with tab_alumnos:
                 df_display["direccion_practica"] = None
             if "localidad_practica" not in df_display.columns:
                 df_display["localidad_practica"] = None
+            
             def calcular_cupo_actual(row, dict_mapeo):
                 empresa = row.get('nombre_empresa')
                 ciclo = row.get('ciclo_formativo')
@@ -230,9 +231,7 @@ with tab_alumnos:
                 # Si no tiene empresa o es la marca de "Sin asignar"
                 if not empresa or empresa == "⚠️ SIN ASIGNAR":
                     return None
-                
-                # Buscamos en el mapeo de ofertas (dict_mapeo que ya generaste)
-                # Estructura esperada: dict_mapeo[empresa][ciclo] -> { "disponibles": X, ... }
+            
                 try:
                     if empresa in dict_mapeo and ciclo in dict_mapeo[empresa]:
                         # Accedemos al primer puesto o sumamos disponibles si hay varios
@@ -246,22 +245,13 @@ with tab_alumnos:
 
             # Creamos la columna físicamente en el DataFrame
             df_display['cupos_disponibles'] = df_display.apply(lambda x: calcular_cupo_actual(x, dict_mapeo), axis=1)
-
             # Ahora sí, asegúrate de incluirla en la lista de columnas visibles
             if "cupos_disponibles" not in cols_visibles:
                 cols_visibles.append("cupos_disponibles")
             if rol_usuario == "admin":
-                st.info("Si no encontrás la empresa y ya tenes al alumno para asignar, dirigite a la sección de  Prácticas -> Carga Rápida")
+                st.caption("Si no encontrás la empresa y ya tienes al alumno para asignar, dirigite a la sección de  Formación en Empresa -> Carga Rápida")
             gb = GridOptionsBuilder.from_dataframe(df_display)
             gb.configure_default_column(editable=True, filter=True, resizable=True)
-
-            si_no_js = JsCode("""
-                function(params) {
-                    if (params.value === true || params.value === 'true') return '✅ SÍ';
-                    if (params.value === false || params.value === 'false') return '';
-                    return params.value;
-                }
-            """)
 
             gb.configure_column("ciclo_acronimo", headerName="Ciclo", pinned='left', width=150, editable=False)
             gb.configure_column("apellido", headerName="Apellidos", width=200)
@@ -465,7 +455,7 @@ with tab_alumnos:
                     except Exception as e:
                         st.error(f"Error técnico: {e}")
         else:
-            st.info("No tienes sugerencias de prácticas por el momento")
+            st.info("Ya asignaste a todos los alumnos o no tienes alumnos nuevos")
 # --- TAB OFERTAS (Todo el código igual, visible para ambos) ---
 with tab_ofertas:
     try:
@@ -496,6 +486,7 @@ with tab_ofertas:
                     gestores_activos_df['ciclo'].str.upper() == nombre_ciclo
                 ]['nombre'].tolist()
                 areas_del_ciclo = puestos_info.get(nombre_ciclo, [{"area": "General", "proyecto": ""}])
+
                 for area_item in areas_del_ciclo:
                     nombre_area = area_item.get('area', 'General')
                     seg_especifico = seguimiento_full.get(nombre_ciclo, {}).get(nombre_area, {})
@@ -508,7 +499,7 @@ with tab_ofertas:
                         "Localidad": empresa.get('localidad', ''),
                         "Horario": empresa.get('horario', ''),
                         "Ciclo": nombre_ciclo,
-                        "Alumnos Pedidos": datos_alumnos.get('alumnos', 0),
+                        "Alumnos Pedidos": datos_alumnos.get('disponibles', 0),
                         "Área": nombre_area,
                         "Proyecto": area_item.get('proyecto', ''),
                         "Requisitos": record.get('requisitos', ''),
@@ -532,7 +523,7 @@ with tab_ofertas:
                     df_ciclo_raw = df_final[df_final['Ciclo'] == nombre_ciclo].copy()
                     
                     columnas_fijas = [
-                        "id", "Empresa", "Teléfono", "Localidad", "Horario"
+                        "id", "Empresa", "Teléfono", "Localidad", "Horario",
                         "Alumnos Pedidos", "Área", "Proyecto", "Requisitos", 
                         "Contrato", "Vehículo", "Nombre Tutor", "Email Tutor","Telefono Tutor"
                     ]

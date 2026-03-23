@@ -3,7 +3,7 @@ import pandas as pd
 from modules.data_base import getEquals, getEqual, upsert, updateTutores,getEquals, getPracticas
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, localidades, tutoresTabla,practicaTabla,fasesPractica,faseColPractica,practicaEstadosTabla,linkCalendar,carpetaPractica
+from variables import empresasTabla, necesidadFP, estados, localidades, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive
 from pathlib import Path

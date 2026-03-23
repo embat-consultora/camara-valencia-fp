@@ -46,7 +46,7 @@ new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
 new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
 
 # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
-st.subheader("📋 Configuración de la Práctica")
+st.subheader("📋 Configuración de la Formación")
 col_p1, col_p2 = st.columns(2)
 
 # Obtenemos los tipos de práctica de tus variables
