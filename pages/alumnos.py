@@ -6,7 +6,7 @@ from pathlib import Path
 from modules.data_base import get, update, upsert, getEquals,getEqual
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla,max_file_size,tipoPracticas,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
+from variables import alumnosTabla,aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 from modules.emailSender import send_email
@@ -21,7 +21,10 @@ st.markdown(
     "<h2 style='text-align: center;'>ALUMNOS</h2>",
     unsafe_allow_html=True
 )
-
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+if "form_registro_key" not in st.session_state:
+    st.session_state.form_registro_key = 0
 base_url = os.getenv("URL")
 
 # --- Traer alumnos ---
@@ -142,23 +145,33 @@ with tab1:
             # --- Detalle / edición ---
             with subtab1:
                 st.write("Edita los datos y guarda para actualizar:")
-
-                new_nombre = st.text_input("Nombre", alumno.get("nombre", ""))
-                new_apellido = st.text_input("Apellido", alumno.get("apellido", ""))
-                new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
-                new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
-                new_localidad = st.text_input("Localidad", alumno.get("localidad", ""))
-                new_dni = st.text_input("dni", alumno.get("dni", ""))
-                new_nia = st.text_input("NIA", alumno.get("NIA", ""))
-                new_nuss = st.text_input("NUSS", alumno.get("nuss", ""))
-                new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
-                new_email = st.text_input("Email", alumno.get("email_alumno", ""))
-                tipo_opts = tipoPracticas
-                new_tipo_practica = st.selectbox(
-                    "Tipo de Formación",
-                    options=tipo_opts,
-                    index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
-                )
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_nombre = st.text_input("Nombre", alumno.get("nombre", ""))
+                    new_apellido = st.text_input("Apellido", alumno.get("apellido", ""))
+                    new_dni = st.text_input("dni", alumno.get("dni", ""))
+                    new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
+                    new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
+                    current_loc = alumno.get("localidad", "")
+                    try:
+                        default_index_loc = localidades.index(current_loc)
+                    except (ValueError, TypeError):
+                        default_index_loc = 10
+                    new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc)
+                    
+                with col2:
+                    new_nia = st.text_input("NIA", alumno.get("NIA", ""))
+                    new_nuss = st.text_input("NUSS", alumno.get("nuss", ""))
+                    new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
+                    new_email = st.text_input("Email", alumno.get("email_alumno", ""))
+                    tipo_opts = tipoPracticas
+                    new_tipo_practica = st.selectbox(
+                        "Tipo de Formación",
+                        options=tipo_opts,
+                        index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
+                    )
+                    ano = st.selectbox("Año *", options= aniosList,index=aniosList.index(alumno.get("anio")) if alumno.get("anio") in aniosList else 0)
+                    curso = st.selectbox("Curso *", options= cursoList,index=cursoList.index(alumno.get("curso")) if alumno.get("curso") in cursoList else 0)
                 if st.button("💾 Actualizar alumno"):
                     update(
                         alumnosTabla,
@@ -172,7 +185,9 @@ with tab1:
                             "NIA": new_nia,
                             "telefono": new_telefono,
                             "email_alumno": new_email,
-                            "tipoPractica": new_tipo_practica
+                            "tipoPractica": new_tipo_practica,
+                            "anio": ano.strip(),
+                            "curso": curso.strip()
                         },
                         {
                             "id":alumno_id
@@ -317,12 +332,12 @@ with tab2:
     with tabNuevo:
         st.write("➕ Nuevo Alumno")
         
-        with st.form("form_nuevo_alumno"):
+        with st.form(key=f"nuevo_alumno_form_{st.session_state.form_registro_key}"):
             new_nombre = st.text_input("Nombre")
             new_apellido = st.text_input("Apellido")
             new_direccion = st.text_input("Dirección")
             new_codigoPostal = st.text_input("CP")
-            new_localidad = st.text_input("Localidad")
+            new_localidad = st.selectbox("Localidad *", (localidades))
             new_dni = st.text_input("dni")
             new_nia = st.text_input("NIA")
             new_telefono = st.text_input("Teléfono")
@@ -333,6 +348,8 @@ with tab2:
                 options=tipo_opts,
                 index=0
             )
+            ano = st.selectbox("Año *", options= aniosList)
+            curso = st.selectbox("Curso *", options= cursoList, key="nuevo_curso")
 
             submitted = st.form_submit_button("Crear Alumno")
             if submitted:
@@ -349,10 +366,13 @@ with tab2:
                         "telefono": new_telefono,
                         "email_alumno": new_email,
                         "estado": "Sin Empresa",
-                        "tipoPractica": new_tipo_practica
+                        "tipoPractica": new_tipo_practica,
+                        "anio": ano,
+                        "curso": curso,
                     }, keys=["dni"]
                 )
                 st.success("Nuevo alumno agregado correctamente")
+                st.session_state.form_registro_key += 1
                 st.rerun()
     with tabBulk:
         st.write("📥 Cargar alumnos desde CSV")
@@ -368,6 +388,8 @@ with tab2:
             "NIA": [""],
             "telefono": [""],
             "email_alumno": [""],
+            "anio": [aniosList[1:]],
+            "curso": [cursoList[1:]],
             "tipoPractica": ["Práctica Autogestionada | Práctica Asignada por el Centro"]
         })
         sample_csv_path = Path(tempfile.gettempdir()) / "alumnos_muestra.csv"
@@ -387,7 +409,7 @@ with tab2:
         uploaded_csv = st.file_uploader(
             "Subir archivo CSV (.csv)",
             type=["csv"],
-            key="upload_csv_alumnos"
+            key=f"upload_csv_{st.session_state.uploader_key}"
         )
 
         if uploaded_csv:
@@ -429,30 +451,33 @@ with tab2:
                             "apellido": row.get("apellido", "").strip(),
                             "direccion": row.get("direccion", "").strip(),
                             "codigo_postal": row.get("codigo_postal", "").strip(),
-                            "localidad": row.get("localidad", "").strip(),
+                            "localidad": row.get("localidad", "").strip().upper(),
                             "NIA": row.get("NIA", "").strip(),
                             "telefono": row.get("telefono", "").strip(),
                             "email_alumno": row.get("email_alumno", "").strip(),
                             "estado": "Sin Empresa",
                             "tipoPractica": row.get("tipoPractica", "").strip(),
+                            "anio": re.sub(r"['\"]", "", row.get("anio", "")).strip(),
+                            "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip()
                         }
 
                         # 4️⃣ Insert/update
                         try:
                             upsert(alumnosTabla, data, keys=["dni"])
                             creados += 1
+                            st.toast(f"🎉 {creados} alumnos creados o actualizados correctamente.")
+
+
                         except Exception as e:
                             errores.append(f"DNI {dni}: {e}")
-
-                    # Resultado del proceso
-                    st.success(f"🎉 {creados} alumnos creados o actualizados correctamente.")
 
                     if errores:
                         st.warning("⚠️ Errores encontrados:")
                         for err in errores:
                             st.write("- " + err)
-
-                    st.rerun()
+                    else:
+                        st.session_state.uploader_key += 1
+                        st.rerun()
 
             except Exception as e:
                 st.error(f"❌ Error leyendo el CSV: {e}")

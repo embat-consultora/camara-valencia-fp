@@ -394,3 +394,5 @@ localidades = [
 ]
 
 linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
+aniosList= ("Seleccionar", "2024-2025","2025-2026", "2026-2027","2027-2028","2028-2029")
+cursoList= ("Seleccionar","1ro","2do")

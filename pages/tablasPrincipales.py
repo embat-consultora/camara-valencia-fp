@@ -216,7 +216,7 @@ with tab_alumnos:
                 "nombre_empresa","asignado", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro", "observaciones_seguimiento","telefono", "email_empresa"
             ]
         
-            cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info","practica_id", "direccion_practica","localidad_practica"]
+            cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info","practica_id", "direccion_practica","localidad_practica", "anio","curso"]
             cols_finales = cols_visibles + [c for c in cols_tecnicas if c in df_raw.columns]
             df_display = df_raw[cols_finales].copy()
             if "direccion_practica" not in df_display.columns:

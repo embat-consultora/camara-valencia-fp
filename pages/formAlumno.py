@@ -5,7 +5,7 @@ import json, uuid
 from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
@@ -49,14 +49,14 @@ with col1:
     email = input_requerido("Email *", key="email_alumno")
     dni = input_requerido("DNI/NIE *", key="dni_alumno")
     cp = input_requerido("Código Postal *", key="cp_alumno")
-    ano = st.selectbox("Año *", ("2024-2025","2025-2026", "2026-2027","2027-2028"), key="ano_alumno")
+    ano = st.selectbox("Año *", aniosList, key="ano_alumno")
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
     direccion = input_requerido("Dirección *", key="direccion_alumno")
     localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
     sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
     nuss = st.text_input("NUSS", key="nuss_alumno")
-    curso = st.selectbox("Curso *", ("1ro","2do"), key="curso_alumno")
+    curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
@@ -172,7 +172,7 @@ if submit:
                 else:
                     file_id, link = str(res), None
 
-                st.success("¡Formulario enviado correctamente!")
+                st.success("¡Formulario enviado correctamente!, ya puedes cerrar la página.")
                 if link:
                     st.success(f"CV subido. [Abrir en Drive]({link})")
                 else:
