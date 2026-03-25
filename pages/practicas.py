@@ -290,121 +290,124 @@ def mostrar_lista_practicas():
             st.rerun()
 
 def mostrar_carga_rapida():
-    st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
+     with st.form("carga_rapida"):
+        st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
 
-    # 1. DATOS DE LA EMPRESA
-    st.subheader("🏢 Datos de la Empresa")
-    c1, c2 = st.columns(2)
-    new_emp_nombre = c1.text_input("Nombre Comercial / Razón Social", key="qr_emp_nom")
-    new_emp_cif = c2.text_input("CIF (Obligatorio)", key="qr_emp_cif").upper().strip()
+        # 1. DATOS DE LA EMPRESA
+        st.subheader("🏢 Datos de la Empresa")
+        c1, c2 = st.columns(2)
+        new_emp_nombre = c1.text_input("Nombre Comercial / Razón Social", key="qr_emp_nom")
+        new_emp_cif = c2.text_input("CIF (Obligatorio)", key="qr_emp_cif").upper().strip()
 
-    c1_2, c2_2 = st.columns(2)
-    new_emp_tel = c1_2.text_input("Teléfono Empresa", key="qr_emp_tel")
-    new_emp_email = c2_2.text_input("Email Empresa", key="qr_emp_email")
+        c1_2, c2_2 = st.columns(2)
+        new_emp_tel = c1_2.text_input("Teléfono Empresa", key="qr_emp_tel")
+        new_emp_email = c2_2.text_input("Email Empresa", key="qr_emp_email")
 
-    st.divider()
+        st.divider()
 
-    # 2. DATOS DEL ALUMNO
-    st.subheader("🧑‍🎓 Datos del Alumno")
-    c3, c4, c5 = st.columns([1, 1, 1.5])
-    new_alu_dni = c3.text_input("DNI (Obligatorio)", key="qr_alu_dni").upper().strip()
-    new_alu_nombre = c4.text_input("Nombre", key="qr_alu_nom")
-    new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
+        # 2. DATOS DEL ALUMNO
+        st.subheader("🧑‍🎓 Datos del Alumno")
+        c3, c4, c5 = st.columns([1, 1, 1.5])
+        new_alu_dni = c3.text_input("DNI (Obligatorio)", key="qr_alu_dni").upper().strip()
+        new_alu_nombre = c4.text_input("Nombre", key="qr_alu_nom")
+        new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
 
-    new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
-    col1, col2 = st.columns(2)
-    with col1:
-        anio = st.selectbox("Año *", aniosList, key="ano_alumno")
-    with col2:
-        curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
-    # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
-    st.subheader("📋 Configuración de la Formación")
-    col_p1, col_p2 = st.columns(2)
+        new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
+        col1, col2 = st.columns(2)
+        with col1:
+            anio = st.selectbox("Año *", aniosList, key="ano_alumno")
+        with col2:
+            curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
+        # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
+        st.subheader("📋 Configuración de la Formación")
+        col_p1, col_p2 = st.columns(2)
 
-    # Obtenemos los tipos de práctica de tus variables
-    new_alu_tipo = col_p1.selectbox(
-        "Tipo de Formación", 
-        options=tipoPracticas, 
-        key="qr_alu_tipo"
-    )
-
-    # Lógica de Ciclos Formativos (Basada en tu código de alumnos)
-    form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-    ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-    pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
-
-    ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
-    prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
-
-    new_alu_ciclo = col_p2.selectbox(
-        "Ciclo Formativo",
-        options=[""] + ciclos_opts,
-        key="qr_alu_ciclo"
-    )
-
-    new_alu_pref = []
-    if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
-        new_alu_pref = st.multiselect(
-            "Preferencias/Áreas",
-            options=prefs_opts_dict[new_alu_ciclo],
-            key="qr_alu_pref"
+        # Obtenemos los tipos de práctica de tus variables
+        new_alu_tipo = col_p1.selectbox(
+            "Tipo de Formación", 
+            options=tipoPracticas, 
+            key="qr_alu_tipo"
         )
 
-    # 4. BOTÓN DE ACCIÓN
-    if st.button("🚀 Guardar y Vincular Formación", use_container_width=True):
-        if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
-            st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
-        else:
-            with st.spinner("Procesando alta rápida..."):
-                try:
-                    # A. Alta Empresa
-                    upsert(empresasTabla, {
-                        "CIF": new_emp_cif,
-                        "nombre": new_emp_nombre,
-                        "telefono": new_emp_tel,
-                        "email_empresa": new_emp_email
-                    }, keys=["CIF"])
-                    usuario = upsertCustome(usuariosTabla, {
-                                "email": new_emp_cif,
-                                "password": new_emp_cif,
-                                "rol": "empresa",
-                            }, keys=["email"])
-                    # B. Alta Alumno
-                    upsert(alumnosTabla, {
-                        "dni": new_alu_dni,
-                        "nombre": new_alu_nombre,
-                        "apellido": new_alu_apellido,
-                        "email_alumno": new_alu_email,
-                        "tipoPractica": new_alu_tipo,
-                        "ciclo_formativo": new_alu_ciclo,
-                        "preferencias_fp": new_alu_pref,
-                        "anio": anio,
-                        "curso": curso,
-                        "estado": estadosAlumno[1]
-                    }, keys=["dni"])
+        # Lógica de Ciclos Formativos (Basada en tu código de alumnos)
+        form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
+        ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
+        pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
 
-                    # C. Crear la Práctica (Vincular)
-                    # Usamos los parámetros que requiere tu función crearPractica
-                    crearPractica(
-                        empresaCif=new_emp_cif,
-                        alumnoDni=new_alu_dni,
-                        ciclo=new_alu_ciclo if new_alu_ciclo else "Autogestionado",
-                        area="General",
-                        proyecto="Alta Rápida",
-                        fecha=datetime.now().isoformat(),
-                        ciclos_info=None,
-                        cupos_disp=None,
-                        oferta_id=None,
-                        status= "Nuevo",
-                        anio= anio,
-                        curso= curso,
-                    )
+        ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
+        prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
 
-                    st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
-                    st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
+        new_alu_ciclo = col_p2.selectbox(
+            "Ciclo Formativo",
+            options=[""] + ciclos_opts,
+            key="qr_alu_ciclo"
+        )
 
-                except Exception as e:
-                    st.error(f"❌ Error en el proceso: {str(e)}")
+        new_alu_pref = []
+        if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
+            new_alu_pref = st.multiselect(
+                "Preferencias/Áreas",
+                options=prefs_opts_dict[new_alu_ciclo],
+                key="qr_alu_pref"
+            )
+
+        # 4. BOTÓN DE ACCIÓN
+        submit_btn = st.form_submit_button("🚀 Guardar y Vincular Formación")
+
+        if submit_btn:
+            if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
+                st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
+            else:
+                with st.spinner("Procesando alta rápida..."):
+                    try:
+                        # A. Alta Empresa
+                        upsert(empresasTabla, {
+                            "CIF": new_emp_cif,
+                            "nombre": new_emp_nombre,
+                            "telefono": new_emp_tel,
+                            "email_empresa": new_emp_email
+                        }, keys=["CIF"])
+                        usuario = upsertCustome(usuariosTabla, {
+                                    "email": new_emp_cif,
+                                    "password": new_emp_cif,
+                                    "rol": "empresa",
+                                }, keys=["email"])
+                        # B. Alta Alumno
+                        upsert(alumnosTabla, {
+                            "dni": new_alu_dni,
+                            "nombre": new_alu_nombre,
+                            "apellido": new_alu_apellido,
+                            "email_alumno": new_alu_email,
+                            "tipoPractica": new_alu_tipo,
+                            "ciclo_formativo": new_alu_ciclo,
+                            "preferencias_fp": new_alu_pref,
+                            "anio": anio,
+                            "curso": curso,
+                            "estado": estadosAlumno[1]
+                        }, keys=["dni"])
+
+                        # C. Crear la Práctica (Vincular)
+                        # Usamos los parámetros que requiere tu función crearPractica
+                        crearPractica(
+                            empresaCif=new_emp_cif,
+                            alumnoDni=new_alu_dni,
+                            ciclo=new_alu_ciclo if new_alu_ciclo else "Autogestionado",
+                            area="General",
+                            proyecto="Alta Rápida",
+                            fecha=datetime.now().isoformat(),
+                            ciclos_info=None,
+                            cupos_disp=None,
+                            oferta_id=None,
+                            status= "Nuevo",
+                            anio= anio,
+                            curso= curso,
+                        )
+
+                        st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
+                        st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
+
+                    except Exception as e:
+                        st.error(f"❌ Error en el proceso: {str(e)}")
 
 def mostrar_anexos():
     if not practicas:
@@ -608,8 +611,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     # Pasamos la KEY en lugar del valor
                     args=(alumnosTabla, alumno['dni'], "gestor", "dni", clave_gestor, "Gestor")
                 )
-        
-        lista_nombres_tutores = [g["nombre"] for g in tutores]
+        tutores_filtrados = [g for g in tutores if g["cif_empresa"] == empresa['CIF']]
+        lista_nombres_tutores = [g["nombre"] for g in tutores_filtrados]
         if "No asignado" not in lista_nombres_tutores:
             lista_nombres_tutores.insert(0, "No asignado")
         tutor_actual = p.get("tutor") 
