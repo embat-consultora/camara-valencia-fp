@@ -5,7 +5,7 @@ import json, uuid
 from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades,cursoList , aniosList
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,tipoPracticas,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
@@ -60,10 +60,10 @@ with col2:
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
-st.subheader("Tipo de práctica")
+st.subheader("Tipo de formación")
 tipo_practica = st.radio(
-    "Indica si tu práctica es autogestionada o si prefieres que sea asignada por el centro:",
-    ["Práctica autogestionada", "Práctica asignada por el centro"],
+    "Indica si tu formación es autogestionada o si prefieres que sea asignada por el centro:",
+    tipoPracticas,
     index=None,
     horizontal=False
 )

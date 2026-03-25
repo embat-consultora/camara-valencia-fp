@@ -11,11 +11,11 @@ import json
 # CONFIG
 # ----------------------------------------------
 # Importante: set_page_config debe ir antes de apply_page_config si esta última no lo tiene
-st.set_page_config(page_title="Prácticas autogestionada", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="Formación autogestionada", page_icon="🚀", layout="wide")
 apply_page_config()
 make_sidebar()
 
-st.markdown("<h2 style='text-align: center;'>🚀 Gestión de Prácticas Autogestionadas</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>🚀 Gestión de Formación Autogestionadas</h2>", unsafe_allow_html=True)
 now = datetime.now().isoformat()
 
 # ----------------------------------------------

@@ -44,6 +44,7 @@ formTabla="forms"
 formFieldsTabla="form_fields"
 empresasTabla="empresas"
 alumnosTabla="alumnos"
+logsTabla="error_logs"
 answersTabla="form_answers"
 necesidadFP="oferta_fp"
 empresaEstadosTabla="empresa_estados"
@@ -103,8 +104,8 @@ opciones_motivo = [
     ]
 
 tipoPracticas= [
-                    "Práctica Autogestionada",
-                    "Práctica asignada por el centro"
+                    "Autogestionada",
+                    "Asignada por el centro"
                 ]
 sectorEmpresa = [
   "Comercio minorista y mayorista",

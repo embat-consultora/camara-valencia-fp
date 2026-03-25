@@ -455,7 +455,7 @@ with tab3:
     for e in st.session_state.emailsList:
         st.markdown(f"- {e}")
 
-    subject_al = st.text_input("Asunto del email", value="Pasantías FP 2025/2026", key="subj_al")
+    subject_al = st.text_input("Asunto del email", value="Formaciones", key="subj_al")
     body_al = st.text_area(
         "Cuerpo del email",
         height=200,
@@ -480,12 +480,6 @@ with tab3:
                             empresaEstadosTabla,
                             {"empresa": cif, "email_enviado": fecha_envio},
                             keys=["empresa"]
-                        )
-                    else:
-                        upsert(
-                            contactoEmpresaTabla,
-                            {"email_empresa": email, "email_enviado": fecha_envio},
-                            keys=["email_empresa"]
                         )
                 st.success("Emails enviados correctamente! 🚀")
         except Exception as e:

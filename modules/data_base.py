@@ -18,7 +18,8 @@ from variables import (
     usuariosTabla,
     tutoresTabla,
     tutoresCentroTabla,
-    practicaCanceladaTabla
+    practicaCanceladaTabla,
+    logsTabla
 )
 load_dotenv()
 
@@ -360,7 +361,7 @@ def get(tableName):
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
-def getEquals(tableName, conditions: dict, in_filters: dict = None):
+def getEquals(tableName, conditions: dict, in_filters: dict = None, not_equals: dict = None):
     query = supabase.table(tableName).select("*")
     if conditions:
         for key, value in conditions.items():
@@ -368,6 +369,9 @@ def getEquals(tableName, conditions: dict, in_filters: dict = None):
     if in_filters:
         for key, values in in_filters.items():
             query = query.in_(key, values)
+    if not_equals:
+        for key, value in not_equals.items():
+            query = query.neq(key, value)
     response = query.execute()
     return response.data
 def getOfertaEmpresas(tableName, conditions: dict, in_filters: dict = None):
@@ -972,6 +976,13 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
         {"alumno": alumnoDni, 'match_fp': fecha, 'fp_asignada': fecha},
         keys=["alumno"]
     )
+def logError(error_msg, pagina):
+    st.write(f"Error en {pagina}: {error_msg}")
+    # add(logsTabla, {
+    #                 "log":error_msg,
+    #                 "pagina": pagina
+    #             })
+
 
     
 def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_fin):

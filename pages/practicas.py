@@ -198,7 +198,7 @@ def mostrar_lista():
         missing_count = contarAnexos(practicas)  
         label_anexos = f"📃 Anexos  🔴 ({missing_count})" if missing_count > 0 else "📃 Anexos"
         tabs_visibles.extend([label_anexos, "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
-    elif rol_usuario in ['gestor', 'tutor', 'tutorCentro']:
+    elif rol_usuario in ['gestor', 'tutorCentro']:
         tabs_visibles.append("📊 Dashboard de Feedback")
    
     tabs = st.tabs(tabs_visibles)
@@ -503,23 +503,20 @@ def mostrar_dashboard():
     # Convertir a DataFrame para filtrar fácil
     df_fb = pd.DataFrame(all_feedback_forms)
     df_fb['fecha_envio'] = pd.to_datetime(df_fb['fecha_envio']).dt.date
-    
+
     # Filtrar por rango de fecha
     mask = (df_fb['fecha_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_envio'] <= fecha_fin_filtro)
     df_filtrado = df_fb.loc[mask]
-
     # 3. Métricas Principales (KPIs)
     # Tipos: feedback_inicial, feedback_adaptacion, feedback_cierre
-    total_enviados = len(df_filtrado[df_filtrado['estado'] == 'enviado'])
+    total_enviados = len(df_filtrado[df_filtrado['estado'] != 'pendiente'])
     total_respondidos = len(df_filtrado[df_filtrado['fecha_respuesta'].notna()])
-    pendientes = total_enviados - total_respondidos
-
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Enviados", total_enviados)
     
     # Desglose por tipo (usando tus constantes de forms o strings)
     for i, tipo in enumerate(['feedback_inicial', 'feedback_adaptacion', 'feedback_cierre']):
-        count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'enviado')])
+        count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
         if i == 0: m2.metric("Acogida", count)
         if i == 1: m3.metric("Adaptación", count)
         if i == 2: m4.metric("Cierre", count)
@@ -711,7 +708,8 @@ def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alu
 def seccion_feedback_candidato(practicaId, forms):
     st.subheader("¿Cómo se siente el candidato?")
     feedbacks_db = getEquals(feedbackResponseTabla, {"practica_id": practicaId})
-    st.write(f"**Número de feedbacks enviados:** {len(feedbacks_db)}")
+    feedbacksEnviados_db = getEquals(feedbackFormsTabla, {"practica_id": practicaId}, not_equals={"estado": "pendiente"})
+    st.write(f"**Número de feedbacks enviados:** {len(feedbacksEnviados_db)}")
     progreso_feedback = {
         forms[0]: None,
         forms[1]: None,
@@ -958,7 +956,6 @@ def seccion_planificacion(alumno, empresa, practicaId):
         pass
 
 def seccion_documentos(alumno, empresa, practicaId):
-    st.divider()
     st.subheader("📎 Adjuntar documentos")
 
     folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
