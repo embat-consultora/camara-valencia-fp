@@ -49,7 +49,7 @@ else:
     new_form_desc = st.text_area("Descripción del formulario", form_desc, key=f"form_desc_{form_id}")
 
     if st.button("Actualizar Formulario"):
-        update(formTabla, {"nombre": new_form_name, "descripcion": new_form_desc}, "id", form_id)
+        update(formTabla, {"nombre": new_form_name, "descripcion": new_form_desc}, {"id":form_id})
         st.success("Formulario actualizado")
         st.rerun()
 
@@ -121,7 +121,7 @@ else:
                         if new_options is not None:
                             update_data["options"] = json.dumps(new_options, ensure_ascii=False)
 
-                        update(formFieldsTabla, update_data, "id", field["id"])
+                        update(formFieldsTabla, update_data, {"id": field["id"] })
                         st.success("Campo actualizado")
                         st.rerun()
                 with col_b:

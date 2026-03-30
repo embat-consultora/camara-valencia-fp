@@ -3,10 +3,10 @@ import pandas as pd
 import os
 import json, uuid
 from pathlib import Path
-from modules.data_base import get, update, upsert, getEquals,getEqual
+from modules.data_base import get, update, upsert, getEquals,getEqual,logError
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla,max_file_size,tipoPracticas,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, contactoAlumnoTabla
+from variables import alumnosTabla, aniosList, cursoList, ciclos, localidades, max_file_size,tipoPracticas,carpetaAlumnos,estadosAlumno, formFieldsTabla,fasesAlumno,alumnoEstadosTabla,fase2colEmpresa,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla
 from datetime import datetime
 from modules.grafico_helper import mostrar_fases
 from modules.emailSender import send_email
@@ -21,7 +21,10 @@ st.markdown(
     "<h2 style='text-align: center;'>ALUMNOS</h2>",
     unsafe_allow_html=True
 )
-
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+if "form_registro_key" not in st.session_state:
+    st.session_state.form_registro_key = 0
 base_url = os.getenv("URL")
 
 # --- Traer alumnos ---
@@ -39,27 +42,44 @@ tab1, tab2, tab3 = st.tabs(["🔍 Buscar / Visualizar", "➕ Nuevo Alumno", "�
 # TAB 1: Buscar / Visualizar / Editar
 # -------------------------------------------------------------------
 with tab1:
-    col1, col2, col3= st.columns([3, 2,2])
+    col1, filtroanio, filtrocurso, total,descargar= st.columns([2,2,2,2,2])
     with col1:
-        search = st.text_input("Buscar alumnos")
-    with col2:
-        st.metric("Total alumnos", len(df_alumnos))
-    with col3:
-        temp_path = Path("/tmp") / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        df_alumnos.to_excel(temp_path, index=False)
-        with open(temp_path, "rb") as f:
-            st.download_button(
-                label="⬇️ Descargar alumnos (.xlsx)",
-                data=f,
-                file_name=temp_path.name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        search = st.text_input("Buscar alumnos", placeholder="Buscar alumno")
     if search:
         mask = df_alumnos.astype(str).apply(
             lambda row: row.str.contains(search, case=False, na=False).any(),
             axis=1
         )
         df_alumnos = df_alumnos[mask]
+    with filtroanio:
+        anios = sorted(df_alumnos["anio"].dropna().unique())
+        selected_anio = st.selectbox("Filtrar por año", options=["Todos"] + anios, index=0)
+        if selected_anio != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["anio"] == selected_anio]     
+    with filtrocurso:
+        cursos = sorted(df_alumnos["curso"].dropna().unique())
+        selected_curso = st.selectbox("Filtrar por curso", options=["Todos"] + cursos, index=0)
+        if selected_curso != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["curso"] == selected_curso]
+    with total:
+        st.metric("Total alumnos", len(df_alumnos))
+    with descargar:
+        import tempfile
+        from pathlib import Path
+
+        # Esto funcionará en Windows, Linux y Mac automáticamente
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = temp_dir / f"alumnos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        df_alumnos.to_excel(temp_path, index=False)
+        st.write("Exportar datos:")
+        with open(temp_path, "rb") as f:
+            st.download_button(
+                label="⬇️",
+                data=f,
+                file_name=temp_path.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+   
 
     # Vista resumida
     cols_map = {
@@ -71,7 +91,7 @@ with tab1:
         "telefono": "Teléfono",
         "email_alumno": "Email",
         "vehiculo": "Vehículo",
-        "tipoPractica": "Tipo Práctica",
+        "tipoPractica": "Tipo Formación",
     }
     df_view = df_alumnos[list(cols_map.keys())].rename(columns=cols_map)
     st.dataframe(df_view, hide_index=True, use_container_width=True)
@@ -125,22 +145,33 @@ with tab1:
             # --- Detalle / edición ---
             with subtab1:
                 st.write("Edita los datos y guarda para actualizar:")
-
-                new_nombre = st.text_input("Nombre", alumno.get("nombre", ""))
-                new_apellido = st.text_input("Apellido", alumno.get("apellido", ""))
-                new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
-                new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
-                new_localidad = st.text_input("Localidad", alumno.get("localidad", ""))
-                new_dni = st.text_input("dni", alumno.get("dni", ""))
-                new_nia = st.text_input("NIA", alumno.get("NIA", ""))
-                new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
-                new_email = st.text_input("Email", alumno.get("email_alumno", ""))
-                tipo_opts = tipoPracticas
-                new_tipo_practica = st.selectbox(
-                    "Tipo de Práctica",
-                    options=tipo_opts,
-                    index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
-                )
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_nombre = st.text_input("Nombre", alumno.get("nombre", ""))
+                    new_apellido = st.text_input("Apellido", alumno.get("apellido", ""))
+                    new_dni = st.text_input("dni", alumno.get("dni", ""))
+                    new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
+                    new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
+                    current_loc = alumno.get("localidad", "")
+                    try:
+                        default_index_loc = localidades.index(current_loc)
+                    except (ValueError, TypeError):
+                        default_index_loc = 10
+                    new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc)
+                    
+                with col2:
+                    new_nia = st.text_input("NIA", alumno.get("NIA", ""))
+                    new_nuss = st.text_input("NUSS", alumno.get("nuss", ""))
+                    new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
+                    new_email = st.text_input("Email", alumno.get("email_alumno", ""))
+                    tipo_opts = tipoPracticas
+                    new_tipo_practica = st.selectbox(
+                        "Tipo de Formación",
+                        options=tipo_opts,
+                        index=tipo_opts.index(alumno.get("tipoPractica")) if alumno.get("tipoPractica") in tipo_opts else 0
+                    )
+                    ano = st.selectbox("Año *", options= aniosList,index=aniosList.index(alumno.get("anio")) if alumno.get("anio") in aniosList else 0)
+                    curso = st.selectbox("Curso *", options= cursoList,index=cursoList.index(alumno.get("curso")) if alumno.get("curso") in cursoList else 0)
                 if st.button("💾 Actualizar alumno"):
                     update(
                         alumnosTabla,
@@ -154,10 +185,14 @@ with tab1:
                             "NIA": new_nia,
                             "telefono": new_telefono,
                             "email_alumno": new_email,
-                            "tipoPractica": new_tipo_practica
+                            "tipoPractica": new_tipo_practica,
+                            "anio": ano.strip(),
+                            "curso": curso.strip()
                         },
-                        "id",
-                        alumno_id
+                        {
+                            "id":alumno_id
+                        }
+                        
                     )
                     st.success("Alumno actualizado correctamente")
                     st.rerun()
@@ -176,8 +211,7 @@ with tab1:
                 }
                 icono = estado_map.get(estado_actual, "⚪")
                 st.write(f"**Estado actual:** {icono} {estado_actual}")
-                st.write(f"**Tipo de Práctica:**  {tipo_practica}")
-                # Obtener opciones de form_fields
+                st.write(f"**Tipo de Formación:**  {tipo_practica}")
                 form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
                 ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
                 pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
@@ -215,16 +249,10 @@ with tab1:
                 else:
                     default_index = 0
 
-                estado = st.selectbox("Estado", options=estadosAlumno, index=default_index)
-                motivo_cancelacion = None
-                if estado == "Cancelado":
-                    motivo_cancelacion = st.text_area("Motivo de cancelación", value=alumno.get("motivo") or "")
 
                 if st.button("💾 Guardar preferencias"):
                     data_to_update = {
                         "dni": alumno["dni"],
-                        "estado": estado,
-                        "motivo": motivo_cancelacion,
                         "ciclo_formativo": selected_ciclo,
                         "preferencias_fp": selected_pref,
                         "vehiculo": "Sí" if vehiculo_selected else "No",
@@ -272,19 +300,21 @@ with tab1:
                                 st.info(f"Subiendo {total} archivo(s), por favor espera...")
 
                                 for i, file in enumerate(uploaded_files, start=1):
-                                    original_name = file.name
-                                    tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{original_name}"
+                                    extension = Path(file.name).suffix
+                                    nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
+                                    nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                                    tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                                     with open(tmp_path, "wb") as f:
                                         f.write(file.getbuffer())
 
-                                    res = upload_to_drive(str(tmp_path), carpetaAlumnos, folder_name, original_name)
+                                    res = upload_to_drive(str(tmp_path), carpetaAlumnos, folder_name, nuevo_nombre)
 
                                     if isinstance(res, dict):
                                         link = res.get("webViewLink") or res.get("webContentLink")
                                     else:
                                         link = None
 
-                                    st.success(f"✅ {i}/{total}: {original_name} subido correctamente")
+                                    st.success(f"✅ {i}/{total}: {nuevo_nombre} subido correctamente")
                                     if link:
                                         st.markdown(f"[Abrir en Drive]({link})")
 
@@ -292,6 +322,7 @@ with tab1:
                                 st.rerun()
 
                             except Exception as e:
+                                logError(f"{type(e).__name__}: {str(e)}", "Alumnos - Subida de Archivos")
                                 st.error(f"❌ Error al subir los archivos: {e}")
 
 # -------------------------------------------------------------------
@@ -302,43 +333,68 @@ with tab2:
     with tabNuevo:
         st.write("➕ Nuevo Alumno")
         
-        with st.form("form_nuevo_alumno"):
+        with st.form(key=f"nuevo_alumno_form_{st.session_state.form_registro_key}"):
             new_nombre = st.text_input("Nombre")
             new_apellido = st.text_input("Apellido")
             new_direccion = st.text_input("Dirección")
             new_codigoPostal = st.text_input("CP")
-            new_localidad = st.text_input("Localidad")
+            new_localidad = st.selectbox("Localidad *", (localidades))
             new_dni = st.text_input("dni")
             new_nia = st.text_input("NIA")
             new_telefono = st.text_input("Teléfono")
             new_email = st.text_input("Email")
             tipo_opts = tipoPracticas
             new_tipo_practica = st.selectbox(
-                "Tipo de Práctica",
+                "Tipo de Formación",
                 options=tipo_opts,
                 index=0
             )
+            ano = st.selectbox("Año *", options= aniosList)
+            curso = st.selectbox("Curso *", options= cursoList, key="nuevo_curso")
 
             submitted = st.form_submit_button("Crear Alumno")
-            if submitted:
-                upsert(
-                    alumnosTabla,
-                    {
-                        "nombre": new_nombre,
-                        "apellido": new_apellido,
-                        "direccion": new_direccion,
-                        "localidad": new_localidad,
-                        "dni": new_dni,
-                        "NIA": new_nia,
-                        "codigo_postal": new_codigoPostal,
-                        "telefono": new_telefono,
-                        "email_alumno": new_email,
-                        "estado": "Activo",
-                        "tipoPractica": new_tipo_practica
-                    }, keys=["dni"]
-                )
-                st.success("Nuevo alumno agregado correctamente")
-                st.rerun()
+
+        if submitted:
+            # --- SECCIÓN DE VALIDACIÓN ---
+            campos_obligatorios = {
+                "Nombre": new_nombre,
+                "Apellido": new_apellido,
+                "DNI": new_dni,
+                "Email": new_email
+            }
+            
+            # Filtramos cuáles están vacíos
+            faltantes = [label for label, valor in campos_obligatorios.items() if not valor or valor.strip() == ""]
+            
+            if faltantes:
+                st.error(f"⚠️ Los siguientes campos son obligatorios: {', '.join(faltantes)}")
+            else:
+                # Si pasa la validación, procedemos al guardado
+                try:
+                    upsert(
+                        alumnosTabla,
+                        {
+                            "nombre": new_nombre,
+                            "apellido": new_apellido,
+                            "direccion": new_direccion,
+                            "localidad": new_localidad,
+                            "dni": new_dni,
+                            "NIA": new_nia,
+                            "codigo_postal": new_codigoPostal,
+                            "telefono": new_telefono,
+                            "email_alumno": new_email,
+                            "estado": "Sin Empresa",
+                            "tipoPractica": new_tipo_practica,
+                            "anio": ano,
+                            "curso": curso,
+                        }, keys=["dni"]
+                    )
+                    st.success("✅ Nuevo alumno agregado correctamente")
+                    st.session_state.form_registro_key += 1
+                    st.rerun()
+                except Exception as e:
+                    logError(f"{type(e).__name__}: {str(e)}", "Alumnos - Nuevo Alumno")
+                    st.error(f"Hubo un error al guardar: {e}")
     with tabBulk:
         st.write("📥 Cargar alumnos desde CSV")
 
@@ -353,10 +409,12 @@ with tab2:
             "NIA": [""],
             "telefono": [""],
             "email_alumno": [""],
-            "tipoPractica": ["Práctica Autogestionada | Práctica Asignada por el Centro"]
+            "anio": [aniosList[1:]],
+            "curso": [cursoList[1:]],
+            "ciclo": [ciclos],
+            "tipoPractica": ["Autogestionada | Asignada por el Centro"]
         })
-
-        sample_csv_path = Path("/tmp") / "alumnos_muestra.csv"
+        sample_csv_path = Path(tempfile.gettempdir()) / "alumnos_muestra.csv"
         sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
 
         with open(sample_csv_path, "rb") as f:
@@ -373,7 +431,7 @@ with tab2:
         uploaded_csv = st.file_uploader(
             "Subir archivo CSV (.csv)",
             type=["csv"],
-            key="upload_csv_alumnos"
+            key=f"upload_csv_{st.session_state.uploader_key}"
         )
 
         if uploaded_csv:
@@ -389,59 +447,64 @@ with tab2:
                     st.error("❌ El archivo debe incluir la columna 'dni'.")
                     st.stop()
 
-                if st.button("🚀 Crear alumnos desde CSV"):
-                    creados = 0
-                    errores = []
+                with st.spinner(f"Procesando alumos."):
+                    if st.button("🚀 Crear/Actualizar alumnos desde CSV"):
+                        creados = 0
+                        errores = []
 
-                    # Iterar filas
-                    for _, row in df_csv.iterrows():
+                        # Iterar filas
+                        for _, row in df_csv.iterrows():
 
-                        # 1️⃣ Saltar fila completamente vacía
-                        if not any(str(v).strip() for v in row.values):
-                            continue
+                            # 1️⃣ Saltar fila completamente vacía
+                            if not any(str(v).strip() for v in row.values):
+                                continue
 
-                        # 2️⃣ Normalizar DNI
-                        dni_raw = row.get("dni", "").strip()
-                        dni = re.sub(r"\.0+$", "", dni_raw)  # eliminar .0 si CSV viene de Excel
-                        dni = dni.strip()
+                            # 2️⃣ Normalizar DNI
+                            dni_raw = row.get("dni", "").strip()
+                            dni = re.sub(r"\.0+$", "", dni_raw)  # eliminar .0 si CSV viene de Excel
+                            dni = dni.strip()
 
-                        if not dni:
-                            errores.append("Fila sin DNI — omitida.")
-                            continue
+                            if not dni:
+                                errores.append("Fila sin DNI — omitida.")
+                                continue
 
-                        # 3️⃣ Construir payload limpio
-                        data = {
-                            "dni": dni,
-                            "nombre": row.get("nombre", "").strip(),
-                            "apellido": row.get("apellido", "").strip(),
-                            "direccion": row.get("direccion", "").strip(),
-                            "codigo_postal": row.get("codigo_postal", "").strip(),
-                            "localidad": row.get("localidad", "").strip(),
-                            "NIA": row.get("NIA", "").strip(),
-                            "telefono": row.get("telefono", "").strip(),
-                            "email_alumno": row.get("email_alumno", "").strip(),
-                            "estado": "Activo",
-                            "tipoPractica": row.get("tipoPractica", "").strip(),
-                        }
+                            data = {
+                                "dni": dni,
+                                "nombre": row.get("nombre", "").strip(),
+                                "apellido": row.get("apellido", "").strip(),
+                                "direccion": row.get("direccion", "").strip(),
+                                "codigo_postal": row.get("codigo_postal", "").strip(),
+                                "localidad": row.get("localidad", "").strip().upper(),
+                                "NIA": row.get("NIA", "").strip(),
+                                "telefono": row.get("telefono", "").strip(),
+                                "email_alumno": row.get("email_alumno", "").strip(),
+                                "estado": "Sin Empresa",
+                                "tipoPractica": row.get("tipoPractica", "").strip(),
+                                "anio": re.sub(r"['\"]", "", row.get("anio", "")).strip(),
+                                "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip(),
+                                "ciclo_formativo": re.sub(r"['\"]", "", row.get("ciclo", "")).strip()
+                            }
 
-                        # 4️⃣ Insert/update
-                        try:
-                            upsert(alumnosTabla, data, keys=["dni"])
-                            creados += 1
-                        except Exception as e:
-                            errores.append(f"DNI {dni}: {e}")
-
-                    # Resultado del proceso
-                    st.success(f"🎉 {creados} alumnos creados o actualizados correctamente.")
-
-                    if errores:
-                        st.warning("⚠️ Errores encontrados:")
-                        for err in errores:
-                            st.write("- " + err)
-
-                    st.rerun()
+                            # 4️⃣ Insert/update
+                            try:
+                                upsert(alumnosTabla, data, keys=["dni"])
+                                creados += 1
+                                    
+                            except Exception as e:
+                                errores.append(f"DNI {dni}: {e}")
+                        
+                        if errores:
+                            st.warning("⚠️ Errores encontrados:")
+                            for err in errores:
+                                st.write("- " + err)
+                        else:
+                            st.toast(f"🎉 {creados} alumnos creados o actualizados correctamente.")
+                            st.session_state.uploader_key += 1
+                            st.rerun()
 
             except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                logError(error_msg,"Alumnos - Leyendo CSV")
                 st.error(f"❌ Error leyendo el CSV: {e}")
 
 # -------------------------------------------------------------------
@@ -458,8 +521,8 @@ with tab3:
         st.warning("No hay alumnos registrados")
         st.stop()
 
-    df_alumnos = pd.DataFrame(alumnos)[["id","NIA", "nombre", "email_alumno"]]
-    emailsAlumnosClean =df_alumnos["email_alumno"].dropna().unique().tolist()
+    df_alumnos = pd.DataFrame(alumnos)[["id","NIA", "nombre", "email_alumno", "dni"]]
+    emailsAlumnosClean = [email for email in df_alumnos["email_alumno"].dropna().unique() if str(email).strip()]
     
     col1, col2 = st.columns([3, 2])
     with col2:
@@ -504,7 +567,7 @@ with tab3:
     for e in st.session_state.emailsList:
         st.markdown(f"- {e}")
 
-    subject_al = st.text_input("Asunto del email", value="Pasantías FP 2025/2026", key="subj_al")
+    subject_al = st.text_input("Asunto del email", value="Formaciones", key="subj_al")
     body_al = st.text_area(
         "Cuerpo del email",
         height=200,
@@ -519,24 +582,18 @@ with tab3:
         try:
             if send_email(email_sender, email_password, final_list, subject_al, body_al):
                 fecha_envio = datetime.now().isoformat()
-
                 for email in final_list:
                     alumno = df_alumnos[df_alumnos["email_alumno"] == email]
-
                     if not alumno.empty:
-                        alumno_id = alumno["NIA"].values[0]
+                        alumno_id = alumno["dni"].values[0]
                         upsert(
                             alumnoEstadosTabla,
                             {"alumno": alumno_id, "email_enviado": fecha_envio},
                             keys=["alumno"]
                         )
-                    else:
-                        upsert(
-                            contactoAlumnoTabla,
-                            {"email_alumno": email, "email_enviado": fecha_envio},
-                            keys=["email_alumno"]
-                        )
                 st.success("Emails enviados correctamente! 🚀")
         except Exception as e:
-            st.error(f"Falló el envío de mail: {e}")
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logError(error_msg,"Alumnos - Envío de Emails")
+            st.error(f"Falló el envío de email: {e}. Por favor contacte a antopiscio@gmail.com (soporte técnico).")
 

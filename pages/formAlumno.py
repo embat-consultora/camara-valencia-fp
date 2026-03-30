@@ -5,7 +5,7 @@ import json, uuid
 from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,alumnoEstadosTabla,ciclos, preferencias,max_file_size
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,tipoPracticas,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
@@ -49,17 +49,21 @@ with col1:
     email = input_requerido("Email *", key="email_alumno")
     dni = input_requerido("DNI/NIE *", key="dni_alumno")
     cp = input_requerido("Código Postal *", key="cp_alumno")
+    ano = st.selectbox("Año *", aniosList, key="ano_alumno")
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
     direccion = input_requerido("Dirección *", key="direccion_alumno")
-    localidad = input_requerido("Localidad *", key="localidad_alumno")
+    localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
+    sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
+    nuss = st.text_input("NUSS", key="nuss_alumno")
+    curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
-st.subheader("Tipo de práctica")
+st.subheader("Tipo de formación")
 tipo_practica = st.radio(
-    "Indica si tu práctica es autogestionada o si prefieres que sea asignada por el centro:",
-    ["Práctica autogestionada", "Práctica asignada por el centro"],
+    "Indica si tu formación es autogestionada o si prefieres que sea asignada por el centro:",
+    tipoPracticas,
     index=None,
     horizontal=False
 )
@@ -87,7 +91,8 @@ if not ciclo:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
 # Subida de CV
 st.subheader("Subir CV")
-cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX/ODT)", type=["pdf", "doc", "docx", "odt"], accept_multiple_files=False)
+st.caption("El nombre del archivo debe seguir el formato: Nombre_Apellidos_CV (ejemplo: Juan_Perez_12345678A.pdf)")
+cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX)", type=["pdf", "doc", "docx"], accept_multiple_files=False)
 cv_too_big = False
 if cv_file is not None:
     size_bytes = file_size_bytes(cv_file)
@@ -109,6 +114,7 @@ if not required_ok(dni): missing.append("DNI/NIE")
 if not required_ok(direccion): missing.append("Dirección")
 if not required_ok(cp): missing.append("CP")
 if not required_ok(localidad): missing.append("Localidad")
+
 if vehiculo not in ("Sí", "No"): missing.append("Dispones de vehículo")
 if not ciclo: missing.append("Ciclo formativo")
 if cv_file is None: missing.append("CV")
@@ -129,6 +135,7 @@ if submit:
                 "nombre": nombre.strip(),
                 "apellido": apellidos.strip(),
                 "email_alumno": email.strip().lower(),
+                "sexo": sexo,
                 "dni": dni.strip().upper(),
                 "direccion": direccion.strip(),
                 "codigo_postal": cp.strip(),
@@ -138,6 +145,9 @@ if submit:
                 "preferencias_fp": preferencias_seleccionadas,
                 "estado":estadosAlumno[0],
                 "tipoPractica": tipo_practica,
+                "nuss": nuss.strip(),
+                "anio": ano.strip(),
+                "curso": curso.strip()
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
         upsert(
@@ -148,26 +158,21 @@ if submit:
         # Subir CV a Drive como {dni}_cv.ext
         try:
             if cv_file:
-                original_name = cv_file.name
-                ext = ""
-                if "." in original_name:
-                    ext = "." + original_name.split(".")[-1].lower()
-                final_name = f"{payload['dni']}_cv{ext}"
 
-                tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{final_name}"
+                tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{cv_file.name}"
                 with open(tmp_path, "wb") as f:
                     f.write(cv_file.getbuffer())
                 
                 # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
                 folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
-                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,payload["dni"]+"-cv" )
+                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,cv_file.name )
                 if isinstance(res, dict):
                     file_id = res.get("id")
                     link = res.get("webViewLink") or res.get("webContentLink")
                 else:
                     file_id, link = str(res), None
 
-                st.success("¡Formulario enviado correctamente!")
+                st.success("¡Formulario enviado correctamente!, ya puedes cerrar la página.")
                 if link:
                     st.success(f"CV subido. [Abrir en Drive]({link})")
                 else:

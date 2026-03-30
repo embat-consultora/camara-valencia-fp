@@ -11,6 +11,8 @@ def load_env_once():
 
 def make_sidebar():
     load_env_once()
+    rol = st.session_state.get("rol", "admin")
+    user = st.session_state.get("username")
     with st.sidebar:
             st.markdown(
             """
@@ -23,26 +25,41 @@ def make_sidebar():
             unsafe_allow_html=True
         )
             st.caption(f"Entorno: **{st.session_state['env']}**")
+            st.caption(f"Rol: **{rol}**")
+            st.caption(f"Usuario: **{user}**")
             st.title("Menú")
             st.write("")
             st.write("")
-
             if st.session_state.get("logged_in", False):
-                st.page_link("pages/dashboard.py", label="Panel de Control")
-                st.page_link("pages/matchs.py", label="Matchs")
-                st.page_link("pages/practicas.py", label="Lista Prácticas")
-                st.page_link("pages/autogestionada.py", label="P. Autogestionada")
-                st.page_link("pages/empresas.py", label="Empresas")
-                st.page_link("pages/alumnos.py", label="Alumnos")
-                st.write("")
-                st.write("")
-
+                if rol == "admin":
+                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
+                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
+                    st.page_link("pages/matchs.py", label="Matchs")
+                    
+                    st.page_link("pages/empresas.py", label="Empresas")
+                    st.page_link("pages/alumnos.py", label="Alumnos")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.write("")
+                    st.write("")
+                if rol == "gestor":
+                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
+                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "tutor":
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "tutorCentro":
+                    st.page_link("pages/practicas.py", label="Formación en Empresa")
+                    st.page_link("pages/documentacion.py", label="Documentación")
+                if rol == "empresa":
+                    st.page_link("pages/empresaDetails.py", label="Mi Empresa")
+                    st.page_link("pages/documentacion.py", label="Documentación")
                 if st.button(logoutButton):
                     logout()
 
             elif get_current_page_name() != "streamlit_app":
-                # If anyone tries to access a secret page without being logged in,
-                # redirect them to the login page
                 st.switch_page("streamlit_app.py")
 
 def logout():

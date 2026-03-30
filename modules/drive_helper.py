@@ -5,83 +5,58 @@ from google.oauth2 import service_account
 import mimetypes
 
 def upload_to_drive(file_name, folder_id, folderName, nombre_archivo_drive=None):
-    """
-    Sube un archivo a Google Drive dentro de una subcarpeta (folderName).
-    Si la subcarpeta no existe, la crea.
-    
-    Parámetros:
-      file_name (str): ruta local del archivo a subir
-      folder_id (str): ID de la carpeta padre en Drive
-      folderName (str): nombre de la subcarpeta (por ejemplo, email del alumno)
-      nombre_archivo_drive (str): nombre que tendrá el archivo en Drive (opcional)
-    """
     # --- Autenticación ---
     credentials_info = st.secrets.connections.gcs
     credentials = service_account.Credentials.from_service_account_info(credentials_info)
     service = build("drive", "v3", credentials=credentials)
 
-    # --- Verificar que folder_id sea una carpeta válida ---
-    meta = service.files().get(
-        fileId=folder_id,
-        fields="id,name,mimeType",
-        supportsAllDrives=True
-    ).execute()
+    # --- Verificar carpeta padre ---
+    meta = service.files().get(fileId=folder_id, fields="id,mimeType", supportsAllDrives=True).execute()
     if meta.get("mimeType") != "application/vnd.google-apps.folder":
         raise RuntimeError("El ID provisto no es una carpeta.")
 
-    # --- Buscar si ya existe una carpeta con el nombre indicado ---
-    query = (
-        f"'{folder_id}' in parents and "
-        f"name = '{folderName}' and "
-        f"mimeType = 'application/vnd.google-apps.folder' and "
-        f"trashed = false"
-    )
+    # --- Buscar/Crear subcarpeta (folderName) ---
+    query_folder = f"'{folder_id}' in parents and name = '{folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results_folder = service.files().list(q=query_folder, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
 
-    results = service.files().list(
-        q=query,
-        spaces="drive",
-        fields="files(id, name)",
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True
-    ).execute()
-
-    if results.get("files"):
-        # Ya existe la carpeta
-        email_folder_id = results["files"][0]["id"]
+    if results_folder.get("files"):
+        email_folder_id = results_folder["files"][0]["id"]
     else:
-        # Crear nueva carpeta
-        folder_metadata = {
-            "name": folderName,
-            "mimeType": "application/vnd.google-apps.folder",
-            "parents": [folder_id]
-        }
-        folder = service.files().create(
-            body=folder_metadata,
-            fields="id",
-            supportsAllDrives=True
-        ).execute()
+        folder_metadata = {"name": folderName, "mimeType": "application/vnd.google-apps.folder", "parents": [folder_id]}
+        folder = service.files().create(body=folder_metadata, fields="id", supportsAllDrives=True).execute()
         email_folder_id = folder["id"]
 
-    # --- Subir el archivo dentro de la carpeta ---
+    # --- Lógica de Sobrescritura ---
+    nombre_final = nombre_archivo_drive or file_name.split("/")[-1]
+    
+    # 1. Buscar si el archivo ya existe EN ESA carpeta específica
+    query_file = f"'{email_folder_id}' in parents and name = '{nombre_final}' and trashed = false"
+    results_file = service.files().list(q=query_file, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+    
     mime_type, _ = mimetypes.guess_type(file_name)
     media = MediaFileUpload(file_name, mimetype=mime_type, resumable=True)
 
-    # Usar el nombre personalizado si se pasa, o el nombre del archivo local
-    nombre_final = nombre_archivo_drive or file_name.split("/")[-1]
-
-    file_metadata = {
-        "name": nombre_final,
-        "parents": [email_folder_id]
-    }
-
-    uploaded = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink, parents",
-        supportsAllDrives=True
-    ).execute()
+    if results_file.get("files"):
+        # 2. SI EXISTE: Actualizar (Pisamos el archivo)
+        file_id = results_file["files"][0]["id"]
+        uploaded = service.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True
+        ).execute()
+    else:
+        # 3. NO EXISTE: Crear nuevo
+        file_metadata = {"name": nombre_final, "parents": [email_folder_id]}
+        uploaded = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True
+        ).execute()
 
     return uploaded["id"]
+
 
 def list_drive_files(folder_name):
     files = []
@@ -122,6 +97,64 @@ def list_drive_files(folder_name):
     return files,folder_id
 
 
+def create_drive_folder_practica(dni, nombre, apellido, empresa, folder_id):
+    credentials_info = st.secrets.connections.gcs
+    credentials = service_account.Credentials.from_service_account_info(credentials_info)
+    service = build("drive", "v3", credentials=credentials)
+
+    # --- 1. Definir nombres de carpetas ---
+    # Carpeta Destino: Practica
+    nombre_folder_practica = f"{apellido}_{nombre}_{dni}_practica_{empresa['nombre']}".strip()
+    # Carpeta Origen: Legajo Alumno (Asegúrate que coincida con cómo guardaste el CV antes)
+    nombre_folder_alumno = f"Alumno - {nombre}_{apellido}_{dni}".strip()
+    st.write(nombre_folder_practica)
+    try:
+        # --- 2. Obtener o Crear Carpeta de la Práctica ---
+        q_dest = f"name = '{nombre_folder_practica}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        res_dest = service.files().list(q=q_dest, supportsAllDrives=True, includeItemsFromAllDrives=True).execute().get("files", [])
+        
+        if res_dest:
+            dest_id = res_dest[0]["id"]
+        else:
+            meta_dest = {
+                "name": nombre_folder_practica,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [folder_id]
+            }
+            dest_id = service.files().create(body=meta_dest, fields="id", supportsAllDrives=True).execute()["id"]
+
+        # --- 3. Buscar el CV en la carpeta del Alumno ---
+        q_orig = f"name = '{nombre_folder_alumno}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        res_orig = service.files().list(q=q_orig, supportsAllDrives=True, includeItemsFromAllDrives=True).execute().get("files", [])
+
+        if res_orig:
+            orig_id = res_orig[0]["id"]
+            # Buscamos archivos que contengan "CV" en el nombre dentro de esa carpeta
+            q_cv = f"'{orig_id}' in parents and name contains 'CV' and trashed = false"
+            cv_files = service.files().list(q=q_cv, supportsAllDrives=True, includeItemsFromAllDrives=True).execute().get("files", [])
+
+            if cv_files:
+                cv_id = cv_files[0]["id"]
+                cv_nombre = cv_files[0]["name"]
+                
+                # --- 4. Copiar el archivo (Server-side copy) ---
+                # Verificamos si ya existe para no duplicar cada vez que corra el script
+                q_existe = f"'{dest_id}' in parents and name = 'CV_IMPORTADO_{cv_nombre}' and trashed = false"
+                existe = service.files().list(q=q_existe, supportsAllDrives=True).execute().get("files", [])
+                
+                if not existe:
+                    body_copy = {
+                        "name": cv_nombre,
+                        "parents": [dest_id]
+                    }
+                    service.files().copy(fileId=cv_id, body=body_copy, supportsAllDrives=True).execute()
+        
+        return dest_id
+
+    except Exception as e:
+        st.error(f"Error en setup_practica_con_cv: {e}")
+        return None
+    
 def delete_drive_file(file_id: str, file_name: str):
     """
     Elimina un archivo de Google Drive por su ID.

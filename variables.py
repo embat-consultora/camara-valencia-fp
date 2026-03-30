@@ -9,18 +9,18 @@ amarillo=""
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
-estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelado"]
+estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelada", "Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
-
+forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre"]
 #fases
-fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Pasantía en progreso", "Finalizada", "Evaluación Enviada"] 
-fasesPractica = ["Documentación Pedida", "Documentación Firmada", "Pasantía en progreso", "Finalizada", "Cancelada"]
+fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Formación en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Formación en progreso", "Finalizada", "Evaluación Enviada"] 
+fasesPractica = ["Documentación Pedida", "Documentación Firmada", "Formación en progreso", "Finalizada", "Cancelada"]
 faseColPractica = {
     "Documentación Pedida": "documentacion_pedida",
     "Documentación Firmada": "documentacion_firmada",
-    "Pasantía en progreso": "en_progreso",
-    "Finalizada": "fp_finalizada",
+    "Formación en progreso": "en_progreso",
+    "Finalizada": "finalizada",
     "Cancelada": "cancelada"
 }
 fase2colEmpresa = {
@@ -29,7 +29,7 @@ fase2colEmpresa = {
     "Documentación Completa": "documentacion_completa",
     "Match en progreso": "match_fp",
     "Alumnos asignados": "fp_asignada",
-    "Pasantía en progreso": "fp_enprogreso",
+    "Formación en progreso": "fp_enprogreso",
     "Finalizada": "fp_finalizada",
     "Evaluación Enviada": "evaluacion_enviada"
 }
@@ -44,6 +44,7 @@ formTabla="forms"
 formFieldsTabla="form_fields"
 empresasTabla="empresas"
 alumnosTabla="alumnos"
+logsTabla="error_logs"
 answersTabla="form_answers"
 necesidadFP="oferta_fp"
 empresaEstadosTabla="empresa_estados"
@@ -51,9 +52,13 @@ contactoEmpresaTabla="contacto_empresas"
 alumnoEstadosTabla="alumno_estados"
 contactoAlumnoTabla="contacto_alumnos"
 practicaTabla="practicas_fp"
+practicaCanceladaTabla="practicas_canceladas"
 practicaEstadosTabla="practica_estados"
 tutoresTabla="tutores"
-
+tutoresCentroTabla="tutor_centro"
+feedbackFormsTabla="feedback_forms"
+feedbackResponseTabla="feedback_respuestas"
+gestoresTabla="gestores"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive
@@ -65,7 +70,7 @@ bodyEmailsEmpresa= f"""Hola,
 
 Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
-Llena esta formulario si tiene alguna pasantia u oferta: {"{{form_link}}"}
+Llena esta formulario si tiene alguna formación u oferta: {"{{form_link}}"}
 
 Saludos,
 Andrea
@@ -74,7 +79,7 @@ bodyEmailsAlumno= f"""Hola,
 
 Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
-Llena esta formulario si te interesaría participar en alguna pasantía: {"{{form_link}}"}
+Llena esta formulario si te interesaría participar en alguna Formación: {"{{form_link}}"}
 
 Saludos,
 Andrea
@@ -99,6 +104,296 @@ opciones_motivo = [
     ]
 
 tipoPracticas= [
-                    "Práctica Autogestionada",
-                    "Práctica Asignada por el Centro"
+                    "Autogestionada",
+                    "Asignada por el centro"
                 ]
+sectorEmpresa = [
+  "Comercio minorista y mayorista",
+  "Turismo y hostelería",
+  "Servicios profesionales y empresariales",
+  "Transporte, logística y actividades portuarias",
+  "Industria manufacturera",
+  "Automoción, maquinaria y bienes de equipo",
+  "Industria cerámica",
+  "Metalurgia y productos metálicos",
+  "Químico y materias plásticas",
+  "Agroalimentario y transformación de alimentos",
+  "Agricultura y ganadería",
+  "Tecnología, innovación y startups",
+  "Energías renovables y sostenibilidad",
+  "Construcción e infraestructuras",
+  "Educación, salud y servicios sociales",
+  "Otros"
+]
+
+localidades = [
+  "ADEMUZ",
+  "ADOR",
+  "AGULLENT",
+  "AIELO DE MALFERIT",
+  "AIELO DE RUGAT",
+  "ALAQUAS",
+  "ALBAIDA",
+  "ALBAL",
+  "ALBALAT DE LA RIBERA",
+  "ALBALAT DELS SORELLS",
+  "ALBALAT DELS TARONGERS",
+  "ALBERIC",
+  "ALBORACHE",
+  "ALBORAYA",
+  "ALBUIXECH",
+  "ALCANTERA DE XUQUER",
+  "ALCASSER",
+  "ALCUBLAS",
+  "ALDAIA",
+  "ALFAFAR",
+  "ALFARA DE ALGIMIA",
+  "ALFARA DEL PATRIARCA",
+  "ALFARP",
+  "ALFARRASI",
+  "ALFAUIR",
+  "ALGAR DE PALANCIA",
+  "ALGEMESI",
+  "ALGIMIA DE ALFARA",
+  "ALGINET",
+  "ALMASSERA",
+  "ALMISERA",
+  "ALMOINES",
+  "ALMUSSAFES",
+  "ALPUENTE",
+  "ALZIRA",
+  "ANDILLA",
+  "ANNA",
+  "ANTELLA",
+  "ARAS DE ALPUENTE",
+  "ATZENETA D'ALBAIDA",
+  "AYORA",
+  "BARX",
+  "BARXETA",
+  "BELGIDA",
+  "BELLREGUARD",
+  "BELLUS",
+  "BENAGEBER",
+  "BENAGUASIL",
+  "BENAVITES",
+  "BENEIXIDA",
+  "BENETUSSER",
+  "BENIARJO",
+  "BENIATJAR",
+  "BENICOLET",
+  "BENIFAIO",
+  "BENIFAIRO DE LES VALLS",
+  "BENIFAIRO DE LA VALLDIGNA",
+  "BENIFLA",
+  "BENIGANIM",
+  "BENIMODO",
+  "BENIMUSLEM",
+  "BENIPARRELL",
+  "BENIRREDRA",
+  "BENISANO",
+  "BENISODA",
+  "BENISUERA",
+  "BETERA",
+  "BICORP",
+  "BOCAIRENT",
+  "BOLBAITE",
+  "BONREPOS I MIRAMBELL",
+  "BUFALI",
+  "BUGARRA",
+  "BUÑOL",
+  "BURJASSOT",
+  "CALLES",
+  "CAMPORROBLES",
+  "CANALS",
+  "CANET D'EN BERENGUER",
+  "CARCAIXENT",
+  "CARCER",
+  "CARLET",
+  "CARRICOLA",
+  "CASAS ALTAS",
+  "CASAS BAJAS",
+  "CASINOS",
+  "CASTELLO DE RUGAT",
+  "CASTELLONET DE LA CONQUESTA",
+  "CASTIELFABIB",
+  "CATADAU",
+  "CATARROJA",
+  "CAUDETE DE LAS FUENTES",
+  "CERDA",
+  "CHELLA",
+  "CHELVA",
+  "CHERA",
+  "CHESTE",
+  "CHIVA",
+  "CHULILLA",
+  "COFRENTES",
+  "CORBERA",
+  "CORTES DE PALLAS",
+  "COTES",
+  "CULLERA",
+  "DAIMUS",
+  "DOMEÑO",
+  "DOS AGUAS",
+  "EMPERADOR",
+  "ENGUERA",
+  "ESTIVELLA",
+  "ESTUBENY",
+  "FAURA",
+  "FAVARA",
+  "FOIOS",
+  "FONTANARS DELS ALFORINS",
+  "FORTALENY",
+  "FUENTERROBLES",
+  "GANDIA",
+  "GATOVA",
+  "GAVARDA",
+  "GENOVES",
+  "GESTALGAR",
+  "GILET",
+  "GODELLA",
+  "GODELLETA",
+  "GUADASEQUIES",
+  "GUADASSUAR",
+  "GUARDAMAR",
+  "HIGUERUELAS",
+  "JALANCE",
+  "JARAFUEL",
+  "LA FONT DE LA FIGUERA",
+  "LA FONT D'EN CARROS",
+  "LA GRANJA DE LA COSTERA",
+  "LA POBLA DE FARNALS",
+  "LA POBLA DE VALLBONA",
+  "LA POBLA DEL DUC",
+  "LA POBLA LLARGA",
+  "LA YESA",
+  "L'ALCUDIA",
+  "L'ALCUDIA DE CRESPINS",
+  "L'ALQUERIA DE LA COMTESSA",
+  "L'ELIANA",
+  "L'ENOVA",
+  "LLANERA DE RANES",
+  "LLAURI",
+  "LLIRIA",
+  "LLOCNOU DE SANT JERONI",
+  "LLOMBAI",
+  "LLOSA DE RANES",
+  "LLUTXENT",
+  "L'OLLERIA",
+  "LORIGUILLA",
+  "LOSA DEL OBISPO",
+  "LUGAR NUEVO DE FENOLLET",
+  "LUGAR NUEVO DE LA CORONA",
+  "MACASTRE",
+  "MANISES",
+  "MANUEL",
+  "MARINES",
+  "MASALAVES",
+  "MASSALFASSAR",
+  "MASSAMAGRELL",
+  "MASSANASSA",
+  "MELIANA",
+  "MILLARES",
+  "MIRAMAR",
+  "MISLATA",
+  "MOIXENT",
+  "MONCADA",
+  "MONTSERRAT",
+  "MONTAVERNER",
+  "MONTESA",
+  "MONTICHELVO",
+  "MONTROY",
+  "MUSEROS",
+  "NAQUERA",
+  "NAVARRES",
+  "NOVELE",
+  "OLIVA",
+  "OLOCAU",
+  "ONTINYENT",
+  "OTOS",
+  "PAIPORTA",
+  "PALMA DE GANDIA",
+  "PALMERA",
+  "PALOMAR",
+  "PATERNA",
+  "PEDRALBA",
+  "PETRES",
+  "PICANYA",
+  "PICASSENT",
+  "PILES",
+  "PINET",
+  "POLINYA DE XUQUER",
+  "POTRIES",
+  "PUÇOL",
+  "PUEBLA DE SAN MIGUEL",
+  "PUIG",
+  "QUART DE LES VALLS",
+  "QUART DE POBLET",
+  "QUARTELL",
+  "QUATRETONDA",
+  "QUESA",
+  "RAFELBUNYOL",
+  "RAFELCOFER",
+  "RAFELGUARAF",
+  "RAFOL DE SALEM",
+  "REAL DE GANDIA",
+  "REAL DE MONTROI",
+  "REQUENA",
+  "RIBA-ROJA DE TURIA",
+  "RIOLA",
+  "ROCAFORT",
+  "ROTGLA I CORBERA",
+  "ROTOVA",
+  "RUGAT",
+  "SAGUNTO",
+  "SALEM",
+  "SAN ANTONIO DE BENAGEBER",
+  "SAN JUAN DE ENOVA",
+  "SEDAVI",
+  "SEGART",
+  "SELLENT",
+  "SEMPERE",
+  "SENYERA",
+  "SERRA",
+  "SIETE AGUAS",
+  "SILLA",
+  "SIMAT DE LA VALLDIGNA",
+  "SINARCAS",
+  "SOLLANA",
+  "SOT DE CHERA",
+  "SUECA",
+  "SUMACARCER",
+  "TAVERNES BLANQUES",
+  "TAVERNES DE LA VALLDIGNA",
+  "TERESA DE COFRENTES",
+  "TERRATEIG",
+  "TITAGUAS",
+  "TORREBAJA",
+  "TORRELLA",
+  "TORRENT",
+  "TORRES TORRES",
+  "TOUS",
+  "TUEJAR",
+  "TURIS",
+  "UTIEL",
+  "VALENCIA",
+  "VALLADA",
+  "VALLANCA",
+  "VALLES",
+  "VENTA DEL MORO",
+  "VILAMARXANT",
+  "VILLALONGA",
+  "VILLANUEVA DE CASTELLON",
+  "VILLAR DEL ARZOBISPO",
+  "VILLARGORDO DEL CABRIEL",
+  "VINALESA",
+  "XATIVA",
+  "XERACO",
+  "XERESA",
+  "XIRIVELLA",
+  "YATOVA",
+  "ZARRA"
+]
+
+linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
+aniosList= ("Seleccionar", "2024-2025","2025-2026", "2026-2027","2027-2028","2028-2029")
+cursoList= ("Seleccionar","1ro","2do")

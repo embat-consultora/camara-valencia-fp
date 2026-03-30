@@ -1,9 +1,9 @@
 import streamlit as st
 from datetime import datetime
-import json, re
+import json
 from modules.forms_helper import required_ok, slug
-from modules.data_base import upsert,add
-from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla
+from modules.data_base import upsert,add, upsertCustome
+from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
 # ---------------------------------
 # Config
 # ---------------------------------
@@ -51,9 +51,10 @@ st.write("DATOS DE LA EMPRESA Y PERSONA DE CONTACTO")
 col1, col2 = st.columns(2)
 with col1:
     nombre_empresa = input_requerido("Nombre de la empresa *", key="nombre_empresa")
+    sector = st.selectbox("Sector de la empresa *", (sectorEmpresa), key="sector")
     direccion = input_requerido("Dirección *", key="direccion")
     cp = input_requerido("Código Postal *", key="cp")
-    localidad = input_requerido("Localidad *", key="localidad")
+    localidad = st.selectbox("Localidad *", (localidades), key="localidad")
     cif = input_requerido("CIF *", key="cif")
     horario_inicio = st.time_input("Horario Empresa inicio *", step=900, key="inicio")
     pagina_web = st.text_input("Página web")
@@ -209,6 +210,7 @@ if submit:
         "nif_responsable_legal": nie_responsable.strip(),
         "horario": str(horario_inicio) + " - " + str(horario_fin),
         "pagina_web": pagina_web.strip(),
+        "sectorEmpresa": sector.strip()
 
     }
     ofertaPayload={
@@ -230,7 +232,7 @@ if submit:
                 {"empresa": res_emp.data[0]["CIF"], "form_completo": datetime.now().isoformat()},
                 keys=["empresa"],
             )
-        tutor = upsert(tutoresTabla, {
+        tutor = upsertCustome(tutoresTabla, {
             "cif_empresa": res_emp.data[0]["CIF"],
             "nombre": nombre_tutor.strip(),
             "nif": nif_tutor.strip().upper(),
@@ -239,5 +241,10 @@ if submit:
         }, keys=["nif"])
         ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
         oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+        usuario = upsertCustome(usuariosTabla, {
+            "email": res_emp.data[0]["CIF"],
+            "password": res_emp.data[0]["CIF"],
+            "rol": "empresa",
+        }, keys=["email"])
 
     st.success("✅ ¡Formulario de empresa enviado correctamente!")
