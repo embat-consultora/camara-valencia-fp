@@ -80,13 +80,13 @@ def show_documentacion():
     with col1:
         st.subheader("Guía de Onboarding")
         st.write("Claves para recibir al aprendiz y conectar desde el primer día.")
-        url_onboarding = 'https://drive.google.com/file/d/1kkiQhUtY0dGd-W5vH16wlKWPRB6EpmCP/view?usp=drive_link'
+        url_onboarding = 'https://drive.google.com/file/d/1kkiQhUtY0dGd-W5vH16wlKWPRB6EpmCP/preview?usp=drive_link'
         st.link_button("Ver Manual Onboarding", url_onboarding)
 
     with col2:
         st.subheader("Guía de Seguimiento")
         st.write("Herramientas de feedback, resolución de conflictos y evaluación.")
-        url_seguimiento = "https://drive.google.com/file/d/1l8tqTFbNsz07AqIvbGSoA-RWDoSkR30C/view?usp=drive_link"
+        url_seguimiento = "https://drive.google.com/file/d/1l8tqTFbNsz07AqIvbGSoA-RWDoSkR30C/preview?usp=drive_link"
         st.link_button("Ver Manual Seguimiento", url_seguimiento)
 
     # --- PIE DE PÁGINA ---

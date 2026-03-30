@@ -121,15 +121,20 @@ if "force_reload" not in st.session_state:
 if "grid_version" not in st.session_state:
     st.session_state.grid_version = 0
 
+@st.cache_data(show_spinner="Cargando datos. Por favor espere..")
+def get_data_cached():
+    return get_alumnos_con_practicas_consolidado()
+
 def load_data():
     if st.session_state["data_loaded"] or not st.session_state["force_reload"]:
         with st.spinner("Cargando datos desde la base..."):
-            st.session_state["practicas_data"] = get_alumnos_con_practicas_consolidado()
+            st.session_state["practicas_data"] = get_data_cached()
             st.session_state["data_loaded"] = True
             st.session_state["force_reload"] = False
 
 st.title("🚀 Panel de Gestión de Formaciones")
-load_data()
+with st.spinner("Cargando datos desde la base..."):
+    load_data()
 nombres_tabs = ["🎓 Alumnos", "🏢 Ofertas por Ciclo"]
 if rol_usuario == "admin":
     nombres_tabs.append("⚙️ Configuración")
