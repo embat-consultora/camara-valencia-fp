@@ -55,6 +55,7 @@ def make_sidebar():
                     st.page_link("pages/documentacion.py", label="Documentación")
                 if rol == "empresa":
                     st.page_link("pages/empresaDetails.py", label="Mi Empresa")
+                    st.page_link("pages/documentacion.py", label="Documentación")
                 if st.button(logoutButton):
                     logout()
 
