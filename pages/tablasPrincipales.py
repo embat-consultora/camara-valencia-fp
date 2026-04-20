@@ -447,6 +447,7 @@ with tab_alumnos:
                 key=f"grid_alumnos_v_{st.session_state.grid_version}"
                 
             )
+            st.write('anto2')
             if st.button("💾 Guardar Cambios Alumnos", type="primary",width='stretch'):
                 df_grid = grid_response['data']
                 with st.spinner("Guardando datos"):
