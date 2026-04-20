@@ -441,7 +441,7 @@ with tab_alumnos:
                 df_display,
                 gridOptions=gridOptions,
                 allow_unsafe_jscode=True,
-                update_mode=GridUpdateMode.MODEL_CHANGED,
+                update_on='modelChanged',
                 theme='balham',
                 height=600,
                 key=f"grid_alumnos_v_{st.session_state.grid_version}"
