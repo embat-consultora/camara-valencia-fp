@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getTutores,getGestore, getTutoresEmpresa,updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
+from modules.data_base import getTutores,getGestore,updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 from datetime import datetime
 # Configuración inicial
 apply_page_config()
@@ -208,7 +208,6 @@ with tab_alumnos:
                     })
 
         json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
-
         if not df_raw.empty:
             def crear_acronimo(nombre):
                 if not nombre or pd.isna(nombre): return ""
@@ -436,18 +435,17 @@ with tab_alumnos:
                     gb.configure_column(col, hide=True)
 
             gridOptions = gb.build()
-
             grid_response = AgGrid(
                 df_display,
                 gridOptions=gridOptions,
                 allow_unsafe_jscode=True,
-                update_mode=GridUpdateMode.MODEL_CHANGED,
-                theme='balham',
+                update_on='modelChanged',
+                theme='alpine',
                 height=600,
                 key=f"grid_alumnos_v_{st.session_state.grid_version}"
                 
             )
-            if st.button("💾 Guardar Cambios Alumnos", type="primary", use_container_width=True):
+            if st.button("💾 Guardar Cambios Alumnos", type="primary",width='stretch'):
                 df_grid = grid_response['data']
                 with st.spinner("Guardando datos"):
                     try:
@@ -574,7 +572,7 @@ with tab_ofertas:
                         df_ciclo_tab,
                         column_config=col_config_oferta,
                         key=f"editor_ofertas_{nombre_ciclo}",
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True
                     )
 
@@ -643,7 +641,7 @@ def fragment_gestion_gestores():
             },
             num_rows="dynamic",
             key="editor_gestores",
-            use_container_width=True,
+            width='stretch',
             disabled=st.session_state.gestores_guardados
         )
         submit_btn = st.form_submit_button("Actualizar Gestores",disabled=st.session_state.gestores_guardados)
@@ -693,7 +691,7 @@ def fragment_gestion_tutores():
             column_config={"id": None, "nombre": "Nombre", "email": "Email","telefono": "Teléfono"},
             num_rows="dynamic",
             key="editor_tutores",
-            use_container_width=True,
+            width='stretch',
             disabled=st.session_state.tutores_guardados
         )
         submit_btn = st.form_submit_button("Actualizar Tutores",disabled=st.session_state.tutores_guardados)

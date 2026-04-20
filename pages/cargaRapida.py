@@ -79,7 +79,7 @@ if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
     )
 
 # 4. BOTÓN DE ACCIÓN
-if st.button("🚀 Guardar y Vincular Práctica", use_container_width=True):
+if st.button("🚀 Guardar y Vincular Práctica", width='stretch'):
     if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
         st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
     else:

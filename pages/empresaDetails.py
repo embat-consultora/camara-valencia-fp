@@ -141,7 +141,7 @@ with tabOferta:
                             {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
                             for ciclo, valores in ciclos.items()]
                         df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
-                        st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
+                        st.dataframe(df_ciclos, hide_index=True, width='stretch')
 
                     if puestos:
                         st.write("🧩 Puestos por ciclo formativo:")
@@ -203,7 +203,7 @@ with tabTutores:
                             },
                             num_rows="dynamic",
                             key="editor_tutores",
-                            use_container_width=True
+                            width='stretch'
                         )
         if st.button("Actualizar Tutores"):
             cambios = st.session_state["editor_tutores"]
@@ -357,7 +357,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
             col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
             with col_cal1:
                 url_generador = linkCalendar
-                st.link_button("🛠️ Generar Nuevo Calendario", url_generador, use_container_width=True)
+                st.link_button("🛠️ Generar Nuevo Calendario", url_generador, width='stretch')
                 
                 st.info("Sube el calendario en formato imagen (PNG/JPG).")
                 uploaded_cal = st.file_uploader(
@@ -397,7 +397,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'),width='stretch')
                 else:
                     st.markdown(
                         """
@@ -425,7 +425,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                             unsafe_allow_html=True
                         )
                 
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
         else:
             st.write("No han subido calendario aun")
         pass

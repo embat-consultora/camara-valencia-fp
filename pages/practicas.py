@@ -445,7 +445,7 @@ def mostrar_anexos():
         df_original,
         key=f"editor_anexos_{st.session_state.df_key}",
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
         # Bloqueamos lo que no queremos que toquen
         disabled=["ID", "Alumno", "Empresa", "Estado", "Ciclo"],
         column_config={
@@ -556,7 +556,7 @@ def mostrar_dashboard():
         st.write("### ⚡ Acciones")
         st.info("Enviar recordatorio por correo a todos los alumnos pendientes de esta lista.")
         
-        if st.button("🔔 Enviar Recordatorio Masivo", type="primary", use_container_width=True):
+        if st.button("🔔 Enviar Recordatorio Masivo", type="primary", width='stretch'):
             if not df_pendientes.empty:
                 with st.spinner("Ejecutando AppScript..."):
                     # Aquí llamarías a tu función de AppScript pasándole los emails
@@ -755,7 +755,7 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
                     key=f"input_fb_{practicaId}"
                 )
                 
-                if st.button("💾 Publicar Comentario", use_container_width=True):
+                if st.button("💾 Publicar Comentario", width='stretch'):
                     if nuevo_comentario.strip():
                         # Crear el nuevo registro
                         nuevo_registro = {
@@ -846,7 +846,7 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
                 disabled=not puede_editar, key="fp_pyme_contacto")     
 
         if puede_editar:
-            if st.button("💾 Guardar", use_container_width=True):
+            if st.button("💾 Guardar",width='stretch'):
                 nuevo_registro = {
                     "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "tutorCentro": tutor_actual, 
@@ -884,7 +884,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
             col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
             with col_cal1:
                 url_generador = linkCalendar
-                st.link_button("🛠️ Generar Nuevo Calendario", url_generador, use_container_width=True)
+                st.link_button("🛠️ Generar Nuevo Calendario", url_generador, width='stretch')
                 
                 st.info("Sube el calendario en formato imagen (PNG/JPG).")
                 uploaded_cal = st.file_uploader(
@@ -924,7 +924,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
                 else:
                     st.markdown(
                         """
@@ -953,7 +953,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                        st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), use_container_width=True)
+                        st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
             else:
                 st.write("No han subido calendario aun")
         pass

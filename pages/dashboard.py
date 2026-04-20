@@ -242,7 +242,7 @@ with tab1:
     else:
         st.dataframe(
             df_emp_display,
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
@@ -295,7 +295,7 @@ with tab1:
     if df_prac_display.empty:
         st.info("No hay prácticas para esta empresa.")
     else:
-            st.dataframe(df_prac_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_prac_display, width='stretch', hide_index=True)
 
 st.divider()
 with tab2:
@@ -307,7 +307,7 @@ with tab2:
         )
 
     with col2: 
-        if st.button("⬇️ Descargar", use_container_width=True):
+        if st.button("⬇️ Descargar", width='stretch'):
             with st.spinner('Generando Excel...'):
                 # 1) Traer datos desde Supabase
                 data_ofertas = getTodosEmpresaOfertas()
@@ -339,7 +339,7 @@ with tab2:
                         data=excel_bytes,
                         file_name="ofertas_fp.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
+                        width='stretch'
                     )
 
     c1, c2, c3 = st.columns(3)
@@ -465,12 +465,12 @@ with tab2:
             # Dropear la columna antes de mostrar si no querés que se vea
             df_emp_display_styled = df_emp_display_styled.hide_index()
 
-            st.dataframe(df_emp_display_styled, use_container_width=True)
+            st.dataframe(df_emp_display_styled, width='stretch')
 
         else:
             st.dataframe(
                 df_emp_display,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
 
@@ -510,7 +510,7 @@ with tab2:
                             for ciclo, valores in ciclos.items()
                         ]
                         df_ciclos = pd.DataFrame(data, columns=["Ciclo", "Alumnos", "Disponibles"])
-                        st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
+                        st.dataframe(df_ciclos, hide_index=True, width='stretch')
 
                     if puestos:
                         st.write("🧩 Puestos por ciclo formativo:")

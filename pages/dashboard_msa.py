@@ -174,7 +174,7 @@ try:
         if not df_vw_ofe.empty:
             fig_stack = px.bar(df_vw_ofe, x='ciclo_formativo', y='cupos_disponibles', color='nombre', 
                                title="Cupos Disponibles por Ciclo", barmode='stack', text_auto=True)
-            st.plotly_chart(fig_stack, use_container_width=True, key="stack_ofertas")
+            st.plotly_chart(fig_stack, width='stretch', key="stack_ofertas")
         else:
             st.warning("No hay datos de ofertas disponibles.")
 
@@ -186,7 +186,7 @@ try:
             if not df_master.empty and 'nombre_tutor' in df_master.columns:
                 tut_df = df_master['nombre_tutor'].value_counts().reset_index(name='alumnos')
                 fig_tut = px.bar(tut_df, x='alumnos', y='nombre_tutor', orientation='h', text_auto=True, title="Carga por Tutor", color_discrete_sequence=[AZUL_CAMARA])
-                st.plotly_chart(fig_tut, use_container_width=True, key="bar_tutores")
+                st.plotly_chart(fig_tut, width='stretch', key="bar_tutores")
 
         with g2:
             if not df_pra.empty and 'created_at' in df_pra.columns:
@@ -198,7 +198,7 @@ try:
                 
                 # Formateo del eje X
                 fig_linea.update_xaxes(dtick="M1", tickformat="%b %Y", ticklabelmode="period")
-                st.plotly_chart(fig_linea, use_container_width=True, key="line_evolucion")
+                st.plotly_chart(fig_linea, width='stretch', key="line_evolucion")
             else:
                 st.info("Sin datos cronológicos.")
 
@@ -207,7 +207,7 @@ try:
         e1, e2 = st.columns(2)
         with e1:
             emp_loc = df_emp_raw['localidad'].apply(limpiar_localidad).value_counts().reset_index(name='total').head(10)
-            st.plotly_chart(px.bar(emp_loc, x='total', y='localidad', orientation='h', text_auto=True, title="Ubicación Empresas", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_emp_loc")
+            st.plotly_chart(px.bar(emp_loc, x='total', y='localidad', orientation='h', text_auto=True, title="Ubicación Empresas", color_discrete_sequence=[CIAN_CAMARA]), width='stretch', key="bar_emp_loc")
         with e2:
             if not df_est.empty:
                 # Ajustado a las columnas reales vistas en tu DB
@@ -217,7 +217,7 @@ try:
                     "Finalizadas": df_est['finalizada'].notna().sum()
                 }
                 df_p = pd.DataFrame(pipe_data.items(), columns=['Estado', 'Total'])
-                st.plotly_chart(px.bar(df_p, x='Estado', y='Total', text_auto=True, title="Pipeline FP", color='Estado', color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA, "#002b56"]), use_container_width=True, key="bar_pipeline")
+                st.plotly_chart(px.bar(df_p, x='Estado', y='Total', text_auto=True, title="Pipeline FP", color='Estado', color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA, "#002b56"]), width='stretch', key="bar_pipeline")
 
     with t_feed:
         st.subheader("📩 Feedback")
@@ -229,7 +229,7 @@ try:
             f2.metric("✅ Total Recibidas", int(recibidas))
             f3.metric("📅 Mes Actual", int(df_stats['respuestas_mes_actual'].sum()))
             
-            st.plotly_chart(px.bar(df_stats.sort_values('porcentaje_completado'), x='porcentaje_completado', y='empresa_nombre', orientation='h', text_auto=True, title="Compromiso (%)", color_discrete_sequence=[AZUL_CAMARA]), use_container_width=True, key="bar_feedback")
+            st.plotly_chart(px.bar(df_stats.sort_values('porcentaje_completado'), x='porcentaje_completado', y='empresa_nombre', orientation='h', text_auto=True, title="Compromiso (%)", color_discrete_sequence=[AZUL_CAMARA]), width='stretch', key="bar_feedback")
 
     st.divider()
     if not df_alu.empty:
