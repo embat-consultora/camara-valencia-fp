@@ -94,7 +94,7 @@ with tab1:
         "tipoPractica": "Tipo Formación",
     }
     df_view = df_alumnos[list(cols_map.keys())].rename(columns=cols_map)
-    st.dataframe(df_view, hide_index=True, use_container_width=True)
+    st.dataframe(df_view, hide_index=True, width='stretch')
 
     # Selección de alumno
     if not df_alumnos.empty:
@@ -440,7 +440,7 @@ with tab2:
                 df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
 
                 st.write("📄 **Vista previa del archivo cargado:**")
-                st.dataframe(df_csv.head(), use_container_width=True)
+                st.dataframe(df_csv.head(), width='stretch')
 
                 # Validar presencia de columna DNI
                 if "dni" not in df_csv.columns:

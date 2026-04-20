@@ -447,7 +447,7 @@ with tab_alumnos:
                 key=f"grid_alumnos_v_{st.session_state.grid_version}"
                 
             )
-            if st.button("💾 Guardar Cambios Alumnos", type="primary", use_container_width=True):
+            if st.button("💾 Guardar Cambios Alumnos", type="primary",width='stretch'):
                 df_grid = grid_response['data']
                 with st.spinner("Guardando datos"):
                     try:
@@ -574,7 +574,7 @@ with tab_ofertas:
                         df_ciclo_tab,
                         column_config=col_config_oferta,
                         key=f"editor_ofertas_{nombre_ciclo}",
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True
                     )
 
@@ -643,7 +643,7 @@ def fragment_gestion_gestores():
             },
             num_rows="dynamic",
             key="editor_gestores",
-            use_container_width=True,
+            width='stretch',
             disabled=st.session_state.gestores_guardados
         )
         submit_btn = st.form_submit_button("Actualizar Gestores",disabled=st.session_state.gestores_guardados)
@@ -693,7 +693,7 @@ def fragment_gestion_tutores():
             column_config={"id": None, "nombre": "Nombre", "email": "Email","telefono": "Teléfono"},
             num_rows="dynamic",
             key="editor_tutores",
-            use_container_width=True,
+            width='stretch',
             disabled=st.session_state.tutores_guardados
         )
         submit_btn = st.form_submit_button("Actualizar Tutores",disabled=st.session_state.tutores_guardados)

@@ -96,7 +96,7 @@ with tab1:
     st.dataframe(
         df_styled,
         hide_index=True,
-        use_container_width=True
+        width='stretch'
     )
 
     if not df_empresas.empty:
@@ -156,7 +156,7 @@ with tab1:
                             {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
                             for ciclo, valores in ciclos.items()]
                         df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
-                        st.dataframe(df_ciclos, hide_index=True, use_container_width=True)
+                        st.dataframe(df_ciclos, hide_index=True, width='stretch')
 
                     if puestos:
                         st.write("🧩 Puestos por ciclo formativo:")
@@ -320,7 +320,7 @@ with tab2:
                 df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
 
                 st.write("📄 **Vista previa del archivo cargado:**")
-                st.dataframe(df_csv.head(), use_container_width=True)
+                st.dataframe(df_csv.head(),width='stretch')
 
                 # Validar presencia de columna DNI
                 if "CIF" not in df_csv.columns:
