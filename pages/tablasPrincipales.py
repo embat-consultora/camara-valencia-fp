@@ -436,7 +436,7 @@ with tab_alumnos:
                     gb.configure_column(col, hide=True)
 
             gridOptions = gb.build()
-
+            st.write('anto')
             grid_response = AgGrid(
                 df_display,
                 gridOptions=gridOptions,
