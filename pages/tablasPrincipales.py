@@ -208,7 +208,6 @@ with tab_alumnos:
                     })
 
         json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
-        st.write(df_raw)
         if not df_raw.empty:
             def crear_acronimo(nombre):
                 if not nombre or pd.isna(nombre): return ""
