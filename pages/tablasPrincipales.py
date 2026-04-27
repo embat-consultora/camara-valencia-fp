@@ -123,10 +123,11 @@ if "grid_version" not in st.session_state:
 
 @st.cache_data(show_spinner="Cargando datos. Por favor espere..")
 def get_data_cached():
+    print("Cargando datos desde la base de datos...")
     return get_alumnos_con_practicas_consolidado()
 
 def load_data():
-    if st.session_state["data_loaded"] or not st.session_state["force_reload"]:
+    if st.session_state["data_loaded"] or not st.session_state["force_reload"] or st.session_state.practicas_data is not None:
         with st.spinner("Cargando datos desde la base..."):
             st.session_state["practicas_data"] = get_data_cached()
             st.session_state["data_loaded"] = True
@@ -450,9 +451,10 @@ with tab_alumnos:
                 with st.spinner("Guardando datos"):
                     try:
                         guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
+                        st.cache_data.clear()
                         st.success("✅ ¡Cambios guardados correctamente!")
-                        st.session_state["force_reload"] = True
-                        load_data()
+                        st.session_state["data_loaded"] = False 
+                        st.session_state["practicas_data"] = None
                         st.session_state.grid_version += 1
                         st.rerun()
                     except Exception as e:

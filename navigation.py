@@ -32,30 +32,30 @@ def make_sidebar():
             st.write("")
             if st.session_state.get("logged_in", False):
                 if rol == "admin":
-                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
-                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
+                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de Formaciones")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/matchs.py", label="Matchs")
                     
-                    st.page_link("pages/empresas.py", label="Empresas")
-                    st.page_link("pages/alumnos.py", label="Alumnos")
-                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.page_link("pages/empresas.py", label="Gestión de Empresas")
+                    st.page_link("pages/alumnos.py", label="Gestión de Alumnos")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                     st.write("")
                     st.write("")
                 if rol == "gestor":
-                    st.page_link("pages/dashboard_msa.py", label="Dashboard MSA", icon="📈")
-                    st.page_link("pages/tablasPrincipales.py", label="Seguimiento")
+                    st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
+                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de Formaciones")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
-                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "tutor":
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
-                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "tutorCentro":
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
-                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "empresa":
                     st.page_link("pages/empresaDetails.py", label="Mi Empresa")
-                    st.page_link("pages/documentacion.py", label="Documentación")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if st.button(logoutButton):
                     logout()
 
