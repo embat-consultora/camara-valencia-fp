@@ -89,8 +89,9 @@ def load_all_data():
             df_tut['id'] = df_tut['id'].astype(str)
 
         # Merge para tener todos los datos cruzados (df_master)
-        df_m = df_pra.merge(df_alu[['id', 'nombre', 'apellido', 'localidad', 'sexo', 'ciclo_formativo', 'estado', 'vehiculo']], 
-                            left_on=col_alu_pra, right_on='id', how='left')
+   
+        df_m = df_pra.merge(df_alu[['dni', 'nombre', 'apellido', 'localidad', 'sexo', 'ciclo_formativo', 'estado', 'vehiculo']], 
+                            left_on=col_alu_pra, right_on='dni', how='left')
         
         if col_tut_pra:
             df_m = df_m.merge(df_tut[['id', 'nombre']], 
@@ -211,7 +212,6 @@ try:
         
         # Usamos df_master porque ahí ya cruzamos las prácticas con los nombres de los alumnos
         df_gestion = df_master if not df_master.empty else df_pra
-        
         if not df_gestion.empty:
             st.markdown("#### ⚠️ Alertas Documentales (Prácticas en curso)")
             a1, a2, a3 = st.columns(3)
