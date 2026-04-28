@@ -37,7 +37,7 @@ def send_email(sender: str, password: str, recipients: list, subject: str, body:
     try:
         msg = MIMEText(body, "plain", "utf-8")
         msg['From'] = sender
-        msg['To'] = sender              # 👈 en pantalla, solo aparece el remitente
+        msg['To'] = sender    
         msg['Subject'] = subject
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()

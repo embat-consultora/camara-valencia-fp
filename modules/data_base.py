@@ -833,7 +833,9 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 "dni": dni,
                 "estado":"Asignado"}
                 upsert(alumnosTabla, datos_alumno, keys=["dni"])
+                print(f"Cambio en tabla alumnos: {dni} a Asignado")
                 update(practicaTabla, {"status": "Nuevo"}, {"id": practicaId})
+                print(f"Cambio en practica el estado a nuevo {practicaId}")
                 upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
                 print(f"Restando cupo (-1) en: {nueva_empresa} ({cif_nuevo})")
                 actualizar_cupo(cif_nuevo, row['ciclo_formativo'], -1)
