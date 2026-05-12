@@ -194,7 +194,6 @@ with tab1:
                         }
                         
                     )
-                    st.success("Alumno actualizado correctamente")
                     st.toast("Alumno actualizado correctamente")
                     st.rerun()
 

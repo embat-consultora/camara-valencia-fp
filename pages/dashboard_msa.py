@@ -118,15 +118,20 @@ df_alu_raw, df_est, df_emp_raw, df_pra, df_vw_ofe, df_master = load_all_data()
 df_stats, df_detalle = load_feedback_data()
 
 st.sidebar.title("🔍 Filtros Globales")
-ciclos_list = sorted(df_alu_raw['ciclo_formativo'].dropna().unique()) if 'ciclo_formativo' in df_alu_raw.columns else []
-f_ciclo = st.sidebar.multiselect("Ciclo Formativo", options=ciclos_list)
-f_loc = st.sidebar.multiselect("Localidad", options=sorted(df_alu_raw['localidad'].apply(limpiar_localidad).unique()))
-f_estado = st.sidebar.multiselect("Estatus Alumno", options=df_alu_raw['estado'].unique() if 'estado' in df_alu_raw.columns else [])
+df_alu = pd.DataFrame()
+if df_alu_raw.empty:
+    
+    st.sidebar.info("No hay datos de alumnos disponibles para filtrar.")
+else:
+    ciclos_list = sorted(df_alu_raw['ciclo_formativo'].dropna().unique()) if 'ciclo_formativo' in df_alu_raw.columns else []
+    f_ciclo = st.sidebar.multiselect("Ciclo Formativo", options=ciclos_list)
+    f_loc = st.sidebar.multiselect("Localidad", options=sorted(df_alu_raw['localidad'].apply(limpiar_localidad).unique()))
+    f_estado = st.sidebar.multiselect("Estatus Alumno", options=df_alu_raw['estado'].unique() if 'estado' in df_alu_raw.columns else [])
 
-df_alu = df_alu_raw.copy()
-if f_ciclo: df_alu = df_alu[df_alu['ciclo_formativo'].isin(f_ciclo)]
-if f_loc: df_alu = df_alu[df_alu['localidad'].apply(limpiar_localidad).isin(f_loc)]
-if f_estado: df_alu = df_alu[df_alu['estado'].isin(f_estado)]
+    df_alu = df_alu_raw.copy()
+    if f_ciclo: df_alu = df_alu[df_alu['ciclo_formativo'].isin(f_ciclo)]
+    if f_loc: df_alu = df_alu[df_alu['localidad'].apply(limpiar_localidad).isin(f_loc)]
+    if f_estado: df_alu = df_alu[df_alu['estado'].isin(f_estado)]
 
 # --- RENDERIZADO VISUAL ---
 try:
@@ -147,30 +152,32 @@ try:
 
     with t_alu:
         c1, c2, c3 = st.columns(3)
-        with c1:
-            sex_df = df_alu['sexo'].fillna("N/E").value_counts().reset_index(name='total')
-            st.plotly_chart(px.pie(sex_df, names='sexo', values='total', hole=0.5, title="Género", color_discrete_sequence=PALETA_GRAFICOS), use_container_width=True, key="pie_sexo")
+        if not df_alu.empty:
+            with c1:
+                sex_df = df_alu['sexo'].fillna("N/E").value_counts().reset_index(name='total')
+                st.plotly_chart(px.pie(sex_df, names='sexo', values='total', hole=0.5, title="Género", color_discrete_sequence=PALETA_GRAFICOS), use_container_width=True, key="pie_sexo")
+                
+                veh_df = df_alu['vehiculo'].fillna("No").value_counts().reset_index(name='total')
+                st.plotly_chart(px.pie(veh_df, names='vehiculo', values='total', hole=0.5, title="Vehículo", color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA]), use_container_width=True, key="pie_vehiculo")
             
-            veh_df = df_alu['vehiculo'].fillna("No").value_counts().reset_index(name='total')
-            st.plotly_chart(px.pie(veh_df, names='vehiculo', values='total', hole=0.5, title="Vehículo", color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA]), use_container_width=True, key="pie_vehiculo")
-        
-        with c2:
-            loc_df = df_alu['localidad'].apply(limpiar_localidad).value_counts().reset_index(name='alumnos').head(10)
-            st.plotly_chart(px.bar(loc_df, x='alumnos', y='localidad', orientation='h', text_auto=True, title="Top 10 Ubicaciones", color_discrete_sequence=[AZUL_CAMARA]), use_container_width=True, key="bar_loc")
+            with c2:
+                loc_df = df_alu['localidad'].apply(limpiar_localidad).value_counts().reset_index(name='alumnos').head(10)
+                st.plotly_chart(px.bar(loc_df, x='alumnos', y='localidad', orientation='h', text_auto=True, title="Top 10 Ubicaciones", color_discrete_sequence=[AZUL_CAMARA]), use_container_width=True, key="bar_loc")
+                
+                if 'ciclo_formativo' in df_alu.columns:
+                    cic_df = df_alu['ciclo_formativo'].value_counts().reset_index(name='total')
+                    st.plotly_chart(px.bar(cic_df, x='total', y='ciclo_formativo', orientation='h', text_auto=True, title="Ciclos", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_ciclo")
             
-            if 'ciclo_formativo' in df_alu.columns:
-                cic_df = df_alu['ciclo_formativo'].value_counts().reset_index(name='total')
-                st.plotly_chart(px.bar(cic_df, x='total', y='ciclo_formativo', orientation='h', text_auto=True, title="Ciclos", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_ciclo")
-        
-        with c3:
-            if 'estado' in df_alu.columns:
-                est_df = df_alu['estado'].value_counts().reset_index(name='total')
-                st.plotly_chart(px.bar(est_df, x='estado', y='total', text_auto=True, title="Estatus", color_discrete_sequence=[AZUL_CAMARA]), use_container_width=True, key="bar_estatus")
-            
-            if 'tipoPractica' in df_alu.columns:
-                tp_df = df_alu['tipoPractica'].value_counts().reset_index(name='total')
-                st.plotly_chart(px.bar(tp_df, x='tipoPractica', y='total', text_auto=True, title="Práctica", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_tipo")
-
+            with c3:
+                if 'estado' in df_alu.columns:
+                    est_df = df_alu['estado'].value_counts().reset_index(name='total')
+                    st.plotly_chart(px.bar(est_df, x='estado', y='total', text_auto=True, title="Estatus", color_discrete_sequence=[AZUL_CAMARA]), use_container_width=True, key="bar_estatus")
+                
+                if 'tipoPractica' in df_alu.columns:
+                    tp_df = df_alu['tipoPractica'].value_counts().reset_index(name='total')
+                    st.plotly_chart(px.bar(tp_df, x='tipoPractica', y='total', text_auto=True, title="Práctica", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_tipo")
+        else:
+            st.info("No hay datos de alumnos disponibles para mostrar estadísticas.")
     with t_ofe:
         st.subheader("Análisis de Disponibilidad por Ciclo")
 
