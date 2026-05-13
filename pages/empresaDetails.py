@@ -78,7 +78,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
 # --- Tabs principales ---
-tabEmpresa, tabOferta,tabPractica, tabTutores = st.tabs(["Mi Empresa", "Ofertas", "Prácticas", "Tutores"])
+tabEmpresa, tabOferta,tabPractica, tabTutores = st.tabs(["Mi Empresa", "Ofertas", "Formaciones", "Tutores"])
 
 # -------------------------------------------------------------------
 # TAB 1: Buscar y visualizar empresas
@@ -121,9 +121,8 @@ with tabEmpresa:
 with tabOferta:
  # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Prácticas ofrecidas")
-        st.link_button("➕ Agregar nueva oferta de prácticas", "http://camara-valencia-fp.streamlit.app/formEmpresa", width='stretch')
-        st.caption('Oferta de prácticas actuales ')
+        st.subheader(f"Formaciones ofrecidas")
+        st.caption('Oferta de formaciones actuales ')
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or "Nuevo"
@@ -349,7 +348,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
         pass
 
 def seccion_planificacion(alumno, empresa, practicaId):
-        st.subheader("📅 Planificación de Prácticas")
+        st.subheader("📅 Planificación de Formaciones")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
