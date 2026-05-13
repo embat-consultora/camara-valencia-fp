@@ -11,7 +11,7 @@ if not tipo_form:
     st.error("⚠️ Error de acceso. El link es incorrecto.")
     st.stop()
 
-if tipo_form != forms[2]:
+if tipo_form != forms[1]:
     st.error(f"❌ Error de acceso. El link es incorrecto.")
     st.stop()
 feedback = getPracticaByToken(token, tipo_form)

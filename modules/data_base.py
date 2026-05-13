@@ -479,6 +479,29 @@ def getAuthToken(email):
         return response.data[0]  # ✅ Devolvemos el primer resultado como dict
     return None
 
+def getFormsLinks(practica_id):
+    base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+    response = supabase.table(feedbackFormsTabla).select("*").eq("practica_id", practica_id).execute()
+
+    if not response.data:
+        return []
+    links_creados = []
+    for item in response.data:
+        token = item.get("token")
+        tipo = item.get("tipo_form")
+        
+        # Estructura: url/tipo_form?token=xyz&tipo=tipo_form
+        # Usamos f-strings para que sea más legible
+        url_completa = f"{base_url.rstrip('/')}/{tipo}?token={token}&tipo={tipo}"
+        
+        # Guardamos el link junto al tipo para saber cuál es cuál
+        links_creados.append({
+            "tipo": tipo,
+            "url": url_completa,
+            "estado": item.get("estado")
+        })
+
+    return links_creados
 def getPracticaByToken(token, tipo_form):
     try:
         fb_res = (

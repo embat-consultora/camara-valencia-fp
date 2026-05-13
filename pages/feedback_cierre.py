@@ -14,7 +14,7 @@ if not tipo_form:
     st.error("⚠️ Error de acceso. El link es incorrecto.")
     st.stop()
 
-if tipo_form != forms[3]:
+if tipo_form != forms[2]:
     st.error(f"❌ Error de acceso. El link es incorrecto.")
     st.stop()
 
@@ -31,6 +31,9 @@ st.title("Cierre y balance final")
 
 # --- ENCAPSULAMOS TODO EN UN FORMULARIO ---
 with st.form("form_cierre"):
+    st.subheader("Datos generales")
+    st.text_input("Empresa", value=feedback["empresa"], disabled=True)
+    st.text_input("Alumno", value=feedback["alumno"], disabled=True)
     # 1. Evaluación Global
     st.subheader("Evaluación global")
     positiva = st.slider("La experiencia fue positiva", 1, 5, 3)
