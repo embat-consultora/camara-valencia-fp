@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica,getFormsLinks
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -698,13 +698,17 @@ def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alu
     fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
     if(estado_actual.get("en_progreso") is not None):
         st.info(f"ℹ️ **Estado:** Pasantía Iniciada: {estado_actual.get("en_progreso")}", icon="🚀")
-
+        links = getFormsLinks(practicaId)
+        links_map = {item['tipo']: item['url'] for item in links}
         with st.container(border=True):
+            link_ini = links_map.get('feedback_inicial', '#')
+            link_ada = links_map.get('feedback_adaptacion', '#')
+            link_cie = links_map.get('feedback_cierre', '#')
             st.markdown(f"""
             **Próximo Hito:**
-            * 📅 **Envio Feedback Acogida:** : {fechas.get('feedback_inicial', '--')}
-            * 🕒 **Envio Feedback Adaptación:** {fechas.get('feedback_adaptacion', '--')}
-            * ⏲️ **Envio Feedback Cierre:** {fechas.get('feedback_cierre', '--')}
+            * 📅 **Envio Feedback Acogida:** : {fechas.get('feedback_inicial', '--')} | [🔗 Abrir Formulario]({link_ini})
+            * 🕒 **Envio Feedback Adaptación:** {fechas.get('feedback_adaptacion', '--')} | [🔗 Abrir Formulario]({link_ada})
+            * ⏲️ **Envio Feedback Cierre:** {fechas.get('feedback_cierre', '--')} | [🔗 Abrir Formulario]({link_cie})
             """)
     pass
 

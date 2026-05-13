@@ -66,7 +66,7 @@ def render_feedback_card(data, titulo_default="Feedback"):
             }
         ))
         fig.update_layout(height=180, margin=dict(l=25, r=25, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
+        st.plotly_chart(fig,use_container_width=True, config={'displayModeBar': False})
 
         # --- FUNCIÓN INTERNA DE FILAS (Mantenida) ---
         def draw_info(label, value, subtext=None, color="#333", icon=""):

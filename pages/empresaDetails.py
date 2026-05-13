@@ -122,6 +122,7 @@ with tabOferta:
  # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
         st.subheader(f"Prácticas ofrecidas")
+        st.link_button("➕ Agregar nueva oferta de prácticas", "http://camara-valencia-fp.streamlit.app/formEmpresa", width='stretch')
         st.caption('Oferta de prácticas actuales ')
         if fps:
             for i, fp in enumerate(fps, start=1):
