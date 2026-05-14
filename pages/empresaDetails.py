@@ -8,6 +8,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive
 from pathlib import Path
 import uuid
+import os
 apply_page_config()
 make_sidebar()
 
@@ -122,7 +123,8 @@ with tabOferta:
  # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
         st.subheader(f"Formaciones ofrecidas")
-        st.caption('Oferta de formaciones actuales ')
+        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+        st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or "Nuevo"
