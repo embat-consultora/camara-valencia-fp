@@ -3,9 +3,9 @@ from pathlib import Path
 from datetime import datetime
 import json, uuid
 from modules.drive_helper import upload_to_drive
-from modules.data_base import upsert
+from modules.data_base import upsert,getCiclosYAreas
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,tipoPracticas,alumnoEstadosTabla,ciclos, preferencias,max_file_size, localidades,cursoList , aniosList
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
@@ -21,10 +21,8 @@ DESCRIPTION = (
     "medida de lo posible a vuestras preferencias, **no podemos garantizar** que se cumplan."
 )
 
-CICLOS = ciclos
+CICLOS,PREFS_MAP = getCiclosYAreas()
 
-PREFERENCIAS_JSON = preferencias
-PREFS_MAP = json.loads(PREFERENCIAS_JSON)
 
 def input_requerido(label, key=None, **kwargs):
     """Input obligatorio con mensaje inline inmediato"""
@@ -49,14 +47,14 @@ with col1:
     email = input_requerido("Email *", key="email_alumno")
     dni = input_requerido("DNI/NIE *", key="dni_alumno")
     cp = input_requerido("Código Postal *", key="cp_alumno")
-    ano = st.selectbox("Año *", aniosList, key="ano_alumno")
+    telefono = st.text_input("Teléfono *", key="tel_alumno")
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
     direccion = input_requerido("Dirección *", key="direccion_alumno")
     localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
     sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
     nuss = st.text_input("NUSS", key="nuss_alumno")
-    curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
+    
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
@@ -89,6 +87,11 @@ if ciclo:
             st.markdown("<span style='color:red;'>Debes seleccionar al menos una preferencia</span>", unsafe_allow_html=True)
 if not ciclo:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
+ano = st.selectbox("Ciclo Académico *", aniosList, key="ano_alumno")
+curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
+requisitos = st.text_area(
+    "Por favor, indícanos skills que consideres relevantes (por ejemplo, B1 de inglés, trabajo en equipo, etc ) *"
+)
 # Subida de CV
 st.subheader("Subir CV")
 st.caption("El nombre del archivo debe seguir el formato: Nombre_Apellidos_CV (ejemplo: Juan_Perez_12345678A.pdf)")
@@ -136,6 +139,7 @@ if submit:
                 "apellido": apellidos.strip(),
                 "email_alumno": email.strip().lower(),
                 "sexo": sexo,
+                "telefono": telefono.strip(),
                 "dni": dni.strip().upper(),
                 "direccion": direccion.strip(),
                 "codigo_postal": cp.strip(),
@@ -147,7 +151,8 @@ if submit:
                 "tipoPractica": tipo_practica,
                 "nuss": nuss.strip(),
                 "anio": ano.strip(),
-                "curso": curso.strip()
+                "curso": curso.strip(),
+                "requisitos": requisitos.strip(),
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
         upsert(
@@ -174,9 +179,9 @@ if submit:
 
                 st.success("¡Formulario enviado correctamente!, ya puedes cerrar la página.")
                 if link:
-                    st.success(f"CV subido. [Abrir en Drive]({link})")
+                    st.success(f"CV subido. [Abrir]({link})")
                 else:
                     st.success(f"CV subido correctamente")
 
         except Exception as e:
-            st.error(f"No se pudo subir el CV a Drive: {e}")
+            st.error(f"No se pudo subir el CV a la carpeta del alumno: {e}")

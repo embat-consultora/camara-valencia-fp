@@ -411,15 +411,16 @@ with tab3:
         st.stop()
 
     df_empresas = pd.DataFrame(empresas)[["CIF", "nombre", "email_empresa"]]
-    emailsEmpresasClean =df_empresas["email_empresa"].dropna().unique().tolist()
-    
+    df_clean = df_empresas.dropna(subset=["nombre", "email_empresa"]).drop_duplicates()
+    emailsEmpresasClean =df_clean["email_empresa"].dropna().unique().tolist()
+    nombreEmpresasClean =df_clean["nombre"].dropna().unique().tolist()
     col1, col2 = st.columns([3, 2])
     with col2:
         checked = st.checkbox("Seleccionar todos", value=False, key="select_all_empresas")
     with col1:
-        emails_empresas = st.multiselect(
-            "Selecciona empresas (emails)", placeholder="Selecciona un valor",
-            options=emailsEmpresasClean,disabled=st.session_state.select_all_empresas
+        empresas_seleccionadas = st.multiselect(
+            "Selecciona empresas", placeholder="Selecciona un valor",
+            options=nombreEmpresasClean,disabled=st.session_state.select_all_empresas
         )
     emails_manual_empresas = st.text_area(
         "Agregar emails manualmente (separados por coma)",
@@ -445,10 +446,11 @@ with tab3:
     
     if checked:
         allEmails = emailsEmpresasClean.copy()
-        final_list = list(set(allEmails + valid_emails))
+        emails_de_seleccion = list(set(allEmails))
     else:
-        final_list = list(set(emails_empresas + valid_emails))
+        emails_de_seleccion = list(set(df_clean[df_clean["nombre"].isin(empresas_seleccionadas)]["email_empresa"].unique().tolist()))
 
+    final_list = list(set(emails_de_seleccion + valid_emails))
     st.session_state.emailsList = final_list
     
     st.write("**Destinatarios seleccionados:**")
@@ -465,10 +467,14 @@ with tab3:
 
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
-
+    adjuntos = st.file_uploader(
+        "Adjuntar archivos", 
+        accept_multiple_files=True, 
+        key="adjuntos_empresas"
+    )
     if st.button("📨 Enviar Emails a Empresas", disabled=not can_send):
         try:
-            if send_email(email_sender, email_password, final_list, subject_al, body_al):
+            if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
                 fecha_envio = datetime.now().isoformat()
 
                 for email in final_list:

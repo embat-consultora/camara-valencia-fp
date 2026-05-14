@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica,getFormsLinks
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -56,6 +56,7 @@ def fetch_practicas_tutores():
     tutoresCentro = getEquals(tutoresCentroTabla, {})
     return practicas, tutores,tutoresCentro
 
+ciclos_opts,prefs_opts_dict = getCiclosYAreas()
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
     if nuevo_valor:
@@ -329,13 +330,6 @@ def mostrar_carga_rapida():
             key="qr_alu_tipo"
         )
 
-        # Lógica de Ciclos Formativos (Basada en tu código de alumnos)
-        form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-        ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-        pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
-
-        ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
-        prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
 
         new_alu_ciclo = col_p2.selectbox(
             "Ciclo Formativo",
@@ -897,7 +891,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                     key=f"cal_up_{practicaId}"
                 )
                 if uploaded_cal:
-                    if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                    if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
                             temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
                             with open(temp_path, "wb") as f:
@@ -928,7 +922,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
+                    st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
                 else:
                     st.markdown(
                         """
@@ -957,7 +951,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                        st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
+                        st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
             else:
                 st.write("No han subido calendario aun")
         pass
@@ -969,7 +963,7 @@ def seccion_documentos(alumno, empresa, practicaId):
     files, folderId = list_drive_files(folder_name)
 
     if folderId:
-        st.link_button("Abrir carpeta en Drive", f"https://drive.google.com/drive/folders/{folderId}")
+        st.link_button("Abrir carpeta", f"https://drive.google.com/drive/folders/{folderId}")
 
     if files:
         for f in files:

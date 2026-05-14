@@ -41,6 +41,7 @@ def make_sidebar():
                     st.page_link("pages/alumnos.py", label="Gestión de Alumnos")
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                     st.write("")
+                    st.page_link("pages/configuracion.py", label="Configuraciones")
                     st.write("")
                 if rol == "gestor":
                     st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")

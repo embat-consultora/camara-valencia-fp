@@ -33,6 +33,18 @@ fase2colEmpresa = {
     "Finalizada": "fp_finalizada",
     "Evaluación Enviada": "evaluacion_enviada"
 }
+coloresCiclos = [
+    "#A7E9E5", # Turquesa suave (análogo al principal)
+    "#BDE2FB", # Azul cielo pastel
+    "#CFE8D5", # Verde menta pálido
+    "#D8BFD8", # Cardo (un lila muy sutil)
+    "#FFD8CC", # Melocotón suave (contraste cálido)
+    "#FFEFB5", # Amarillo canario pastel
+    "#E5FCC2", # Lima suave
+    "#F3E5F5", # Lavanda claro
+    "#FFC8DD", # Rosa chicle pastel
+    "#CDEAC0"  # Verde té claro
+]
 #colores
 verdeOk="#D8E4BC"
 celeste="#P3252C"
@@ -43,6 +55,7 @@ usuariosTabla="usuarios"
 formTabla="forms"
 formFieldsTabla="form_fields"
 empresasTabla="empresas"
+ciclosFormativosTablas="ciclos_formativos"
 alumnosTabla="alumnos"
 logsTabla="error_logs"
 answersTabla="form_answers"
@@ -86,16 +99,6 @@ Andrea
 """
 
 #forms
-ciclos = [
-    "COMERCIO INTERNACIONAL",
-    "TRANSPORTE Y LOGÍSTICA",
-    "MARKETING Y PUBLICIDAD",
-    "DESARROLLO APLICACIONES MULTIPLATAFORMA",
-    "DESARROLLO APLICACIONES WEB",
-]
-
-preferencias = "{\"COMERCIO INTERNACIONAL\": [\"Departamento Export/import\", \"Departamento Comercio Ext/aduanas\", \"Compras internacionales/ aprovisionamiento\", \"Atención a clientes internacionales\", \"Gestión documental/ almacén\"], \"TRANSPORTE Y LOGÍSTICA\": [\"Gestión de tráfico y transporte terrestre; marítimo o aéreo\", \"Gestión de almacén y stock\", \"Operaciones logísticas y distribución\", \"Atención al cliente/logística inversa (devoluciones)\", \"Administración y documentación de transporte\"], \"MARKETING Y PUBLICIDAD\": [\"Departamento de Marketing (estrategia/campañas)\", \"Publicidad y Comunicación (redes sociales)\", \"Marketing digital (SEO/SEM)\", \"Gestión de eventos\", \"Atención al cliente y fidelización\", \"Estudios de mercado e investigación comercial\"], \"DESARROLLO APLICACIONES MULTIPLATAFORMA\": [\"Desarrollo aplicaciones móviles\", \"Desarrollo software\", \"Bases de datos y gestión de información\", \"Soporte técnico y mantenimiento de apps\", \"Integración de sistemas multiplataforma\"], \"DESARROLLO APLICACIONES WEB\": [\"Desarrollo fronted\", \"Desarrollo backend\", \"Bases de datos\", \"Soporte técnico en entornos web\", \"Administración de sistemas web/hosting\"]}"
-
 opciones_motivo = [
         "Ya no tienen necesidad de acoger becarios",
         "El alumno/a no ha pasado la entrevista",

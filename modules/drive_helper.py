@@ -85,7 +85,7 @@ def list_drive_files(folder_name):
 
         files = service.files().list(
             q=f"'{folder_id}' in parents and trashed = false",
-            fields="files(id, name, webViewLink, modifiedTime)",
+            fields="files(id, name, webViewLink,webContentLink, modifiedTime)",
             orderBy="modifiedTime desc",
             supportsAllDrives=True,
             includeItemsFromAllDrives=True

@@ -368,7 +368,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                     key=f"cal_up_{practicaId}"
                 )
                 if uploaded_cal:
-                    if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                    if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
                             temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
                             with open(temp_path, "wb") as f:
@@ -399,7 +399,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'),width='stretch')
+                    st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'),width='stretch')
                 else:
                     st.markdown(
                         """
@@ -427,7 +427,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                             unsafe_allow_html=True
                         )
                 
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
+                    st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
         else:
             st.write("No han subido calendario aun")
         pass

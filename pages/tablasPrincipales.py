@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getTutores,getGestore,updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas
+from modules.data_base import getTutores,getGestore,updateTutoresCentro, get_alumnos_con_practicas_consolidado, getOfertasTabla, guardar_cambios_alumnos, getGestores, updateOfertasTabla, updateGestores, getEmpresasYOfertas,getCiclosYAreas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
@@ -218,7 +218,7 @@ with tab_alumnos:
             df_raw['ciclo_acronimo'] = df_raw['ciclo_formativo'].apply(crear_acronimo)
             cols_visibles = [
                 "ciclo_acronimo", "apellido", "nombre","localidad", "vehiculo", "horas_totales", 
-                "nombre_empresa","asignado", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro", "observaciones_seguimiento","telefono", "email_empresa"
+                "nombre_empresa","asignado", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro","telefono", "email_empresa"
             ]
         
             cols_tecnicas = ["dni", "ciclo_formativo", "oferta_id", "ciclos_info","practica_id", "direccion_practica","localidad_practica", "anio","curso"]
@@ -487,9 +487,12 @@ with tab_ofertas:
             seguimiento_full = record.get('seguimiento_gestores', {}) or {}
             tutores_full = empresa.get("tutores", {}) or {}
             for nombre_ciclo, datos_alumnos in ciclos_info.items():
+                nombre_ciclo_buscado = nombre_ciclo.upper()
                 gestores_ciclo = gestores_activos_df[
-                    gestores_activos_df['ciclo'].str.upper() == nombre_ciclo
+                    gestores_activos_df['ciclo'].str.upper().str.contains(f'"{nombre_ciclo_buscado}"', na=False, regex=False)
                 ]['nombre'].tolist()
+                st.write(gestores_activos_df[
+                    gestores_activos_df['ciclo']])
                 areas_del_ciclo = puestos_info.get(nombre_ciclo, [{"area": "General", "proyecto": ""}])
 
                 for area_item in areas_del_ciclo:
@@ -619,6 +622,7 @@ with tab_ofertas:
 
 # --- TAB CONFIGURACIÓN (Solo Admin) ----
 
+CICLOS,AREAS_MAP = getCiclosYAreas()
 @st.fragment
 def fragment_gestion_gestores():
     if "gestores_guardados" not in st.session_state:
@@ -634,10 +638,10 @@ def fragment_gestion_gestores():
                 "password": "Password", 
                 "nombre": "Nombre", 
                 "email": "Email", 
-                "ciclo": st.column_config.SelectboxColumn(
-                    "Ciclo",
-                    options=["Comercio Internacional","Desarrollo Aplicaciones Multiplataforma", "Desarrollo Aplicaciones Web", "Marketing y Publicidad", "Transporte y Logística"], 
-                    required=False
+                "ciclo": st.column_config.MultiselectColumn(
+                    "Ciclos Formativo",
+                    help="Selecciona los ciclos formativos del gestor",
+                    options=CICLOS,
                 ),
                 "activo": "Visible"
             },

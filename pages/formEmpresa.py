@@ -2,8 +2,8 @@ import streamlit as st
 from datetime import datetime
 import json
 from modules.forms_helper import required_ok, slug
-from modules.data_base import upsert,add, upsertCustome
-from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
+from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas
+from variables import empresaEstadosTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
 # ---------------------------------
 # Config
 # ---------------------------------
@@ -26,11 +26,8 @@ DESCRIPTION = (
     "Por favor, completad todos los campos con la información solicitada."
 )
 
-CICLOS = ciclos
+CICLOS,AREAS_MAP = getCiclosYAreas()
 
-AREAS_JSON = preferencias
-
-AREAS_MAP = json.loads(AREAS_JSON)
 
 def input_requerido(label, key=None, **kwargs):
     """Input obligatorio con mensaje inline inmediato"""

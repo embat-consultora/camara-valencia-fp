@@ -3,7 +3,7 @@ import pandas as pd
 import json
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from modules.data_base import get, getEqual, getEquals, getTodosEmpresaOfertas
+from modules.data_base import get, getEqual, getCiclosYAreas, getTodosEmpresaOfertas
 from modules.utils import df_to_excel
 from variables import (
     empresasTabla,
@@ -13,8 +13,7 @@ from variables import (
     necesidadFP,
     tutoresTabla,
     fasesPractica,
-    faseColPractica,
-    formFieldsTabla
+    faseColPractica
 )
 
 # CONFIG
@@ -45,10 +44,8 @@ with st.spinner('Cargando datos...'):
     # LOAD ALL CICLOS DESDE formFieldsTabla
     # -------------------------------------------------------------------
 
+    ciclos_opts, areas = getCiclosYAreas()
 
-    form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-    ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-    ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
 
     # -------------------------------------------------------------------
     # 2. CALCULAR ESTADO PRÁCTICA

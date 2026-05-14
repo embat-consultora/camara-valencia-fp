@@ -19,7 +19,7 @@ from variables import (
     tutoresTabla,
     tutoresCentroTabla,
     practicaCanceladaTabla,
-    logsTabla
+    ciclosFormativosTablas
 )
 load_dotenv()
 
@@ -1037,3 +1037,56 @@ def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_f
                 add(feedbackFormsTabla, data_feedback)       
         except Exception as e:
             st.error(f"Error procesando feedback para {tipo}: {e}")
+
+def updateCiclosFormativos(cambios, df_original):
+    st.write(cambios)
+    st.write(df_original)
+    for new_row in cambios["added_rows"]:
+        nombre = new_row.get("nombre", "").strip()
+        abreviatura = new_row.get("abreviatura", "").strip()
+        areas = new_row.get("areas", "").strip()
+
+        if abreviatura and nombre:
+            try:
+                add(ciclosFormativosTablas, {
+                    "nombre": nombre,
+                    "abreviatura": abreviatura,
+                    "areas":areas
+                })
+            except Exception as e:
+                raise Exception(f"Error al crear el ciclo {nombre}: {e}")
+
+    for idx, mods in cambios["edited_rows"].items():
+            fila_orig = df_original[int(idx)]
+            id_ciclo = fila_orig["id"]
+
+            try:
+                # Actualizamos la tabla de gestores
+                update(ciclosFormativosTablas, mods, {"id": id_ciclo})
+                
+                    
+                # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
+            except Exception as e:
+                raise Exception(f"Error al actualizar el ciclo {id_ciclo}: {e}")
+    # 3. MANEJAR BORRADOS (Deleted)
+    for idx in cambios["deleted_rows"]:
+        fila_orig = df_original.iloc[int(idx)]
+        id_ciclo = fila_orig["id"]
+        nombre_ciclo = fila_orig["nombre"]
+        
+        try:
+            delete(ciclosFormativosTablas, "id", id_ciclo)
+        except Exception as e:
+            st.error(f"Error al eliminar ciclo {nombre_ciclo}: {e}")
+        
+@st.cache_data(ttl=600)
+def getCiclosYAreas():
+    ciclos_db = get(ciclosFormativosTablas)
+    lista_nombres = [c["nombre"] for c in ciclos_db] if ciclos_db else []
+    diccionario_pref = {}
+    if ciclos_db:
+        for c in ciclos_db:
+            areas_string = c.get("areas", "")
+            lista_areas = [a.strip() for a in areas_string.split(",") if a.strip()]
+            diccionario_pref[c["nombre"]] = lista_areas
+    return lista_nombres, diccionario_pref
