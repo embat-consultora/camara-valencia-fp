@@ -21,6 +21,7 @@ def fetch_ciclos():
 def fetch_email_pymes():
     email = getEqual(emailImportantesTabla, "seccion", "pymes")
     if email:
+        email = email[0]
         st.session_state.email_pymes_id = email.get("id")
         return email.get("email", "")
     return ""
