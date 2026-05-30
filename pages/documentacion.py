@@ -1,7 +1,9 @@
 import streamlit as st
 from page_utils import apply_page_config
 from navigation import make_sidebar
-
+from variables import aniosList
+import os
+from st_copy import copy_button
 apply_page_config()
 make_sidebar()
 
@@ -16,6 +18,32 @@ def show_documentacion():
     role = rol_usuario if rol_usuario else "admin" 
     st.title("📚 Centro de Documentación")
     # --- SECCIÓN 1: INTRODUCCIÓN SEGÚN ROL ---
+    st.header("Link útiles")
+    col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
+
+    with col1:
+        st.selectbox(
+            "Seleccione curso académico", 
+            options=aniosList[1:], 
+            key="selector_curso_ac_doc"
+        )
+
+    with col2:
+        # Construimos la URL dinámica usando el valor actual del selectbox
+        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+        
+        # Nos aseguramos de que la URL termine en / antes de los parámetros
+        if not base_url.endswith("/"):
+            base_url += "/"
+            
+        url_form_empresas = f"{base_url}formEmpresa?curso_academico={st.session_state['selector_curso_ac_doc']}"
+        colLink , colCopy = st.columns([3, 1])
+        with colLink:
+            st.info(url_form_empresas)
+        with colCopy:
+            st.caption("")
+            copy_button( url_form_empresas, tooltip="Copiar Link", copied_label="Copiado!")
+
     st.header("1. Tu Rol en el Proyecto")
     
     if role == "admin" or role == "gestor":
@@ -47,11 +75,11 @@ def show_documentacion():
 
     # Contenido común o específico usando Expanders
     if role in ["admin", "empresa"]:
-        with st.expander("📝 Gestión de Prácticas y Asignación"):
+        with st.expander("📝 Gestión de Formaciones y Asignación"):
             st.write("""
             1. Ve a la pestaña de **Seguimiento**.
             2. Selecciona la **Empresa** y el **Puesto**. 
-            3. Inicia la práctica definiendo las fechas pactadas y el tutor asignado.
+            3. Inicia la formación definiendo las fechas pactadas y el tutor asignado.
             """)
 
     if role in [ "tutorCentro", "admin", "gestor"]:

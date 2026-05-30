@@ -2,12 +2,13 @@ import streamlit as st
 from datetime import datetime
 import json
 from modules.forms_helper import required_ok, slug
-from modules.data_base import upsert,add, upsertCustome
-from variables import empresaEstadosTabla,empresasTabla,necesidadFP,ciclos, preferencias,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
+from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
+from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
 # ---------------------------------
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Empresas Formación", page_icon="🏢", layout="centered")
+curso_academico = st.query_params.get("curso_academico","2026-2027")
 st.markdown("""
 <style>
 div[data-testid="stTextInput"] input {
@@ -18,19 +19,16 @@ div[data-testid="stTextInput"] input {
 </style>
 """, unsafe_allow_html=True)
 st.image("./images/cv-fp.png", width=250)
-TITLE = "Formación Empresas"
-SUBTITLE = "Ficha 2025/2026"
-DESCRIPTION = (
-    "⚙️ **Objetivo:** Este formulario permite registrar a vuestra empresa para participar "
-    "en el Formación en Empresa (FE). "
-    "Por favor, completad todos los campos con la información solicitada."
+
+formValues = getEqual(formTabla,"tipo", "empresa")
+TITLE = formValues[0].get("titulo", "Formulario de Formación en Empresa")
+SUBTITLE = formValues[0].get("subtitulo", "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa.")
+DESCRIPTION = formValues[0].get("description",
+    "⚙️ Objetivo: Este formulario permite registrar a vuestra empresa para participar en el Formación en Empresa (FE). Por favor, completad todos los campos con la información solicitada."
 )
 
-CICLOS = ciclos
+CICLOS,AREAS_MAP = getCiclosYAreas()
 
-AREAS_JSON = preferencias
-
-AREAS_MAP = json.loads(AREAS_JSON)
 
 def input_requerido(label, key=None, **kwargs):
     """Input obligatorio con mensaje inline inmediato"""
@@ -66,7 +64,7 @@ with col2:
     nie_responsable = input_requerido("NIF del responsable legal *", key="nie_responsable")
     horario_fin = st.time_input("Horario Empresa fin *", step=900)
 st.divider()
-st.write("DATOS DEL TUTOR DE LA EMPRESA (PERSONA QUE SE ENCARGARÁ DE SEGUIR AL ALUMNO EN PRÁCTICAS)")
+st.write("DATOS DEL TUTOR DE LA EMPRESA (PERSONA QUE SE ENCARGARÁ DE SEGUIR AL ALUMNO EN FORMACIONES)")
 col1, col2 = st.columns(2)
 with col1:
     nombre_tutor = input_requerido("Nombre Completo del tutor *", key="nombre_tutor")
@@ -75,7 +73,7 @@ with col2:
     email_tutor = input_requerido("Email del tutor *", key="email_tutor")
     telefono_tutor = input_requerido("Teléfono del tutor *", key="telefono_tutor")
 st.divider()
-st.write("DIRECCIÓN DEL CENTRO DE TRABAJO DONDE SE REALIZARÁN LAS PRÁCTICAS")
+st.write("DIRECCIÓN DEL CENTRO DE TRABAJO DONDE SE REALIZARÁN LAS FORMACIONES")
 direccion_centro = st.text_input("Dirección del centro de trabajo")
 col1, col2 = st.columns(2)
 with col1:
@@ -92,7 +90,7 @@ posible_contrato = st.radio(
 vehiculo = st.radio("¿Se necesita vehículo propio para acceder a vuestras instalaciones? *", ["Sí", "No"], horizontal=True)
 st.divider()
 # --- Ciclos y cantidad ---
-st.write("¿DE QUE CICLO/S FORMATIVO/S OS INTERESA INCORPORAR ALUMNOS EN PRÁCTICAS Y CANTIDAD DE ALUMNO POR CADA UNO?(Puedes seleccionar uno o varios)")
+st.write("¿DE QUE CICLO/S FORMATIVO/S OS INTERESA INCORPORAR ALUMNOS EN FORMACIONES Y CANTIDAD DE ALUMNO POR CADA UNO?(Puedes seleccionar uno o varios)")
 st.write("Selecciona los ciclos y especifica la cantidad de alumnos por cada uno:")
 selected_ciclos = []
 cantidades = {}
@@ -115,7 +113,7 @@ if not selected_ciclos:
 # --- Puestos / áreas ---
 puestos_seleccionados = {}
 if selected_ciclos:
-    st.write("¿EN QUÉ PUESTOS/ÁREAS SE DESARROLLARÍA LA PRÁCTICA? - DESCRIBE EN QUÉ PROYECTO/S PODRÍA COLABORAR EL ALUMNO EN PRÁCTICAS.")
+    st.write("¿EN QUÉ PUESTOS/ÁREAS SE DESARROLLARÍA LA FORMACIÓN? - DESCRIBE EN QUÉ PROYECTO/S PODRÍA COLABORAR EL ALUMNO EN FORMACIONES.")
     for ciclo in selected_ciclos:
         with st.expander(f"{ciclo}", expanded=False):
             opciones = AREAS_MAP.get(ciclo, [])
@@ -210,7 +208,8 @@ if submit:
         "nif_responsable_legal": nie_responsable.strip(),
         "horario": str(horario_inicio) + " - " + str(horario_fin),
         "pagina_web": pagina_web.strip(),
-        "sectorEmpresa": sector.strip()
+        "sectorEmpresa": sector.strip(),
+        "anio": curso_academico
 
     }
     ofertaPayload={
@@ -219,7 +218,7 @@ if submit:
         "ciclos_formativos": cantidades,
         "puestos": puestos_seleccionados,
         "requisitos": requisitos.strip(),
-        "estado": estados[0],
+        "estado": estados[4],
         "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
         "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
         "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),

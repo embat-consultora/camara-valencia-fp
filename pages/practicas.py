@@ -1,22 +1,22 @@
 import streamlit as st
 import pandas as pd
+import os
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,cancelarPractica,getFormsLinks
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from modules.grafico_helper import mostrar_fases
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from modules.drive_helper import list_drive_files, upload_to_drive
 from modules.forms_helper import file_size_bytes
+from modules.emailSender import enviarRecordatoriosMasivos
 from pathlib import Path
 from modules.feedback_helper import render_feedback_card
 import uuid
-import json
 from variables import (
     practicaTabla, tutoresTabla, practicaEstadosTabla,
-    fasesPractica, faseColPractica, max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
-    empresasTabla,tipoPracticas,formFieldsTabla,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList
+    max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
+    empresasTabla,tipoPracticas,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList,locale_tabla_principal
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # ----------------------------------------------
@@ -24,10 +24,13 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # ----------------------------------------------
 apply_page_config()
 make_sidebar()
-st.set_page_config(page_title="Formaciones", page_icon="🚀")
+st.set_page_config(page_title="Formaciones en Empresas", page_icon="🚀")
 
 now = datetime.now().isoformat()
-st.title("🚀 Formaciones")
+
+# ----------------------------------------------
+# BOTÓN REFRESCAR
+# ----------------------------------------------
 
 if "practicas" not in st.session_state:
     st.session_state["practicas"] = []
@@ -41,11 +44,29 @@ if "gestores" not in st.session_state:
     st.session_state["gestores"] = []
 if "tutorCentro" not in st.session_state:
     st.session_state["tutorCentro"] = []
+if "practicas_filtradas" not in st.session_state:
+    st.session_state["practicas_filtradas"] = []
 if "page" not in st.session_state:
     st.session_state.page = "lista"
 if "practica_seleccionada" not in st.session_state:
     st.session_state.practica_seleccionada = None
+if "fecha_inicio_widget" not in st.session_state:
+    st.session_state["fecha_inicio_widget"] = None
+if "missing_anexos" not in st.session_state:
+    st.session_state["missing_anexos"] = None
+if "fecha_fin_widget" not in st.session_state:
+    st.session_state["fecha_fin_widget"] = None
+if "email_alumno" not in st.session_state:
+    st.session_state["email_alumno"] = None
 rol_usuario = st.session_state.get("rol")
+
+col_refresh, col_volver = st.columns([1, 0.15])
+with col_refresh:
+    st.title("🧠 Formaciones en Empresa")
+with col_volver:
+    if st.button("🔄 Actualizar", key="btn_refresh"):
+        st.session_state["force_reload"] = True
+        st.rerun()
 # ----------------------------------------------
 # FETCH FUNCTIONS
 # ----------------------------------------------
@@ -56,6 +77,7 @@ def fetch_practicas_tutores():
     tutoresCentro = getEquals(tutoresCentroTabla, {})
     return practicas, tutores,tutoresCentro
 
+ciclos_opts,prefs_opts_dict = getCiclosYAreas()
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
     if nuevo_valor:
@@ -69,14 +91,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
 
-# ----------------------------------------------
-# BOTÓN REFRESCAR
-# ----------------------------------------------
-col_refresh, col_volver = st.columns([1, 0.15])
-with col_refresh:
-    if st.button("🔄 Actualizar", key="btn_refresh"):
-        st.session_state["force_reload"] = True
-        st.rerun()
+
 
 # ----------------------------------------------
 # CARGA DE DATOS
@@ -129,49 +144,29 @@ def load_data():
     st.session_state["force_reload"] = False
 
 load_data()
-practicas = st.session_state["practicas"]
+anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
+practicas = st.session_state.practicas
+if anioFiltro != aniosList[0]: 
+    practicas = [p for p in practicas if p.get("anio") == anioFiltro]
+if cursoFiltro != cursoList[0]:
+    practicas = [p for p in practicas if p.get("curso") == cursoFiltro]
+
 tutores = st.session_state["tutores"]
 gestores =  st.session_state["gestores"]
 tutoresCentro =st.session_state["tutorCentro"]
 
-##--- DIALOG
-@st.dialog("Finalización de Formación")
-def dialog_fecha_fin(practica_id, email_alumno):
-    st.write(f"Por favor, indica cuándo finalizará la Formación:")
-    
-    # Input de fecha
-    fecha_fin = st.date_input("Fecha de finalización prevista", value=datetime.now().date() + timedelta(days=90))
-    
-    if st.button("Confirmar", type="primary"):
-        asignarFechasFormsFeedback(int(practica_id), datetime.now().date(), email_alumno, fecha_fin)
-        st.success("Fechas programadas correctamente.")
-        st.toast("✅  La Formación ha pasado a estado INICIADA")
-
-        st.rerun()
-
-@st.dialog("Cancelación de Formación")
-def dialog_cancelacion(practica):
-    st.write(f"Por favor, indica el motivo de la cancelación")
-    motivo = st.text_input("", placeholder="Ej: El alumno no ha pasado la entrevista, la empresa ya no puede acoger, etc.")
-    
-    if st.button("Confirmar", type="primary"):
-        cancelarPractica(practica, motivo)
-        st.toast("✅  La Formación ha pasado a estado CANCELADA")
-        st.session_state.page = "lista"
-        st.rerun()
 # ----------------------------------------------
 # HELPER
 # ----------------------------------------------
 def tutores_por_empresa(empresa_id, lista_tutores):
     return [t for t in lista_tutores if t.get("cif_empresa") == empresa_id]
 
-
-
 def contarAnexos(practicas: list) -> int:
-    total_missing = 0
+    st.session_state["missing_anexos"] = 0
     for p in practicas:
         estados_p = p.get("status", {})    
-        if estados_p != "Nuevo":
+        if estados_p != estados[4]:
                 continue
         anexos_creados = p.get("anexos_creados")
         anexos_enviados = p.get("anexos_enviados")
@@ -184,19 +179,19 @@ def contarAnexos(practicas: list) -> int:
             anexos_firmados,
             doc_sao_entregada
         ]):
-            total_missing += 1
+            st.session_state["missing_anexos"] += 1
 
-    return total_missing
+    return st.session_state["missing_anexos"]
 
 # ----------------------------------------------
 # PAGINA: LISTA
 # ----------------------------------------------
 def mostrar_lista():
-    tabs_visibles = ["📋 Listado de Formaciones"]
+    tabs_visibles = ["📋 Listado de FE"]
     label_anexos = "📃 Anexos"
     if rol_usuario == 'admin':
-        missing_count = contarAnexos(practicas)  
-        label_anexos = f"📃 Anexos  🔴 ({missing_count})" if missing_count > 0 else "📃 Anexos"
+        contarAnexos(practicas)  
+        label_anexos = f"📃 Anexos  🔴 ({st.session_state["missing_anexos"]})" if st.session_state["missing_anexos"] > 0 else "📃 Anexos"
         tabs_visibles.extend([label_anexos, "📊 Dashboard de Feedback", "⚡️ Carga Rápida"])
     elif rol_usuario in ['gestor', 'tutorCentro']:
         tabs_visibles.append("📊 Dashboard de Feedback")
@@ -219,38 +214,50 @@ def mostrar_lista():
         idx = tabs_visibles.index("⚡️ Carga Rápida")
         with tabs[idx]:
             mostrar_carga_rapida()
-    
         
 # ----------------------------------------------
 # PAGINA: DETALLE
 # ----------------------------------------------
 def mostrar_lista_practicas():
+        colText, colFiltro = st.columns([2, 2])
+        with colText:
+            st.write("")
+            st.write("**Selecciona una fila para ver el detalle:**")
+        with colFiltro:
+            estadoFiltro = st.multiselect("**Estado**", options= estados,placeholder="Seleccione uno o más estados", default=[estados[0], estados[1], estados[4]], key="estados_tabla")
         if not practicas:
             st.info("No tienes formaciones asignadas aun.")
+            st.session_state.practicas_filtradas = []
             return
         data_for_grid = []
+        practicas_filtradas_raw = []
         for p in practicas:
             pid = p["id"]
             estados_p = p.get("status", {})
-            if estados_p == estados[4]:
+            if estadoFiltro and (estados_p not in estadoFiltro):
                 continue
+            
+            practicas_filtradas_raw.append(p)
             data_for_grid.append({
                 "ID": pid,
                 "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
                 "Empresa": p.get('empresas', {}).get('nombre'),
                 "Estado": estados_p,
+                "Fecha Inicio": p.get('fecha_inicio', '—'),
                 "Ciclo": p.get('ciclo_formativo', '—'),
-                "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar')
+                "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar'),
+                "Curso Académico": f"{p.get('anio', '—')}/{p.get('curso', '—')}"
             })
-
+        st.session_state.practicas_filtradas = practicas_filtradas_raw
         df = pd.DataFrame(data_for_grid)
 
         if df.empty:
-            st.info("No hay formaciones asignadas aun")
+            st.info("No hay formaciones con esos parametros de filtro.")
             return
 
         # 2. Configurar AgGrid
         gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_grid_options(localeText=locale_tabla_principal)
         gb.configure_selection('single', use_checkbox=False) # Selección de fila completa
         gb.configure_column("ID", hide=True) # Ocultamos el ID técnico
         gb.configure_grid_options(domLayout='normal')
@@ -258,8 +265,6 @@ def mostrar_lista_practicas():
         # Tip de experto: Hacer que las columnas se ajusten automáticamente
         gridOptions = gb.build()
 
-        st.write("Selecciona una fila para ver el detalle:")
-        
         # 3. Renderizar el Grid
         response = AgGrid(
             df,
@@ -313,29 +318,18 @@ def mostrar_carga_rapida():
         new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
 
         new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
-        col1, col2 = st.columns(2)
-        with col1:
-            anio = st.selectbox("Año *", aniosList, key="ano_alumno")
-        with col2:
-            curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
-        # 3. CONFIGURACIÓN DE PRÁCTICA Y CICLO
+
+        # 3. CONFIGURACIÓN DE formación Y CICLO
         st.subheader("📋 Configuración de la Formación")
         col_p1, col_p2 = st.columns(2)
 
-        # Obtenemos los tipos de práctica de tus variables
+        # Obtenemos los tipos de formación de tus variables
         new_alu_tipo = col_p1.selectbox(
             "Tipo de Formación", 
             options=tipoPracticas, 
             key="qr_alu_tipo"
         )
 
-        # Lógica de Ciclos Formativos (Basada en tu código de alumnos)
-        form_fields = getEquals(formFieldsTabla, {"category": "Alumno", "type": "Opciones"})
-        ciclo_field = next((f for f in form_fields if f["columnName"] == "ciclo_formativo"), None)
-        pref_field = next((f for f in form_fields if f["columnName"] == "preferencias_fp"), None)
-
-        ciclos_opts = json.loads(ciclo_field["options"]) if ciclo_field else []
-        prefs_opts_dict = json.loads(pref_field["options"]) if pref_field else {}
 
         new_alu_ciclo = col_p2.selectbox(
             "Ciclo Formativo",
@@ -350,7 +344,11 @@ def mostrar_carga_rapida():
                 options=prefs_opts_dict[new_alu_ciclo],
                 key="qr_alu_pref"
             )
-
+        col1, col2 = st.columns(2)
+        with col1:
+            anio = st.selectbox("Ciclo Académico*", aniosList, key="ano_alumno")
+        with col2:
+            curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
         # 4. BOTÓN DE ACCIÓN
         submit_btn = st.form_submit_button("🚀 Guardar y Vincular Formación")
 
@@ -386,7 +384,7 @@ def mostrar_carga_rapida():
                             "estado": estadosAlumno[1]
                         }, keys=["dni"])
 
-                        # C. Crear la Práctica (Vincular)
+                        # C. Crear la formación (Vincular)
                         # Usamos los parámetros que requiere tu función crearPractica
                         crearPractica(
                             empresaCif=new_emp_cif,
@@ -398,7 +396,7 @@ def mostrar_carga_rapida():
                             ciclos_info=None,
                             cupos_disp=None,
                             oferta_id=None,
-                            status= "Nuevo",
+                            status= estados[4],
                             anio= anio,
                             curso= curso,
                         )
@@ -408,7 +406,64 @@ def mostrar_carga_rapida():
 
                     except Exception as e:
                         st.error(f"❌ Error en el proceso: {str(e)}")
+def guardar_anexo_automatico(practica_id, campo_bd, key_widget):
+    # Obtenemos el valor actual del checkbox directamente desde el session_state
+    nuevo_valor = st.session_state[key_widget]
+    
+    payload_practica = {
+        "id": practica_id,
+        campo_bd: nuevo_valor
+    }
+    
+    try:
+        res = upsert(practicaTabla, payload_practica, keys=["id"])
+        if res and getattr(res, 'data', None):
+            st.toast(f"✅ Estado actualizado")
+    except Exception as e:
+        st.error(f"Error al actualizar la base de datos: {e}")
 
+def mostrar_anexos_practica(practica):
+    with st.expander("📋 Gestión de Anexos"):
+        practica_id = practica.get("id")
+
+        # Creamos 4 columnas para la fila horizontal
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.checkbox(
+                "Anexos Creados", 
+                value=bool(practica.get('anexos_creados')),
+                key=f"chk_creado_{practica_id}",
+                on_change=guardar_anexo_automatico,
+                args=(practica_id, 'anexos_creados', f"chk_creado_{practica_id}")
+            )
+        
+        with col2:
+            st.checkbox(
+                "Anexos Enviados", 
+                value=bool(practica.get('anexos_enviados')),
+                key=f"chk_enviados_{practica_id}",
+                on_change=guardar_anexo_automatico,
+                args=(practica_id, 'anexos_enviados', f"chk_enviados_{practica_id}")
+            )
+            
+        with col3:
+            st.checkbox(
+                "Anexos Firmados", 
+                value=bool(practica.get('anexos_firmados')),
+                key=f"chk_firmados_{practica_id}",
+                on_change=guardar_anexo_automatico,
+                args=(practica_id, 'anexos_firmados', f"chk_firmados_{practica_id}")
+            )
+            
+        with col4:
+            st.checkbox(
+                "DOC SAO", 
+                value=bool(practica.get('doc_sao_entregada')),
+                key=f"chk_sao_{practica_id}",
+                on_change=guardar_anexo_automatico,
+                args=(practica_id, 'doc_sao_entregada', f"chk_sao_{practica_id}")
+            )
 def mostrar_anexos():
     if not practicas:
         st.info("No tienes formaciones asignadas aun.")
@@ -419,35 +474,42 @@ def mostrar_anexos():
         pid = p["id"]
         
         estados_p = p.get("status", {})
-        if estados_p != "Nuevo":
+        if estados_p != estados[4]:
             continue
+            
         data_for_grid.append({
             "ID": pid,
             "Alumno": f"{p.get('alumnos', {}).get('nombre', '')} {p.get('alumnos', {}).get('apellido', '')}",
             "Empresa": p.get('empresas', {}).get('nombre', '—'),
+            "Gestor": p.get('gestor', 'Sin asignar'),
             "Estado": estados_p,
             "Ciclo": p.get('ciclo_formativo', '—'),
-            # Usamos 'is True' para que solo sea True si es explícito en la BD
             "Creado": True if p.get('anexos_creados') is True else False,
             "Enviados": True if p.get('anexos_enviados') is True else False,
             "Firmados": True if p.get('anexos_firmados') is True else False,
             "DOC SAO": True if p.get('doc_sao_entregada') is True else False
         })
 
-    # 2. Creamos el DataFrame
-    df_original = pd.DataFrame(data_for_grid)
+    # Si después de revisar todas las prácticas la lista está vacía, muestra un solo mensaje
+    if not data_for_grid:
+        st.info("No tienes formaciones pendientes de documentación.")
+        return
 
+    # Todo lo siguiente se ejecuta una sola vez, fuera del bucle for
+    df_original = pd.DataFrame(data_for_grid)
     st.subheader("📋 Gestión de Anexos")
+    
     if "df_key" not in st.session_state:
         st.session_state.df_key = 0
 
+    state_key = f"editor_anexos_{st.session_state.df_key}"
+
     edited_df = st.data_editor(
         df_original,
-        key=f"editor_anexos_{st.session_state.df_key}",
+        key=state_key,
         hide_index=True,
         width='stretch',
-        # Bloqueamos lo que no queremos que toquen
-        disabled=["ID", "Alumno", "Empresa", "Estado", "Ciclo"],
+        disabled=["ID", "Alumno", "Empresa", "Gestor", "Estado", "Ciclo"],
         column_config={
             "ID": None,
             "Creado": st.column_config.CheckboxColumn("Creado"),
@@ -457,8 +519,6 @@ def mostrar_anexos():
         }
     )
 
-
-    state_key = f"editor_anexos_{st.session_state.df_key}"
     cambios = st.session_state[state_key].get("edited_rows")
     
     if cambios:
@@ -487,13 +547,13 @@ def mostrar_anexos():
                 st.rerun()
 
 def mostrar_dashboard():
-    st.subheader("📊 Seguimiento de Feedback")
+    st.subheader("Seguimiento de Feedback")
     
-    col_f1, col_f2 = st.columns(2)
+    col_f1, col_f2, col_f3 = st.columns([1,1, 4])
     with col_f1:
-        fecha_inicio_filtro = st.date_input("Desde", value=datetime(2025, 9, 1))
+        fecha_inicio_filtro = st.date_input("Desde", value=datetime.now() - timedelta(days=90))
     with col_f2:
-        fecha_fin_filtro = st.date_input("Hasta", value=datetime(2026, 6, 30))
+        fecha_fin_filtro = st.date_input("Hasta", value=datetime.now())
 
     all_feedback_forms = get(feedbackFormsTabla) 
     ids_permitidos = [p["id"] for p in practicas]
@@ -505,24 +565,92 @@ def mostrar_dashboard():
 
     # Convertir a DataFrame para filtrar fácil
     df_fb = pd.DataFrame(all_feedback_forms)
-    df_fb['fecha_envio'] = pd.to_datetime(df_fb['fecha_envio']).dt.date
+    df_fb['fecha_real_envio'] = pd.to_datetime(df_fb['fecha_real_envio']).dt.date
 
     # Filtrar por rango de fecha
-    mask = (df_fb['fecha_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_envio'] <= fecha_fin_filtro)
+    mask = (df_fb['fecha_real_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_real_envio'] <= fecha_fin_filtro)
     df_filtrado = df_fb.loc[mask]
     # 3. Métricas Principales (KPIs)
     # Tipos: feedback_inicial, feedback_adaptacion, feedback_cierre
     total_enviados = len(df_filtrado[df_filtrado['estado'] != 'pendiente'])
     total_respondidos = len(df_filtrado[df_filtrado['fecha_respuesta'].notna()])
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Enviados", total_enviados)
-    
-    # Desglose por tipo (usando tus constantes de forms o strings)
-    for i, tipo in enumerate(['feedback_inicial', 'feedback_adaptacion', 'feedback_cierre']):
+    pct_respuesta = round((total_respondidos / total_enviados * 100) if total_enviados > 0 else 0)
+    pct_pendiente = 100 - pct_respuesta
+
+    st.markdown("""
+    <style>
+    .kpi-card {
+        background: #f8f9fa;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+    }
+    .kpi-circle {
+        width: 110px; height: 110px;
+        border-radius: 50%;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        margin: 0 auto 10px auto;
+        font-weight: bold;
+    }
+    .kpi-title { font-size: 13px; color: #666; margin-bottom: 4px; }
+    .kpi-number { font-size: 32px; font-weight: 800; }
+    .kpi-pct { font-size: 13px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.subheader("📊 Métricas Envio Correos y Respuestas")
+    c1, c2, c3= st.columns(3)
+
+    with c1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
+                <div class="kpi-number">{total_enviados}</div>
+                <div class="kpi-pct">Enviados</div>
+            </div>
+            <div class="kpi-title">Total Enviados</div>
+        </div>""", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
+                <div class="kpi-number">{total_respondidos}</div>
+                <div class="kpi-pct">{pct_respuesta}%</div>
+            </div>
+            <div class="kpi-title">Total Respondidos y %</div>
+        </div>""", unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
+                <div class="kpi-number">{total_enviados - total_respondidos}</div>
+                <div class="kpi-pct">{pct_pendiente}%</div>
+            </div>
+            <div class="kpi-title">Total Pendientes Respuesta y %</div>
+        </div>""", unsafe_allow_html=True)
+
+    tipos = [
+        ("feedback_inicial", "Acogida", "#fff3e0", "#f57c00"),
+        ("feedback_adaptacion", "Adaptación", "#f3e5f5", "#8e24aa"),
+        ("feedback_cierre", "Cierre", "#e0f2f1", "#00897b"),
+    ]
+    st.subheader("📊 Métricas Por tipo")
+    col1, col2, col3 = st.columns(3)
+    for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos):  # reutiliza columnas o ajusta
         count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
-        if i == 0: m2.metric("Acogida", count)
-        if i == 1: m3.metric("Adaptación", count)
-        if i == 2: m4.metric("Cierre", count)
+        with col:
+            st.markdown(f"""
+            <div class="kpi-card" style="margin-top:12px">
+                <div class="kpi-circle" style="background:{bg}; color:{color};">
+                    <div class="kpi-number">{count}</div>
+                    <div class="kpi-pct">Completos</div>
+                </div>
+                <div class="kpi-title">{label}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.divider()
 
@@ -533,24 +661,34 @@ def mostrar_dashboard():
         st.write("### ⏳ Alumnos que no han respondido")
         # Filtramos los que se enviaron pero no tienen fecha_respuesta
         df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
-        if not df_pendientes.empty:
-            listado_morosos = []
-            for _, row in df_pendientes.iterrows():
+        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+       
+        listado_morosos = []
+        for _, row in df_pendientes.iterrows():
+            practica = next((x for x in practicas if x["id"] == row['practica_id']), None)
+            if practica:
+                alumno_nom = f"{practica['alumnos']['nombre']} {practica['alumnos']['apellido']}"
+                tipo = row['tipo_form']
+                token = row['token']
+                link = f"{base_url.rstrip('/')}/{tipo}?token={token}&tipo={tipo}"
 
-                practica = next((x for x in practicas if x["id"] == row['practica_id']), None)
-                if practica:
-                    alumno_nom = f"{practica['alumnos']['nombre']} {practica['alumnos']['apellido']}"
-                    listado_morosos.append({
-                        "Alumno": alumno_nom,
-                        "Email": row['email_destino'],
-                        "Formulario": row['tipo_form'].replace('_', ' ').title(),
-                        "Fecha Envío": row['fecha_envio']
-                    })
-                    st.table(pd.DataFrame(listado_morosos))
-                else:
-                    st.success("¡Todos los alumnos han respondido a sus formularios o no se han enviado aun!")
+                listado_morosos.append({
+                    "Id": row['practica_id'],
+                    "Alumno": alumno_nom,
+                    "Email": row['email_destino'],
+                    "Formulario": row['tipo_form'].replace('_', ' ').title(),
+                    "Fecha Envío": row['fecha_real_envio'],
+                    "Recordatorio Enviado": row['recordatorio'] if row['recordatorio'] else "No enviado aún",
+                    "Link": f'<a href="{link}" target="_blank">Link</a>',
+                    "_tipo_form": row['tipo_form'],
+                })
+
+        if listado_morosos:
+                df_mostrar = pd.DataFrame(listado_morosos)
+                columnas_visibles = [c for c in df_mostrar.columns if not c.startswith("_")]
+                st.markdown(df_mostrar[columnas_visibles].to_html(escape=False, index=False).replace('<th>', '<th style="text-align:center">'), unsafe_allow_html=True)
         else:
-            st.success("¡Todos los alumnos han respondido a sus formularios o no se han enviado aun!")
+            st.success("¡Todos los alumnos han respondido!")
 
     with col_p2:
         st.write("### ⚡ Acciones")
@@ -558,26 +696,31 @@ def mostrar_dashboard():
         
         if st.button("🔔 Enviar Recordatorio Masivo", type="primary", width='stretch'):
             if not df_pendientes.empty:
-                with st.spinner("Ejecutando AppScript..."):
-                    # Aquí llamarías a tu función de AppScript pasándole los emails
-                    # Ejemplo: trigger_appscript_reminder(df_pendientes['email_destino'].tolist())
-                    st.success(f"Recordatorios enviados a {len(df_pendientes)} alumnos.")
+                with st.spinner("Enviando recordatorios..."):
+                    emails_enviados, errores = enviarRecordatoriosMasivos(listado_morosos)
+                    if emails_enviados:
+                        st.success(f"✅ Recordatorios enviados a {emails_enviados} alumnos.")
+                    if errores:
+                        st.warning(f"⚠️ No se pudo enviar a: {', '.join(errores)}")
             else:
                 st.warning("No hay nadie a quien reclamar.")
 
 def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
-    with st.expander("Detalle"):
+    st.session_state["email_alumno"] = alumno.get("email_alumno")
+    with st.expander("Detalle", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**Alumno:** {alumno['nombre']} {alumno['apellido']}")
             st.write(f"**DNI:** {alumno['dni']}")
             st.write(f"**Email:** {alumno['email_alumno']}")
+            st.write(f"**Teléfono Alumno:** {alumno['telefono']}")
             st.write(f"**Ciclo:** {p.get('ciclo_formativo', '—')}")
             area = p.get("area") or "No especificado"
             st.write(f"**Área:** {area}")     
             proyecto = p.get("proyecto") or "No especificado"
             st.write(f"**Proyecto:** {proyecto}")      
-            st.write(f"**Año:** {p.get('anio', '—')}")  
+            st.write(f"**Curso Académico:** {p.get('anio', '—')}")  
+            st.write(f"**Curso:** {p.get('curso', '—')}")  
         with col2:
             st.write(f"**Empresa:** {empresa['nombre']}")
             st.write(f"**CIF:** {empresa['CIF']}")
@@ -587,7 +730,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             st.write(f"**Dirección Formación:** {direccion}")
             localidad = oferta.get("localidad_empresa") or  empresa['localidad'] 
             st.write(f"**Localidad:** {localidad}")
-            st.write(f"**Curso:** {p.get('curso', '—')}")  
+
             lista_nombres_gestores = [g["nombre"] for g in gestores]
             if "No asignado" not in lista_nombres_gestores:
                 lista_nombres_gestores.insert(0, "No asignado")
@@ -651,68 +794,89 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
 
         pass
 
-def seccion_seguimiento(practicaId, fasesPractica, faseColPractica, empresa, alumno,practica):
-    st.subheader("Seguimiento")
-    estado_actual = st.session_state["estados"].get(practicaId, {})
-
-    mostrar_fases(fasesPractica, faseColPractica, estado_actual)
-
-    cols = st.columns(len(fasesPractica))
-    if rol_usuario != 'tutor' and rol_usuario != 'tutorCentro':
-        for i, fase in enumerate(fasesPractica):
-            col = faseColPractica[fase]
-            valor = bool(estado_actual.get(col))
-            key_checkbox = f"{empresa['CIF']}_{alumno['dni']}_{col}"
-
-            if key_checkbox not in st.session_state:
-                st.session_state[key_checkbox] = valor
-
-            with cols[i]:
-                if fase == fasesPractica[2]:
-                    checked = st.checkbox(fase, key=key_checkbox, help="Al marcar esta casilla, se comenzarán a enviar los formularios de feedack segun las fechas especificadas.")
-                else:
-                    checked = st.checkbox(fase, key=key_checkbox)
-
-            if checked != valor:
-                new_value = datetime.now().isoformat() if checked else None
-
-                upsert(practicaEstadosTabla, {"practicaId": int(practicaId), col: new_value}, keys=["practicaId"])
-                estado_actual[col] = new_value
-
-                if fase == fasesPractica[2] and checked:
-                    payload_practica = {
-                            "id": int(practicaId),
-                            "fecha_inicio": new_value,
-                            "status": estados[2]
-                        }
-                    upsert(practicaTabla, payload_practica, keys=["id"])
-                    dialog_fecha_fin(practicaId, alumno['email_alumno'])
-                if fase == fasesPractica[4] and checked:
-                    dialog_cancelacion(practica)
-                    
-                st.session_state["estados"][practicaId] = estado_actual
-                st.toast(f"✅  Estado actualizado")
+def seccion_programar(p):
+    with st.expander("📅 Fechas de la Formación", expanded=True):
+        f_inicio_db = p.get('fecha_inicio')
+        f_fin_db = p.get('fecha_fin')
+        if f_inicio_db and f_fin_db:
+            st.caption(f"✅ Periodo definido: de {f_inicio_db} hasta {f_fin_db}")
+        fecha_inicio_val = datetime.strptime(f_inicio_db, '%Y-%m-%d').date() if f_inicio_db else datetime.now().date()
     
-    
+        if f_fin_db:
+            fecha_fin_val = datetime.strptime(f_fin_db, '%Y-%m-%d').date()
+        else:
+            fecha_fin_val = fecha_inicio_val + timedelta(days=90) # Aprox 3 meses
+
+        colForm , col, colCancel = st.columns([3,0.5, 1])
+        with colForm:
+            with st.form(key=f"form_fechas_{p['id']}"):
+                col_ini, col_fin = st.columns(2)
+                with col_ini:
+                    nueva_f_ini = st.date_input(
+                        "Fecha Inicio", 
+                        value=fecha_inicio_val
+                    )
+
+                with col_fin:
+                    nueva_f_fin = st.date_input(
+                        "Fecha Fin (Prevista)", 
+                        value=fecha_fin_val
+                    )
+                
+                # Botón de guardado dentro del formulario
+                submit_save = st.form_submit_button("💾 Guardar")
+
+            if submit_save:
+                payload_practica = {
+                                "id": int(p.get('id')),
+                                "fecha_inicio": nueva_f_ini.isoformat(),
+                                "fecha_fin": nueva_f_fin.isoformat()
+                            }
+                st.write(payload_practica)
+                upsert(practicaTabla, payload_practica, keys=["id"])
+                st.success("Fechas actualizadas")
+                st.rerun()
+
+        with colCancel:
+            st.write("")  # Espaciado
+            st.write("")  # Espaciado
+                        
+            if st.button("Cancelar Formación", key=f"cancelar_{p['id']}", type="primary"):
+                dialog_cancelacion(p)
+        
+def feedback_formaciones(practica):
+    practicaId=practica.get('id')
+    alumno = practica.get('alumnos', {})
     feedbacks_forms = getEquals(feedbackFormsTabla, {"practica_id": practicaId})
     fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
-    if(estado_actual.get("en_progreso") is not None):
-        st.info(f"ℹ️ **Estado:** Pasantía Iniciada: {estado_actual.get("en_progreso")}", icon="🚀")
-        links = getFormsLinks(practicaId)
-        links_map = {item['tipo']: item['url'] for item in links}
-        with st.container(border=True):
-            link_ini = links_map.get('feedback_inicial', '#')
-            link_ada = links_map.get('feedback_adaptacion', '#')
-            link_cie = links_map.get('feedback_cierre', '#')
-            st.markdown(f"""
-            **Próximo Hito:**
-            * 📅 **Envio Feedback Acogida:** : {fechas.get('feedback_inicial', '--')} | [🔗 Abrir Formulario]({link_ini})
-            * 🕒 **Envio Feedback Adaptación:** {fechas.get('feedback_adaptacion', '--')} | [🔗 Abrir Formulario]({link_ada})
-            * ⏲️ **Envio Feedback Cierre:** {fechas.get('feedback_cierre', '--')} | [🔗 Abrir Formulario]({link_cie})
-            """)
-    pass
 
-def seccion_feedback_candidato(practicaId, forms):
+    if(practica.get('status') is not None and practica.get('status') != estados[1]):
+        st.info(f"ℹ️ **Estado:** Formación {practica.get('status')}", icon="🚀")
+    else:
+        st.info(f"ℹ️ **Estado:** Formación {practica.get('status')}", icon="🚀")
+        if len(feedbacks_forms) <= 0:
+            fecha_inicio_dt = datetime.fromisoformat(practica.get('fecha_inicio'))
+            fecha_fin_dt = datetime.fromisoformat(practica.get('fecha_fin'))
+            asignarFechasFormsFeedback(int(practica.get('id')), fecha_inicio_dt, alumno.get('email_alumno'), fecha_fin_dt)
+            st.toast("Generando formularios de feedback.")
+            st.caption("Actualice la formación para ver los hitos")
+        else:
+            if (practica.get('status') is not None and practica.get('status') == estados[1]):
+                links = getFormsLinks(practicaId)
+                links_map = {item['tipo']: item['url'] for item in links}
+                with st.container(border=True):
+                    link_ini = links_map.get('feedback_inicial', '#')
+                    link_ada = links_map.get('feedback_adaptacion', '#')
+                    link_cie = links_map.get('feedback_cierre', '#')
+                    st.markdown(f"""
+                    **Próximo Hito:**
+                    * 📅 **Envio Feedback Acogida:** : {fechas.get('feedback_inicial', '--')} | [🔗 Abrir Formulario]({link_ini})
+                    * 🕒 **Envio Feedback Adaptación:** {fechas.get('feedback_adaptacion', '--')} | [🔗 Abrir Formulario]({link_ada})
+                    * ⏲️ **Envio Feedback Cierre:** {fechas.get('feedback_cierre', '--')} | [🔗 Abrir Formulario]({link_cie})
+                    """)
+
+def seccion_feedback_candidato(p, practicaId, forms):
+    feedback_formaciones(p)
     st.subheader("¿Cómo se siente el candidato?")
     feedbacks_db = getEquals(feedbackResponseTabla, {"practica_id": practicaId})
     feedbacksEnviados_db = getEquals(feedbackFormsTabla, {"practica_id": practicaId}, not_equals={"estado": "pendiente"})
@@ -727,6 +891,7 @@ def seccion_feedback_candidato(practicaId, forms):
         tipo = f["respuestas_json"].get("tipo")
         if tipo in progreso_feedback:
             progreso_feedback[tipo] = f["respuestas_json"]
+    respuestasCierre= progreso_feedback[forms[2]]
 
     # 3. Crear las columnas y mostrar las cards
     col_ini, col_ada,col_cie = st.columns(3)
@@ -738,13 +903,38 @@ def seccion_feedback_candidato(practicaId, forms):
         render_feedback_card(progreso_feedback[forms[1]], "Adaptación")
 
     with col_cie:
-        render_feedback_card(progreso_feedback[forms[2]], "Cierre")
+        render_feedback_card(respuestasCierre, "Cierre")
     pass
+    st.subheader(f"Resultado de la formación en empresa")
+    respuestasCierreFormacion = p.get("datos_cierre") or {}
+
+    if respuestasCierre:
+        # ¿Te contrata la empresa?
+        contratado = respuestasCierreFormacion.get("contratado", False)
+        st.markdown(f"{'✅' if contratado else '❌'} **¿Lo contrata la empresa?**")
+
+        # ¿Sigue estudiando?
+        sigue = respuestasCierreFormacion.get("sigueEstudiando", False)
+        st.markdown(f"{'✅' if sigue else '❌'} **¿Sigue estudiando?**")
+        if sigue:
+            estudios = respuestasCierreFormacion.get("estudios") or "—"
+            lugar = respuestasCierreFormacion.get("lugarEstudios") or "—"
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📚 **Qué:** {estudios}")
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📍 **Dónde:** {lugar}")
+
+        # ¿Contratado por otra empresa?
+        otra = respuestasCierreFormacion.get("contratadoOtraEmpresa", False)
+        st.markdown(f"{'✅' if otra else '❌'} **¿Contratado por otra empresa?**")
+        if otra:
+            empresa = respuestasCierreFormacion.get("nombreEmpresa") or "—"
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;🏢 **Empresa:** {empresa}")
+    else:
+        st.info("Aún no se ha completado el formulario de cierre.") 
 
 def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
     st.subheader("Seguimiento del Tutor Empresa")
     nombre_tutor = tutor_actual or "Sin Asignar"
-    with st.expander(f"Tutor Centro: {nombre_tutor}", expanded=abierto):
+    with st.expander(f"Tutor en Empresa: {nombre_tutor}", expanded=True):
         historial_feedback = p.get("feedback_tutor")
         if not isinstance(historial_feedback, list):
             historial_feedback = []
@@ -789,7 +979,7 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
         # 3. VISUALIZACIÓN DEL HISTORIAL (Para Tutor y Gestor)
         # Lo mostramos en un contenedor con scroll si hay muchos
         if historial_feedback:
-            with st.expander("Historial de observaciones"):
+            with st.expander("Historial de observaciones", expanded=abierto):
                 for fb in reversed(historial_feedback):
                     with st.chat_message("user", avatar="👨‍🏫"):
                         st.markdown(f"**{fb['tutor']}** - <span style='color:gray; font-size:0.8rem;'>{fb['fecha']}</span>", unsafe_allow_html=True)
@@ -804,88 +994,74 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
     if "contratadoOtraEmpresa" not in st.session_state:
         st.session_state.contratadoOtraEmpresa = ultimo_feedback.get("contratadoOtraEmpresa", False)
     st.subheader("Seguimiento del Tutor Centro")
-    with st.expander(f"Tutor Centro: {tutor_actual}"):
-        colContrata, colEstudio,colEmpresa = st.columns(3)
-        with colContrata:
-            lo_contratan = st.checkbox("¿Lo contratan?" ,value=ultimo_feedback.get("contratado", False),
-                disabled=not puede_editar)
-        with colEstudio:    
-            sigue_estudiando = st.checkbox("¿Sigue estudiando?",
-                value=ultimo_feedback.get("sigueEstudiando", False),
-                disabled=not puede_editar)
-            que_estudia = None
-            donde_estudia = None
-            if sigue_estudiando:
-                que_estudia = st.text_input("¿Qué estudia?",
-                    value=ultimo_feedback.get("estudios", ""),
-                    disabled=not puede_editar)
-                donde_estudia = st.text_input("¿Dónde estudia?",
-                    value=ultimo_feedback.get("lugarEstudios", ""),
-                    disabled=not puede_editar)
-        with colEmpresa:
-            otra_empresa = st.checkbox("¿Contratado por otra empresa?",
-                disabled=not puede_editar, key="contratadoOtraEmpresa")
-            nombre_empresa = None
-
-            if otra_empresa:
-                nombre_empresa = st.text_input("Nombre de la empresa",
-                    value=ultimo_feedback.get("nombreEmpresa", ""),
-                    disabled=not puede_editar)
-
-
-        st.write("**Seguimiento**")
+    with st.expander(f"Tutor Centro: {tutor_actual}", expanded=True):
         if "fp_contacto" not in st.session_state:
             st.session_state.fp_contacto = ultimo_feedback.get("programaFP", False)
 
         if "fp_pyme_contacto" not in st.session_state:
-            st.session_state.fp_pyme_contacto = ultimo_feedback.get("FPPYME", False)
+            st.session_state.fp_pyme_contacto = ultimo_feedback.get("FPPYME", "No")
 
-        with st.expander("Comentarios "):
-            comentarios_contacto1 = st.text_area("Comentarios ",
-            value=ultimo_feedback.get("primerContacto", ""),
-            disabled=not puede_editar)
+        with st.form("form_feedback_tutor_centro"):
+            comentarios_contacto1 = st.text_area("Comentarios",
+                value=ultimo_feedback.get("primerContacto", ""),
+                disabled=not puede_editar)
+
             fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
                 disabled=not puede_editar, key="fp_contacto")
-            fp_pyme = st.checkbox("¿Quiere participar en FP PYME?",
-                disabled=not puede_editar, key="fp_pyme_contacto")     
 
-        if puede_editar:
-            if st.button("💾 Guardar",width='stretch'):
-                nuevo_registro = {
-                    "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "tutorCentro": tutor_actual, 
-                    "contratado": lo_contratan,
-                    "sigueEstudiando": sigue_estudiando,
-                    "estudios":que_estudia,
-                    "lugarEstudios": donde_estudia,
-                    "contratadoOtraEmpresa": otra_empresa,
-                    "nombreEmpresa": nombre_empresa,
-                    "primerContacto": comentarios_contacto1.strip(),
-                    "programaFP": fp,
-                    "FPPYME": fp_pyme
-                }
-                
-                try:
-                    upsert(practicaTabla, {
-                        "id": int(practicaId),
-                        "feedback_tutor_centro": nuevo_registro
-                    }, keys=["id"])
-                    
-                    st.toast("✅ Seguimiento guardado")
-                    p["feedback_tutor_centro"] = nuevo_registro
-                    st.rerun() 
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+            ha_acogido = st.radio(
+                label="**¿Alguna vez has acogido a algún estudiante de FP dual?**",
+                options=["Sí", "No"],
+                index=0 if st.session_state.fp_pyme_contacto == "Sí" else 1,
+                horizontal=True,
+                key="ha_acogido_fp_dual",
+                disabled=not puede_editar
+            )
 
+            submit = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True, disabled= not puede_editar)
 
-def seccion_planificacion(alumno, empresa, practicaId):
-        st.subheader("📅 Planificación de Formación")
+        if submit:
+            nuevo_registro = {
+                "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "tutorCentro": tutor_actual,
+                "primerContacto": comentarios_contacto1.strip(),
+                "programaFP": fp,
+                "FPPYME": ha_acogido
+            }
+
+            try:
+                upsert(practicaTabla, {
+                    "id": int(practicaId),
+                    "feedback_tutor_centro": nuevo_registro
+                }, keys=["id"])
+
+                st.toast("✅ Seguimiento guardado")
+                p["feedback_tutor_centro"] = nuevo_registro
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar: {e}")
+
+def actualizar_fecha(key_nombre, id_registro, tipo):
+    nueva_fecha = st.session_state[key_nombre]
+    st.write(nueva_fecha)
+    st.toast(f"Actualizando fecha: {nueva_fecha}")
+    payload_practica = {
+                            "id": int(id_registro),
+                            tipo: datetime.strptime(str(nueva_fecha.strftime("%Y-%m-%d")), "%Y-%m-%d").strftime("%Y-%m-%d")
+                        }
+    res = upsert(practicaTabla, payload_practica, keys=["id"])
+    if res and getattr(res, 'data', None):
+        st.toast("✅ Fecha actualizada")
+
+def seccion_planificacion(alumno, empresa, practica):
+    with st.expander("🗓️ Planificación de Formación"):
+        practicaId = practica.get("id")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
-        
+
         if rol_usuario == 'admin':
-            col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
+            col_cal1, col_cal2 = st.columns([1, 2]) # Ajustamos el ancho para la imagen
             with col_cal1:
                 url_generador = linkCalendar
                 st.link_button("🛠️ Generar Nuevo Calendario", url_generador, width='stretch')
@@ -897,7 +1073,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                     key=f"cal_up_{practicaId}"
                 )
                 if uploaded_cal:
-                    if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                    if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
                             temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
                             with open(temp_path, "wb") as f:
@@ -928,7 +1104,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
+                    st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
                 else:
                     st.markdown(
                         """
@@ -957,19 +1133,127 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                        st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
+                        st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
             else:
                 st.write("No han subido calendario aun")
         pass
 
 def seccion_documentos(alumno, empresa, practicaId):
-    st.subheader("📎 Adjuntar documentos")
+    st.subheader("📎 Documentos")
 
     folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
     files, folderId = list_drive_files(folder_name)
+    if rol_usuario != 'tutor':
+        if folderId:
+            st.link_button("Abrir carpeta", f"https://drive.google.com/drive/folders/{folderId}")
 
-    if folderId:
-        st.link_button("Abrir carpeta en Drive", f"https://drive.google.com/drive/folders/{folderId}")
+    if files:
+        for f in files:
+            fecha = f.get("modifiedTime", "")[:10]
+            st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
+    else:
+        st.warning("No hay documentación subida.")
+    if rol_usuario != 'tutor':
+        uploaded_files = st.file_uploader(
+            "Subir archivos",
+            type=["pdf", "doc", "docx", "odt"],
+            accept_multiple_files=True,
+            key=f"up_{practicaId}"
+        )
+
+        if uploaded_files:
+            too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+            if too_big:
+                st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+            else:
+                if st.button("Subir Archivos", key=f"subir_{practicaId}"):
+                    with st.spinner("Subiendo archivos..."):
+                        for file in uploaded_files:
+                            extension = Path(file.name).suffix
+                            nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
+                            nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                            temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
+                            with open(temp, "wb") as f:
+                                f.write(file.getbuffer())
+                            upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
+                            st.success(f"Subido: {nuevo_nombre}")
+
+
+        
+        pass
+
+def mostrar_detalle_cancelada(p):
+    if not p:
+        st.error("Formación no encontrada.")
+        return
+
+    oferta = p.get("oferta_fp", {}) or {}
+    empresa = p.get("empresas", {}) or {}
+    alumno = p.get("alumnos", {}) or {}
+    
+    st.title(f"{alumno.get('nombre', '')} {alumno.get('apellido', '')} – {empresa.get('nombre', '')}")
+    
+    # Detalle expandido en modo estricto de lectura
+    seccion_detalle_cancelado(alumno, empresa, p, oferta)
+    st.divider( )
+
+    st.write(f"**Estado de Formación:** `{p.get('status', '—')}`")
+    st.write(f"**Fecha Inicio:** `{p.get('fecha_inicio', '—')}`")
+    st.write(f"**Fecha Cancelación:** `{p.get('fecha_cancelacion', '—')}`")
+    st.write(f"**Motivo:** `{p.get('motivo', '—')}`")
+    st.divider( )
+
+
+    seccion_planificacion_cancelado(alumno, empresa, p)
+    st.divider( )
+    seccion_documentacion_cancelado(alumno, empresa)
+
+def seccion_detalle_cancelado(alumno, empresa, p, oferta):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Alumno:** {alumno.get('nombre', '')} {alumno.get('apellido', '')}")
+        st.write(f"**DNI:** {alumno.get('dni', '')}")
+        st.write(f"**Email:** {alumno.get('email_alumno', '')}")
+        st.write(f"**Ciclo Formativo:** {p.get('ciclo_formativo', '—')}")
+        st.write(f"**Curso Académico:** {p.get('anio') or 'No especificado'}")     
+        st.write(f"**Curso:** {p.get('curso') or 'No especificado'}")     
+        st.write(f"**Área:** {p.get('area') or 'No especificado'}")     
+        st.write(f"**Proyecto:** {p.get('proyecto') or 'No especificado'}")      
+
+
+    with col2:
+        st.write(f"**Empresa:** {empresa.get('nombre', '')}")
+        st.write(f"**CIF:** {empresa.get('CIF', '')}")
+        st.write(f"**Dirección formación:** {oferta.get('direccion_empresa') or empresa.get('direccion', '')}") 
+        st.write(f"**Localidad:** {oferta.get('localidad_empresa') or empresa.get('localidad', '')}")
+        st.write(f"**Tutor Empresa:** {p.get('tutor') or 'No asignado'}")
+        st.write(f"**Tutor Centro:** {p.get('tutor_centro', 'Sin asignar')}")
+        st.write(f"**Gestor:** {alumno.get('gestor', 'Sin asignar')}")
+
+def seccion_planificacion_cancelado(alumno, empresa, p):
+    st.subheader("📅 Planificación de Formaciones")
+    folder_name = f"{alumno.get('apellido', '')}_{alumno.get('nombre', '')}_{alumno.get('dni', '')}_practica_{empresa.get('nombre', '')}".strip()
+    
+    archivo_calendario = None
+    try:
+        files = list_drive_files(folder_name)
+        archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
+    except Exception:
+        pass
+    
+    with st.expander("Ver Calendario", expanded=True):
+        if archivo_calendario and archivo_calendario.get('id'):
+            preview_url = f"https://drive.google.com/file/d/{archivo_calendario.get('id')}/preview"
+            st.markdown(f'<div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;"><iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe></div>', unsafe_allow_html=True)
+            st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
+        else:
+            st.markdown('<div style="border: 2px dashed #ccc; border-radius: 10px; height: 350px; display: flex; align-items: center; justify-content: center; color: #aaa; text-align: center; padding: 10px;">No hay archivos de calendario subidos en la carpeta de Drive de esta pasantía.</div>', unsafe_allow_html=True)
+
+def seccion_documentacion_cancelado(alumno,empresa):
+    st.subheader("📎 Documentos Adjuntos")
+
+    folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
+    files, folderId = list_drive_files(folder_name)
 
     if files:
         for f in files:
@@ -978,33 +1262,6 @@ def seccion_documentos(alumno, empresa, practicaId):
     else:
         st.warning("No hay archivos.")
 
-    uploaded_files = st.file_uploader(
-        "Subir archivos",
-        type=["pdf", "doc", "docx", "odt"],
-        accept_multiple_files=True,
-        key=f"up_{practicaId}"
-    )
-
-    if uploaded_files:
-        too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
-        if too_big:
-            st.error("Archivos demasiado grandes: " + ", ".join(too_big))
-        else:
-            if st.button("Subir Archivos", key=f"subir_{practicaId}"):
-                with st.spinner("Subiendo archivos..."):
-                    for file in uploaded_files:
-                        extension = Path(file.name).suffix
-                        nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
-                        nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
-                        temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
-                        with open(temp, "wb") as f:
-                            f.write(file.getbuffer())
-                        upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
-                        st.success(f"Subido: {nuevo_nombre}")
-
-
-    pass
-
 def mostrar_detalle():
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
@@ -1012,45 +1269,48 @@ def mostrar_detalle():
         st.error("Formación no encontrada.")
         st.session_state.page = "lista"
         return
-
-    p["oferta_fp"] = p.get("oferta_fp") or {}
-    p["empresas"] = p.get("empresas") or {}
-    p["alumnos"] = p.get("alumnos") or {}
-    oferta = p["oferta_fp"]
-    empresa = p["empresas"]
-    alumno = p["alumnos"]
-    tutor_actual = p.get("tutor") 
-    tutorCentro_actual = p.get("tutor_centro") 
-    st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
-    if rol_usuario == 'tutor':
-        seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
-        st.divider()
-        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno, p)
-        st.divider()
-        seccion_feedback_tutor(practicaId, p, tutor_actual, True)
-        st.divider()
-        seccion_planificacion(alumno,empresa, practicaId)
-
+    if p.get("status") == estados[2] or p.get("status") == estados[3]:
+        mostrar_detalle_cancelada(p)
     else:
-        seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
-        st.divider()
-        seccion_seguimiento(practicaId, fasesPractica, faseColPractica,empresa, alumno, p)
-        st.divider()
-        seccion_planificacion(alumno,empresa, practicaId)
-        st.divider()
-        seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
-        st.divider()
-        seccion_feedback_tutor(practicaId, p, tutor_actual, False)
-        st.divider()
-        seccion_feedback_candidato(practicaId, forms)
-        st.divider()
-        seccion_documentos(alumno, empresa, practicaId)
+        p["oferta_fp"] = p.get("oferta_fp") or {}
+        p["empresas"] = p.get("empresas") or {}
+        p["alumnos"] = p.get("alumnos") or {}
+        oferta = p["oferta_fp"]
+        empresa = p["empresas"]
+        alumno = p["alumnos"]
+        tutor_actual = p.get("tutor") 
+        tutorCentro_actual = p.get("tutor_centro") 
+        st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
+        planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento y Feedback", "Documentación"])
+        if rol_usuario == 'tutor':
+            with planificacionTab:
+                seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
+                seccion_planificacion(alumno,empresa, p)
+            with seguimientoTab:
+                seccion_feedback_tutor(practicaId, p, tutor_actual, True)
+            with documentacionTab:
+                seccion_documentos(alumno, empresa, practicaId)
+        else:
+            with planificacionTab:
+                seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
+                mostrar_anexos_practica(p)
+                seccion_programar(p)
+                seccion_planificacion(alumno,empresa, p)
+            with seguimientoTab:
+                seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
+                st.divider()
+                seccion_feedback_tutor(practicaId, p, tutor_actual, True)
+                st.divider()
+                seccion_feedback_candidato(p, practicaId, forms)
+            with documentacionTab:
+                seccion_documentos(alumno, empresa, practicaId)
 
    
 # ------------------------------------------
 # VOLVER SIN EXPERIMENTAL
 # ------------------------------------------
-    if st.button("⬅️ Volver"):
+    st.divider()
+    if st.button("⬅ Volver",type="primary"):
         st.session_state.page = "lista"
         st.rerun()
 
