@@ -19,7 +19,8 @@ from variables import (
     tutoresTabla,
     tutoresCentroTabla,
     practicaCanceladaTabla,
-    logsTabla
+    ciclosFormativosTablas,
+    estados
 )
 load_dotenv()
 
@@ -63,8 +64,10 @@ def update_oferta_complex(oferta_id, df_editado, gestores_activos):
     
     return res
 def get_alumnos_con_practicas_consolidado():
+    ciclos_db = supabase.table(ciclosFormativosTablas).select("nombre, abreviatura").execute()
+    mapa_ciclos = {c["nombre"]: c["abreviatura"] for c in ciclos_db.data}
     sinEmpresa = (
-        supabase.table("alumnos")
+        supabase.table(alumnosTabla)
         .select("""
         *,
         practicas_fp!left(
@@ -72,11 +75,15 @@ def get_alumnos_con_practicas_consolidado():
             alumno,
             status,
             area,
+            proyecto,
             tutor_centro,
             tutor,
             gestor,
-            anio, 
+            anio,
+            oferta, 
             curso,
+            direccion,
+            localidad,
             empresas(CIF, nombre, telefono, email_empresa)
         )
     """)
@@ -94,13 +101,16 @@ def get_alumnos_con_practicas_consolidado():
                 area,
                 tutor_centro,
                 tutor,
+                proyecto,
                 gestor,
                 anio,
                 curso,
+                direccion,
+                localidad,
                 empresas(CIF, nombre, telefono, email_empresa)
             )
             """)
-        .eq("practicas_fp.status", "Borrador")
+        .eq("practicas_fp.status", estados[5])
         .execute()
     )
 
@@ -120,8 +130,11 @@ def get_alumnos_con_practicas_consolidado():
         practicas = item.get("practicas_fp", [])
         practica = practicas[0] if practicas else {}
         empresa = practica.get("empresas", {}) if practica else None
+        nombre_ciclo = item.get("ciclo_formativo")
+        abreviatura = mapa_ciclos.get(nombre_ciclo) if nombre_ciclo else None
         row = {
             **item,
+            "abreviatura": abreviatura,
             "practica_id": practica.get("id") if practica else None,
             "id_empresa": empresa.get("CIF") if isinstance(empresa, dict) else "⚠️ SIN ASIGNAR",
             "nombre_empresa": empresa.get("nombre") if isinstance(empresa, dict) else "⚠️ SIN ASIGNAR",
@@ -131,6 +144,14 @@ def get_alumnos_con_practicas_consolidado():
             "tutor_centro": practica.get("tutor_centro") if practica else None,
             "tutor": practica.get("tutor") if practica else None,
             "gestor": practica.get("gestor") if practica else None,
+            "anio_alumno": item.get("anio"),    # Año nativo de la tabla Alumnos
+            "curso_alumno": item.get("curso"),  # Curso nativo de la tabla Alumnos
+            "anio_practica": practica.get("anio") if practica else None,    # Año de la práctica
+            "curso_practica": practica.get("curso") if practica else None,
+            "oferta": practica.get("oferta") if practica else None,
+            "puesto": practica.get("proyecto") if practica else None,
+            "direccion_empresa": practica.get("direccion") if practica else None,
+            "localidad_empresa": practica.get("localidad") if practica else None,
         }
 
         if "practicas_fp" in row: 
@@ -176,10 +197,17 @@ def getTutores():
 def getEmpresasYOfertas():
     res = (
         supabase.table(empresasTabla)
-        .select("*, oferta_fp(ciclos_formativos,puestos,tutores_por_puesto, tutores(nombre))")
+        .select("*, oferta_fp(id, ciclos_formativos,puestos,anio, tutor, direccion_empresa,localidad_empresa)")
         .order("nombre")
         .execute()
     )
+    res_tutores = supabase.table(tutoresTabla).select("id, nombre").execute()
+    mapeo_tutores = {t['id']:t['nombre'] for t in res_tutores.data}
+    for empresa in res.data:
+        if "oferta_fp" in empresa and empresa["oferta_fp"]:
+            for oferta in empresa["oferta_fp"]:
+                id_tutor = oferta.get("tutor")
+                oferta["tutor_nombre"] = mapeo_tutores.get(id_tutor, "Sin asignar")
     return res.data
 
 def updateTutores(cambios, df_original, cif=None):
@@ -479,6 +507,38 @@ def getAuthToken(email):
         return response.data[0]  # ✅ Devolvemos el primer resultado como dict
     return None
 
+def getFormsLinks(practica_id):
+    response = supabase.table(feedbackFormsTabla).select("*").eq("practica_id", practica_id).execute()
+    return getLinkFromList(response.data)
+   
+def getLinkFromList(listForms):
+    base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+    if isinstance(listForms, pd.DataFrame):
+        if listForms.empty:
+            return []
+        listForms = listForms.to_dict(orient="records")
+    else:
+        if not listForms:
+            return []
+
+    links_creados = []
+    for item in listForms:
+        token = item.get("token")
+        tipo = item.get("tipo_form")
+        fechaEnvio = item.get("fecha_envio")
+        # Estructura: url/tipo_form?token=xyz&tipo=tipo_form
+        # Usamos f-strings para que sea más legible
+        url_completa = f"{base_url.rstrip('/')}/{tipo}?token={token}&tipo={tipo}"
+        
+        # Guardamos el link junto al tipo para saber cuál es cuál
+        links_creados.append({
+            "tipo": tipo,
+            "url": url_completa,
+            "estado": item.get("estado"),
+            "fecha_envio": fechaEnvio
+        })
+
+    return links_creados
 def getPracticaByToken(token, tipo_form):
     try:
         fb_res = (
@@ -496,7 +556,7 @@ def getPracticaByToken(token, tipo_form):
         feedback = fb_res.data
         practica_id = feedback["practica_id"]
 
-        # 2️⃣ Traer la práctica
+        # 2️⃣ Traer la formación
         practica_res = (
             supabase
             .table(practicaTabla)
@@ -752,7 +812,6 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         curr_horas = clean_int(row.get('horas_totales'))
         curr_gestor = clean_str(row.get('gestor'))
         curr_asignado = clean_str(row.get('asignado'))
-        curr_practica = row.get('practica_id')
         curr_anio = clean_str(row.get('anio'))
         curr_curso = clean_str(row.get('curso'))
         # 4. EXTRAER VALORES ORIGINALES
@@ -763,6 +822,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         orig_horas = clean_int(row_orig.get('horas_totales'))
         orig_gestor = clean_str(row_orig.get('gestor'))
         orig_asignado = clean_str(row_orig.get('asignado'))
+  
 
         # 5. DETECCIÓN DE CAMBIOS EXPLÍCITA
         # He añadido curr_horas != orig_horas aquí para que el IF se active si cambian las horas
@@ -785,20 +845,26 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
             }
             upsert(alumnosTabla, datos_alumno, keys=["dni"])
 
-
         # 6. LÓGICA DE ASIGNACIÓN DE EMPRESA
         nueva_empresa = row.get('nombre_empresa')
         empresa_antigua = row_orig.get('nombre_empresa')
+        nuevo_area = row.get('area')
+        antiguo_area= row_orig.get('area')
         nuevo_puesto = row.get('puesto')
         antiguo_puesto= row_orig.get('puesto')
-        nueva_direccion = row.get('direccion')
-        nueva_localidad= row.get('localidad')
+        nueva_oferta = clean_int(row.get('oferta'))
+        antigua_oferta = clean_int(row_orig.get('oferta'))
+        antigua_direccion = row_orig.get('direccion_empresa')
+        nueva_direccion = row.get('direccion_empresa')
+        antigua_localidad= row_orig.get('localidad_empresa')
+        nueva_localidad= row.get('localidad_empresa')
         nuevo_tutorCentro = row.get('tutor_centro')
         antiguo_tutorCentro = row_orig.get('tutor_centro')
         cambio_logistica = (nueva_empresa != empresa_antigua or 
                     nuevo_puesto != antiguo_puesto or 
                     nuevo_tutorCentro != antiguo_tutorCentro or
-                    curr_gestor != orig_gestor)
+                    curr_gestor != orig_gestor or 
+                    nuevo_area != antiguo_area)
         newCif=None
         if cambio_logistica:
                 if nueva_empresa == "⚠️ SIN ASIGNAR":
@@ -809,15 +875,15 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                     empresaCif=newCif,
                     alumnoDni=dni,
                     ciclo=row['ciclo_formativo'], 
-                    area=nuevo_puesto if nuevo_puesto else antiguo_puesto,
-                    proyecto= "No asignado aun",
+                    area= nuevo_area if nuevo_area else antiguo_area,
+                    proyecto=nuevo_puesto if nuevo_puesto else antiguo_puesto,
                     tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
-                    oferta_id=row.get('oferta_id'),
-                    status="Borrador",
+                    oferta_id=nueva_oferta if nueva_oferta else antigua_oferta,
+                    status=estados[5],
                     practicaId=row.get('practica_id'),
                     gestor=curr_gestor if curr_gestor else orig_gestor,
-                    direccion=nueva_direccion,
-                    localidad=nueva_localidad,
+                    direccion=nueva_direccion if nueva_direccion else antigua_direccion,
+                    localidad=nueva_localidad if nueva_localidad else antigua_localidad,
                     anio=curr_anio,
                     curso=curr_curso
                 )
@@ -834,13 +900,13 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 "estado":"Asignado"}
                 upsert(alumnosTabla, datos_alumno, keys=["dni"])
                 print(f"Cambio en tabla alumnos: {dni} a Asignado")
-                update(practicaTabla, {"status": "Nuevo"}, {"id": practicaId})
-                print(f"Cambio en practica el estado a nuevo {practicaId}")
+                update(practicaTabla, {"status": estados[4]}, {"id": practicaId})
+                print(f"Cambio en practica el estado a falta documentacion {practicaId}")
                 upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
                 print(f"Restando cupo (-1) en: {nueva_empresa} ({cif_nuevo})")
                 actualizar_cupo(cif_nuevo, row['ciclo_formativo'], -1)
             else:
-                st.warning(f"No se puede confirmar la práctica de {curr_nombre} sin una empresa asignada.")
+                st.warning(f"No se puede confirmar la formación de {curr_nombre} sin una empresa asignada.")
 
 def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro ,oferta_id, status, 
                        practicaId=None, gestor=None,direccion=None, localidad=None, anio=None, curso=None):
@@ -859,11 +925,18 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
             "anio": anio,
             "curso": curso
         }
+
+        print(f"entro a crear practica {payload_practica}")
         if practicaId:
             payload_practica["id"] = int(practicaId)
-        response = upsert(practicaTabla, payload_practica, keys=["id"])
-       
+            print(f"entro a actualizar")
+            response = upsert(practicaTabla, payload_practica, keys=["id"])
+        else:  
+            print(f"entro a crear")
+            response = add(practicaTabla, payload_practica)
+        
         return response.data
+        
         #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
 def cancelarPractica(practica, motivo):
@@ -881,22 +954,10 @@ def cancelarPractica(practica, motivo):
     feedbackEmpresa = practica.get("feedback_tutor")
     fecha_inicio = practica.get("fecha_inicio")
 
-    payload_practica = {"id": int(practicaId),"status": "Cancelada",
-                        "area":"",
-                        "proyecto":"" ,"fecha_inicio":None
-                        ,"tutor_centro": None, 
-                        "tutor": None, 
-                        "gestor": None, 
-                        "feedback_tutor_centro": None,
-                        "feedback_tutor": None,
-                        "anexos_creados": None,
-                        "anexos_enviados"  : None,
-                        "anexos_firmados": None,
-                        "doc_sao_entregada": None,
-                        "direccion": None,
-                        "localidad": None,
-                        "anio": None,
-                        "curso": None
+    payload_practica = {"id": int(practicaId),"status":estados[3],
+                        "motivo": motivo,
+                        "fecha_fin": None,
+                        "fecha_cancelacion": datetime.now().isoformat()
                         }
     payload_practica_cancelada = {"alumno":alumnoDni, 
          "empresa": cif, 
@@ -931,11 +992,11 @@ def cancelarPractica(practica, motivo):
 
 
     except Exception as e:
-            st.error(f"Error procesando la cancelación de la práctica: {e}")
+            st.error(f"Error procesando la cancelación de la formación: {e}")
 
 
 def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id, status:None, anio=None, curso=None):
-    registro_existente = getEquals(practicaTabla, {"alumno": alumnoDni})
+    registro_existente = getEquals(practicaTabla, {"alumno": alumnoDni, "empresa":empresaCif})
     payload_practica = {
         "empresa": empresaCif,
         "alumno": alumnoDni,
@@ -986,7 +1047,10 @@ def logError(error_msg, pagina):
     #             })
 
 
-    
+def actualizarFeedbackRecordatorio(email, tipo_form, id_practica):
+    data_feedback = {"recordatorio": datetime.now().date().isoformat()}
+    update(feedbackFormsTabla, data_feedback, {"email_destino": email, "tipo_form": tipo_form, "practica_id": id_practica})
+
 def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_fin):
     for i, tipo in enumerate(forms):
         if i == len(forms) - 1:
@@ -1014,3 +1078,54 @@ def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_f
                 add(feedbackFormsTabla, data_feedback)       
         except Exception as e:
             st.error(f"Error procesando feedback para {tipo}: {e}")
+
+def updateCiclosFormativos(cambios, df_original):
+    for new_row in cambios["added_rows"]:
+        nombre = new_row.get("nombre", "").strip()
+        abreviatura = new_row.get("abreviatura", "").strip()
+        areas = new_row.get("areas", "").strip()
+
+        if abreviatura and nombre:
+            try:
+                add(ciclosFormativosTablas, {
+                    "nombre": nombre,
+                    "abreviatura": abreviatura,
+                    "areas":areas
+                })
+            except Exception as e:
+                raise Exception(f"Error al crear el ciclo {nombre}: {e}")
+
+    for idx, mods in cambios["edited_rows"].items():
+            fila_orig = df_original[int(idx)]
+            id_ciclo = fila_orig["id"]
+
+            try:
+                # Actualizamos la tabla de gestores
+                update(ciclosFormativosTablas, mods, {"id": id_ciclo})
+                
+                    
+                # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
+            except Exception as e:
+                raise Exception(f"Error al actualizar el ciclo {id_ciclo}: {e}")
+    # 3. MANEJAR BORRADOS (Deleted)
+    for idx in cambios["deleted_rows"]:
+        fila_orig = df_original.iloc[int(idx)]
+        id_ciclo = fila_orig["id"]
+        nombre_ciclo = fila_orig["nombre"]
+        
+        try:
+            delete(ciclosFormativosTablas, "id", id_ciclo)
+        except Exception as e:
+            st.error(f"Error al eliminar ciclo {nombre_ciclo}: {e}")
+        
+@st.cache_data(ttl=600)
+def getCiclosYAreas():
+    ciclos_db = get(ciclosFormativosTablas)
+    lista_nombres = [c["nombre"] for c in ciclos_db] if ciclos_db else []
+    diccionario_pref = {}
+    if ciclos_db:
+        for c in ciclos_db:
+            areas_string = c.get("areas", "")
+            lista_areas = [a.strip() for a in areas_string.split(",") if a.strip()]
+            diccionario_pref[c["nombre"]] = lista_areas
+    return lista_nombres, diccionario_pref

@@ -5,7 +5,7 @@ from modules.data_base import get, getEqual, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla, tutoresTabla,usuariosTabla,localidades
+from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -137,14 +137,14 @@ with tab1:
 
         # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Oferta FP - {empresa['nombre']}")
+        st.subheader(f"Formación - {empresa['nombre']}")
         if fps:
             for i, fp in enumerate(fps, start=1):
-                estado_actual = fp.get("estado") or "Nuevo"
-                bg_color = "🟢" if estado_actual == "Nuevo" else "🔴"
+                estado_actual = fp.get("estado") or estados[4]
+                bg_color = "🟢" if estado_actual == estados[4] else "🔴"
 
                 with st.expander(
-                    f"Oferta #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')} | {estado_actual} {bg_color}",
+                    f"Formación #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')}",
                     expanded=False
                 ):
                     ciclos = fp.get("ciclos_formativos")
@@ -185,36 +185,7 @@ with tab1:
                     st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
                     st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
 
-                    if estado_actual in estados:
-                        default_index = estados.index(estado_actual)
-                    else:
-                        default_index = 0
-                    estado = st.selectbox("Estado", options=estados, index=default_index, key=f"estado_{fp['id']}")
-                    motivo_seleccionado = None
-                    if estado == "Cancelado":
-                        st.write("Motivo de cancelación:")
-                        motivo_seleccionado = st.selectbox(
-                            "Selecciona el motivo",
-                            options=opciones_motivo,
-                            index=opciones_motivo.index(fp.get("motivo")) if fp.get("motivo") in opciones_motivo else 0,
-                            key=f"motivo_select_{fp['id']}")
-                        if motivo_seleccionado == "Otros":
-                                motivo_otro = st.text_area(
-                                    "Especifica el motivo",
-                                    value=fp.get("motivo_otro") or "",
-                                    key=f"motivo_otro_{fp['id']}"
-                                )
-                                motivo_final = motivo_otro
-                        else:
-                                motivo_final = motivo_seleccionado
-                    if st.button("Guardar cambios", key=f"guardar_{fp['id']}"):
-                        upsert(
-                            necesidadFP,
-                            {"empresa": empresa["CIF"], "estado": estado, "motivo": motivo_final, "id": fp["id"]},
-                            keys=["id"]
-                        )
-                        st.success("Oferta FP actualizada")
-                        st.rerun()
+
         else:
             st.info(
                 'No hay necesidades FP registradas para esta empresa. '
@@ -411,15 +382,16 @@ with tab3:
         st.stop()
 
     df_empresas = pd.DataFrame(empresas)[["CIF", "nombre", "email_empresa"]]
-    emailsEmpresasClean =df_empresas["email_empresa"].dropna().unique().tolist()
-    
+    df_clean = df_empresas.dropna(subset=["nombre", "email_empresa"]).drop_duplicates()
+    emailsEmpresasClean =df_clean["email_empresa"].dropna().unique().tolist()
+    nombreEmpresasClean =df_clean["nombre"].dropna().unique().tolist()
     col1, col2 = st.columns([3, 2])
     with col2:
         checked = st.checkbox("Seleccionar todos", value=False, key="select_all_empresas")
     with col1:
-        emails_empresas = st.multiselect(
-            "Selecciona empresas (emails)", placeholder="Selecciona un valor",
-            options=emailsEmpresasClean,disabled=st.session_state.select_all_empresas
+        empresas_seleccionadas = st.multiselect(
+            "Selecciona empresas", placeholder="Selecciona un valor",
+            options=nombreEmpresasClean,disabled=st.session_state.select_all_empresas
         )
     emails_manual_empresas = st.text_area(
         "Agregar emails manualmente (separados por coma)",
@@ -445,10 +417,11 @@ with tab3:
     
     if checked:
         allEmails = emailsEmpresasClean.copy()
-        final_list = list(set(allEmails + valid_emails))
+        emails_de_seleccion = list(set(allEmails))
     else:
-        final_list = list(set(emails_empresas + valid_emails))
+        emails_de_seleccion = list(set(df_clean[df_clean["nombre"].isin(empresas_seleccionadas)]["email_empresa"].unique().tolist()))
 
+    final_list = list(set(emails_de_seleccion + valid_emails))
     st.session_state.emailsList = final_list
     
     st.write("**Destinatarios seleccionados:**")
@@ -465,10 +438,14 @@ with tab3:
 
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
-
+    adjuntos = st.file_uploader(
+        "Adjuntar archivos", 
+        accept_multiple_files=True, 
+        key="adjuntos_empresas"
+    )
     if st.button("📨 Enviar Emails a Empresas", disabled=not can_send):
         try:
-            if send_email(email_sender, email_password, final_list, subject_al, body_al):
+            if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
                 fecha_envio = datetime.now().isoformat()
 
                 for email in final_list:

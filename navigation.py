@@ -1,6 +1,7 @@
 import streamlit as st
+import extra_streamlit_components as stx
 from time import sleep
-from variables import logoutButton
+from variables import logoutButton,nombres_roles, aniosList,cursoList
 import os
 def get_current_page_name():
     return st.session_state.get("current_page", "")
@@ -13,6 +14,7 @@ def make_sidebar():
     load_env_once()
     rol = st.session_state.get("rol", "admin")
     user = st.session_state.get("username")
+    rol_amigable = nombres_roles.get(rol, rol.capitalize())
     with st.sidebar:
             st.markdown(
             """
@@ -24,27 +26,50 @@ def make_sidebar():
             """,
             unsafe_allow_html=True
         )
-            st.caption(f"Entorno: **{st.session_state['env']}**")
-            st.caption(f"Rol: **{rol}**")
+            if st.session_state["env"] == "prod":
+                st.caption(f"Entorno: **{st.session_state['env']}**")
+            st.caption(f"Rol: **{rol_amigable}**")
             st.caption(f"Usuario: **{user}**")
+        
+            lista_cursosAcademico = aniosList
+            lista_curso = cursoList
+            if "index_curso" not in st.session_state:
+                st.session_state["index_curso"] = 0
+            if "index_academic" not in st.session_state:
+                st.session_state["index_academic"] = 0
+        
+            st.selectbox(
+                "**Curso Académico**",
+                options=lista_cursosAcademico,
+                index=st.session_state["index_academic"],
+                key="selector_curso_ac_global"
+            )
+        
+            st.selectbox(
+                    "**Curso**",
+                    options=lista_curso,
+                    index=st.session_state["index_curso"],
+                    key="selector_curso_global"
+                )
+            st.session_state["index_curso"] = lista_curso.index(st.session_state.get("selector_curso_global"))
+            st.session_state["index_academic"]  = lista_cursosAcademico.index(st.session_state.get("selector_curso_ac_global"))
             st.title("Menú")
-            st.write("")
             st.write("")
             if st.session_state.get("logged_in", False):
                 if rol == "admin":
                     st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
-                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de Formaciones")
+                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
-                    st.page_link("pages/matchs.py", label="Matchs")
-                    
+                    st.page_link("pages/matchs.py", label="Panel de Matcheos")
                     st.page_link("pages/empresas.py", label="Gestión de Empresas")
                     st.page_link("pages/alumnos.py", label="Gestión de Alumnos")
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                     st.write("")
+                    st.page_link("pages/configuracion.py", label="Configuraciones")
                     st.write("")
                 if rol == "gestor":
                     st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
-                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de Formaciones")
+                    st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "tutor":
@@ -55,7 +80,8 @@ def make_sidebar():
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "empresa":
                     st.page_link("pages/empresaDetails.py", label="Mi Empresa")
-                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
+                if rol == "alumno":
+                    st.page_link("pages/alumno.py", label="Mi Formación en Empresa")
                 if st.button(logoutButton):
                     logout()
 
@@ -63,8 +89,21 @@ def make_sidebar():
                 st.switch_page("streamlit_app.py")
 
 def logout():
+    # 1. Limpiamos TODO el session_state primero para "apagar" la interfaz
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    sleep(0.5)
+    
+    # 2. Forzamos el estado de salida para que los menús no intenten renderizarse
+    st.session_state["logged_in"] = False
+    
+    # 3. Borramos la cookie de forma segura
+    try:
+        cookie_manager = stx.CookieManager(key="logout_manager")
+        cookie_manager.delete("saved_user_email")
+    except:
+        pass # Silenciamos errores visuales del componente
+    
+    # 4. Una pausa un poco más larga para asegurar que el navegador limpie caché
+    import time
+    time.sleep(0.8)
     st.rerun()
-
