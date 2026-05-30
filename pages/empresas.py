@@ -5,7 +5,7 @@ from modules.data_base import get, getEqual, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,opciones_motivo,bodyEmailsEmpresa,contactoEmpresaTabla, tutoresTabla,usuariosTabla,localidades
+from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -137,14 +137,14 @@ with tab1:
 
         # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Oferta FP - {empresa['nombre']}")
+        st.subheader(f"Formación - {empresa['nombre']}")
         if fps:
             for i, fp in enumerate(fps, start=1):
-                estado_actual = fp.get("estado") or "Nuevo"
-                bg_color = "🟢" if estado_actual == "Nuevo" else "🔴"
+                estado_actual = fp.get("estado") or estados[4]
+                bg_color = "🟢" if estado_actual == estados[4] else "🔴"
 
                 with st.expander(
-                    f"Oferta #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')} | {estado_actual} {bg_color}",
+                    f"Formación #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')}",
                     expanded=False
                 ):
                     ciclos = fp.get("ciclos_formativos")
@@ -185,36 +185,7 @@ with tab1:
                     st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
                     st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
 
-                    if estado_actual in estados:
-                        default_index = estados.index(estado_actual)
-                    else:
-                        default_index = 0
-                    estado = st.selectbox("Estado", options=estados, index=default_index, key=f"estado_{fp['id']}")
-                    motivo_seleccionado = None
-                    if estado == "Cancelado":
-                        st.write("Motivo de cancelación:")
-                        motivo_seleccionado = st.selectbox(
-                            "Selecciona el motivo",
-                            options=opciones_motivo,
-                            index=opciones_motivo.index(fp.get("motivo")) if fp.get("motivo") in opciones_motivo else 0,
-                            key=f"motivo_select_{fp['id']}")
-                        if motivo_seleccionado == "Otros":
-                                motivo_otro = st.text_area(
-                                    "Especifica el motivo",
-                                    value=fp.get("motivo_otro") or "",
-                                    key=f"motivo_otro_{fp['id']}"
-                                )
-                                motivo_final = motivo_otro
-                        else:
-                                motivo_final = motivo_seleccionado
-                    if st.button("Guardar cambios", key=f"guardar_{fp['id']}"):
-                        upsert(
-                            necesidadFP,
-                            {"empresa": empresa["CIF"], "estado": estado, "motivo": motivo_final, "id": fp["id"]},
-                            keys=["id"]
-                        )
-                        st.success("Oferta FP actualizada")
-                        st.rerun()
+
         else:
             st.info(
                 'No hay necesidades FP registradas para esta empresa. '

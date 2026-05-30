@@ -117,7 +117,7 @@ def load_feedback_data():
 df_alu_raw, df_est, df_emp_raw, df_pra, df_vw_ofe, df_master = load_all_data()
 df_stats, df_detalle = load_feedback_data()
 
-st.sidebar.title("🔍 Filtros Globales")
+st.sidebar.title("🔍 Filtros Panel")
 ciclos_list = sorted(df_alu_raw['ciclo_formativo'].dropna().unique()) if 'ciclo_formativo' in df_alu_raw.columns else []
 f_ciclo = st.sidebar.multiselect("Ciclo Formativo", options=ciclos_list)
 f_loc = st.sidebar.multiselect("Localidad", options=sorted(df_alu_raw['localidad'].apply(limpiar_localidad).unique()))
@@ -130,7 +130,7 @@ if f_estado: df_alu = df_alu[df_alu['estado'].isin(f_estado)]
 
 # --- RENDERIZADO VISUAL ---
 try:
-    st.title("Panel Estratégico Cámara Valencia FP")
+    st.title("Panel Estratégico CÁMARA FP")
 
     # A. BLOQUE SUPERIOR: KPIs
     k1, k2, k3, k4 = st.columns(4)
@@ -169,7 +169,7 @@ try:
             
             if 'tipoPractica' in df_alu.columns:
                 tp_df = df_alu['tipoPractica'].value_counts().reset_index(name='total')
-                st.plotly_chart(px.bar(tp_df, x='tipoPractica', y='total', text_auto=True, title="Práctica", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_tipo")
+                st.plotly_chart(px.bar(tp_df, x='tipoPractica', y='total', text_auto=True, title="Formación", color_discrete_sequence=[CIAN_CAMARA]), use_container_width=True, key="bar_tipo")
 
     with t_ofe:
         st.subheader("Análisis de Disponibilidad por Ciclo")
@@ -187,8 +187,8 @@ try:
                 x='cupos_disponibles', 
                 y='nombre', 
                 orientation='h',
-                title=f"Cupos disponibles en: {ciclo_seleccionado}",
-                labels={'cupos_disponibles': 'Nº de Cupos', 'nombre': ''},
+                title=f"Plazas disponibles en: {ciclo_seleccionado}",
+                labels={'cupos_disponibles': 'Nº de Plazas', 'nombre': ''},
                 text_auto=True, 
                 color_discrete_sequence=['#b3d4d8']
             )
@@ -196,7 +196,7 @@ try:
             altura_dinamica = max(400, len(df_plot) * 40)
             fig_ofe.update_layout(
                 showlegend=False, 
-                xaxis_title="Cantidad de Cupos",
+                xaxis_title="Cantidad de Plazas",
                 yaxis_title=None,
                 height=altura_dinamica, 
                 margin=dict(l=20, r=20, t=50, b=20),
@@ -210,10 +210,10 @@ try:
     with t_gest:
         st.subheader("Supervisión de Gestión y Cuellos de Botella")
         
-        # Usamos df_master porque ahí ya cruzamos las prácticas con los nombres de los alumnos
+        # Usamos df_master porque ahí ya cruzamos las formaciones con los nombres de los alumnos
         df_gestion = df_master if not df_master.empty else df_pra
         if not df_gestion.empty:
-            st.markdown("#### ⚠️ Alertas Documentales (Prácticas en curso)")
+            st.markdown("#### ⚠️ Alertas Documentales (Formaciones en curso)")
             a1, a2, a3 = st.columns(3)
             
             # Identificamos los pendientes
@@ -222,7 +222,7 @@ try:
             
             a1.metric("Anexos SIN Firmar", len(df_anexos_faltantes), delta="Atención requerida", delta_color="inverse")
             a2.metric("Doc. SAO Pendiente", len(df_sao_faltante), delta="Prioridad alta", delta_color="inverse")
-            a3.metric("Total Prácticas Activas", len(df_gestion))
+            a3.metric("Total Formaciones Activas", len(df_gestion))
             
             # Tabla desplegable para el Director
             if not df_anexos_faltantes.empty or not df_sao_faltante.empty:
@@ -248,7 +248,7 @@ try:
                     cols_finales = [c for c in columnas_check.keys() if c in df_pendientes.columns]
                     df_final = df_pendientes[cols_finales].rename(columns=columnas_check)
                     
-                    st.warning("El siguiente listado muestra las prácticas que requieren intervención inmediata de sus gestores.")
+                    st.warning("El siguiente listado muestra las formaciones que requieren intervención inmediata de sus gestores.")
                     st.dataframe(df_final, use_container_width=True, hide_index=True)
 
             st.divider()
@@ -257,11 +257,11 @@ try:
         with g1:
             if not df_gestion.empty and 'gestor' in df_gestion.columns:
                 carga_gestor = df_gestion['gestor'].fillna('Sin asignar').value_counts().reset_index()
-                carga_gestor.columns = ['Gestor', 'Nº Prácticas']
+                carga_gestor.columns = ['Gestor', 'Nº Formaciones']
                 
                 fig_gest = px.bar(
                     carga_gestor, 
-                    x='Nº Prácticas', 
+                    x='Nº Formaciones', 
                     y='Gestor', 
                     orientation='h', 
                     text_auto=True,
@@ -270,7 +270,7 @@ try:
                 )
                 st.plotly_chart(fig_gest, use_container_width=True, key="bar_carga_gestores")
             else:
-                st.info("No hay datos de gestores asignados a prácticas.")
+                st.info("No hay datos de gestores asignados a formaciones.")
 
         with g2:
             if not df_pra.empty and 'created_at' in df_pra.columns:
@@ -282,7 +282,7 @@ try:
                     x='mes_grafico', 
                     y='total', 
                     markers=True, 
-                    title="Ritmo de Formalización de Prácticas",
+                    title="Ritmo de Formalización de Formaciones",
                     color_discrete_sequence=[CIAN_CAMARA]
                 )
                 fig_linea.update_xaxes(dtick="M1", tickformat="%b %Y")
@@ -310,7 +310,7 @@ try:
                 df_p = pd.DataFrame(pipe_data.items(), columns=['Estado', 'Total'])
                 st.plotly_chart(px.bar(df_p, x='Estado', y='Total', text_auto=True, title="Pipeline FP", color='Estado', color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA, "#002b56"]), use_container_width=True, key="bar_pipeline")
             else:
-                st.info("El Pipeline de estados se generará cuando comiencen las prácticas.")
+                st.info("El Pipeline de estados se generará cuando comiencen las Formaciones.")
 
     with t_feed:
         st.subheader("📩 Feedback")

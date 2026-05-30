@@ -9,7 +9,7 @@ amarillo=""
 #forms
 tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
-estados=["Nuevo","Completa", "Activo", "Finalizada", "Cancelada", "Borrador"]
+estados=["Documentación lista", "Iniciada", "Finalizada", "Cancelada", "Falta Documentación","Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
 forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre"]
 #fases
@@ -53,12 +53,10 @@ gris="P431C"
 #Tablas
 usuariosTabla="usuarios"
 formTabla="forms"
-formFieldsTabla="form_fields"
 empresasTabla="empresas"
 ciclosFormativosTablas="ciclos_formativos"
 alumnosTabla="alumnos"
 logsTabla="error_logs"
-answersTabla="form_answers"
 necesidadFP="oferta_fp"
 empresaEstadosTabla="empresa_estados"
 contactoEmpresaTabla="contacto_empresas"
@@ -72,6 +70,7 @@ tutoresCentroTabla="tutor_centro"
 feedbackFormsTabla="feedback_forms"
 feedbackResponseTabla="feedback_respuestas"
 gestoresTabla="gestores"
+emailImportantesTabla = "email_importantes"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive
@@ -398,5 +397,73 @@ localidades = [
 ]
 
 linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
-aniosList= ("Seleccionar", "2024-2025","2025-2026", "2026-2027","2027-2028","2028-2029")
+aniosList= ("Seleccionar", "2025-2026", "2026-2027","2027-2028","2028-2029","2029-2030","2030-2031","2031-2032","2032-2033","2033-2034","2034-2035","2035-2036","2036-2037","2037-2038","2038-2039","2039-2040")
 cursoList= ("Seleccionar","1ro","2do")
+locale_tabla_principal = {
+                # Menú de cabeceras de columna
+                "pinColumn": "Fijar columna",
+                "pinLeft": "Fijar a la izquierda",
+                "pinRight": "Fijar a la derecha",
+                "noPin": "Sin fijar",
+                "valueAggregation": "Agregación de valores",
+                "autosizeThiscolumn": "Ajustar esta columna",
+                "autosizeAllColumns": "Ajustar todas las columnas",
+                "groupBy": "Agrupar por",
+                "ungroupBy": "Desagrupar por",
+                "resetColumns": "Restablecer columnas",
+                "expandAll": "Expandir todo",
+                "collapseAll": "Contraer todo",
+                
+                # Filtros estándar
+                "filterOoo": "Filtrar...",
+                "equals": "Igual a",
+                "notEqual": "Diferente de",
+                "blank": "Vacío",
+                "notBlank": "No vacío",
+                
+                # Filtros de texto
+                "contains": "Contiene",
+                "notContains": "No contiene",
+                "startsWith": "Empieza con",
+                "endsWith": "Termina con",
+                
+                # Filtros de números
+                "lessThan": "Menor que",
+                "greaterThan": "Mayor que",
+                "lessThanOrEqual": "Menor o igual que",
+                "greaterThanOrEqual": "Mayor o igual que",
+                "inRange": "En un rango",
+                
+                # Combinaciones de filtros
+                "andCondition": "Y",
+                "orCondition": "O",
+                "Search...": "Buscar",
+            }
+
+FESTIVOS_FIJOS = {
+    (1, 1): "Año Nuevo",
+    (1, 6): "Epifanía del Señor",
+    (3, 19): "San José",
+    (5, 1): "Fiesta del Trabajo",
+    (6, 24): "San Juan",
+    (8, 15): "Asunción de la Virgen",
+    (10, 9): "Día de la Comunitat Valenciana",
+    (10, 12): "Fiesta Nacional de España",
+    (12, 8): "Inmaculada Concepción",
+    (12, 25): "Navidad"
+}
+
+    
+MESES_ES = {
+    1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO",
+    7: "JULIO", 8: "AGOSTO", 9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+}
+
+nombres_roles = {
+        "admin": "Administrador",
+        "alumno": "Alumno",
+        "empresa": "Empresa",
+        "gestor": "Gestor",
+        "tutor": "Tutor en Empresa",
+        "tutorCentro": "Tutor de Centro"
+    }

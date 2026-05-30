@@ -109,7 +109,7 @@ def create_drive_folder_practica(dni, nombre, apellido, empresa, folder_id):
     nombre_folder_alumno = f"Alumno - {nombre}_{apellido}_{dni}".strip()
     st.write(nombre_folder_practica)
     try:
-        # --- 2. Obtener o Crear Carpeta de la Práctica ---
+        # --- 2. Obtener o Crear Carpeta de la formación ---
         q_dest = f"name = '{nombre_folder_practica}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         res_dest = service.files().list(q=q_dest, supportsAllDrives=True, includeItemsFromAllDrives=True).execute().get("files", [])
         

@@ -4,6 +4,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from modules.data_base import logError,actualizarFeedbackRecordatorio
+
 # def send_email_outlook( recipients: list, subject: str, body: str):
 #     sender = st.secrets["emailOutlook"]["EMAIL_USER"]
 #     password = st.secrets["emailOutlook"]["EMAIL_PASS"]
@@ -80,3 +82,38 @@ def send_email(sender: str, password: str, recipients: list, subject: str, body:
     except Exception as e:
         print(f"Error enviando email: {e}")
         raise e
+
+
+def enviarRecordatoriosMasivos(listado_morosos):
+    try:
+        email_sender = st.secrets['email']['gmail']
+        email_password = st.secrets['email']['password']
+
+        emails_enviados = 0
+        errores = []
+
+        for item in listado_morosos:
+            link = item['Link'].split('href="')[1].split('"')[0]  # extraemos la url del hyperlink
+            tipo_label = item['Formulario']
+            subject = f"Recordatorio: Completa tu formulario de {tipo_label}"
+            body = f"""Hola,
+
+            Te recordamos que aún tienes pendiente completar el formulario de {tipo_label}.
+
+            Por favor, accede al siguiente enlace para completarlo:
+            {link}
+
+            Muchas gracias por tu colaboración.
+            """
+            if send_email(email_sender, email_password, [item['Email']], subject, body, []):
+                actualizarFeedbackRecordatorio(item['Email'], item['_tipo_form'], item['Id'])
+                emails_enviados += 1
+            else:
+                errores.append(item['Email'])
+        return emails_enviados, errores
+
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        logError(error_msg, "Feedback - Recordatorio Masivo")
+        st.error(f"Error al enviar recordatorios: {e}")

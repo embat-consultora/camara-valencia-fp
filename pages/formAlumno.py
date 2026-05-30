@@ -3,18 +3,19 @@ from pathlib import Path
 from datetime import datetime
 import json, uuid
 from modules.drive_helper import upload_to_drive
-from modules.data_base import upsert,getCiclosYAreas
+from modules.data_base import upsert,getCiclosYAreas, getEqual
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
+from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Alumnos Formación", page_icon="🏫", layout="centered")
 st.image("./images/cv-fp.png", width=250)
-TITLE = "Alumnos Formación"
-SUBTITLE = "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa."
-DESCRIPTION = (
+formValues = getEqual(formTabla,"tipo", "alumnos")
+TITLE = formValues[0].get("titulo", "Formulario de Formación en Empresa")
+SUBTITLE = formValues[0].get("subtitulo", "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa.")
+DESCRIPTION = formValues[0].get("description",
     "⚠️ **Importante**: La información que facilitéis será tenida en cuenta en el proceso de asignación, "
     "pero la decisión final dependerá de: el tipo de empresas solicitantes, los requisitos que planteen "
     "y vuestro perfil, potencial y desempeño académico. Por tanto, aunque intentaremos ajustarnos en la "
@@ -66,7 +67,7 @@ tipo_practica = st.radio(
     horizontal=False
 )
 if not tipo_practica:
-    st.markdown("<span style='color:red;'>Debes seleccionar el tipo de práctica</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:red;'>Debes seleccionar el tipo de formación</span>", unsafe_allow_html=True)
 # Ciclo formativo (único)
 st.subheader("Ciclo Formativo")
 ciclo = st.radio("Selecciona tu ciclo formativo", CICLOS, index=None)

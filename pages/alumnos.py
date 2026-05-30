@@ -24,6 +24,8 @@ if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 if "form_registro_key" not in st.session_state:
     st.session_state.form_registro_key = 0
+
+
 base_url = os.getenv("URL")
 
 # --- Traer alumnos ---
@@ -51,14 +53,12 @@ with tab1:
         if selected_ciclo != "Todos":
             df_alumnos = df_alumnos[df_alumnos["ciclo_formativo"] == selected_ciclo]     
     with filtroanio:
-        anios = sorted(df_alumnos["anio"].dropna().unique())
-        selected_anio = st.selectbox("Filtrar por curso académico", options=["Todos"] + anios, index=0)
-        if selected_anio != "Todos":
+        selected_anio = st.selectbox("Filtrar por curso académico", options= aniosList, index=st.session_state.get("index_academic", 0))
+        if selected_anio != "Seleccionar":
             df_alumnos = df_alumnos[df_alumnos["anio"] == selected_anio]     
     with filtrocurso:
-        cursos = sorted(df_alumnos["curso"].dropna().unique())
-        selected_curso = st.selectbox("Filtrar por curso", options=["Todos"] + cursos, index=0)
-        if selected_curso != "Todos":
+        selected_curso = st.selectbox("Filtrar por curso", options= cursoList, index=st.session_state.get("index_curso",0))
+        if selected_curso != "Seleccionar":
             df_alumnos = df_alumnos[df_alumnos["curso"] == selected_curso]
     with total:
         st.metric("Total alumnos", len(df_alumnos))
@@ -178,13 +178,20 @@ with tab1:
                 curso = st.selectbox("Curso *", options= cursoList,index=cursoList.index(alumno.get("curso")) if alumno.get("curso") in cursoList else 0)
                 
                 vehiculo_selected = st.checkbox("Vehículo", value=vehiculo_bool,key=f"vehiculo_pref_{new_email}")
-                requisitos = st.text_input("Requisitos adicionales (separados por comas)", value=alumno.get("requisitos") or "")
-            
-                
+                val_requisitos = "" if pd.isna(alumno.get("requisitos")) else str(alumno.get("requisitos"))
+
+                requisitos = st.text_input("Requisitos adicionales (separados por comas)", value=val_requisitos)
+                raw_horas = alumno.get("horas_totales")
+                if pd.isna(raw_horas) or raw_horas is None:
+                    val_horas_totales = 7.0
+                else:
+                    try:
+                        val_horas_totales = float(raw_horas)
+                    except ValueError:
+                        val_horas_totales = 7.0
+                horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=0.5) 
                 if st.button("💾 Actualizar alumno"):
-                    update(
-                        alumnosTabla,
-                        {
+                    data_alumnos = {
                             "nombre": new_nombre,
                             "apellido": new_apellido,
                             "direccion": new_direccion,
@@ -200,12 +207,13 @@ with tab1:
                             "ciclo_formativo": selected_ciclo,
                             "preferencias_fp": selected_pref,
                             "vehiculo": "Sí" if vehiculo_selected else "No",
-                            "requisitos": requisitos
-                        },
-                        {
-                            "id":alumno_id
+                            "requisitos": requisitos,
+                            "horas_totales": horas_totales
                         }
-                        
+                    update(
+                        alumnosTabla,
+                        data_alumnos,
+                        {"id":alumno_id}
                     )
                     st.success("Alumno actualizado correctamente")
                     st.toast("Alumno actualizado correctamente")
@@ -307,6 +315,8 @@ with tab2:
                 )
             ano = st.selectbox("Curso Académico *", options= aniosList)
             curso = st.selectbox("Curso *", options= cursoList, key="nuevo_curso")
+            val_horas_totales = 7.0
+            horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=0.5) 
 
             submitted = st.form_submit_button("Crear Alumno")
 
@@ -344,7 +354,8 @@ with tab2:
                             "tipoPractica": new_tipo_practica,
                             "anio": ano,
                             "curso": curso,
-                            "ciclo_formativo": selected_ciclo
+                            "ciclo_formativo": selected_ciclo,
+                            "horas_totales": horas_totales
                         }, keys=["dni"]
                     )
                     st.success("✅ Nuevo alumno agregado correctamente")
@@ -370,7 +381,8 @@ with tab2:
             "anio": [aniosList[1:]],
             "curso": [cursoList[1:]],
             "ciclo": [ciclos],
-            "tipoPractica": ["Autogestionada | Asignada por el Centro"]
+            "tipoPractica": ["Autogestionada | Asignada por el Centro"],
+            "horas_totales": [""]
         })
         sample_csv_path = Path(tempfile.gettempdir()) / "alumnos_muestra.csv"
         sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
@@ -426,6 +438,13 @@ with tab2:
                                 errores.append("Fila sin DNI — omitida.")
                                 continue
 
+                            horas_raw = row.get("horas_totales", "").strip()
+                            try:
+                                # Reemplazamos coma por punto por si el usuario escribió "350,5"
+                                horas_float = float(horas_raw.replace(",", ".")) if horas_raw else 7.0
+                            except ValueError:
+                                # Si el usuario escribió texto no numérico, cae aquí
+                                horas_float = 7.0
                             data = {
                                 "dni": dni,
                                 "nombre": row.get("nombre", "").strip(),
@@ -440,7 +459,8 @@ with tab2:
                                 "tipoPractica": row.get("tipoPractica", "").strip(),
                                 "anio": re.sub(r"['\"]", "", row.get("anio", "")).strip(),
                                 "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip(),
-                                "ciclo_formativo": re.sub(r"['\"]", "", row.get("ciclo", "")).strip()
+                                "ciclo_formativo": re.sub(r"['\"]", "", row.get("ciclo", "")).strip(),
+                                "horas_totales": horas_float,
                             }
 
                             # 4️⃣ Insert/update

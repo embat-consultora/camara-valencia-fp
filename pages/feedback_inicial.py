@@ -39,10 +39,11 @@ with st.form("main_feedback_form"):
     st.divider()
 
     st.subheader("Inicio y acogida")
-    acogida = st.slider("Me sentí bien recibido/a", 1, 5, 3)
-    funciones = st.slider("Me explicaron mis funciones", 1, 5, 3)
-    dudas = st.slider("Sé a quién acudir si tengo dudas", 1, 5, 3)
-    comodidad = st.slider("Me siento cómodo/a en el entorno de trabajo", 1, 5, 3)
+    st.write("Queremos saber cómo ha sido tu proceso de incorporación y acogida en la empresa durante esta primera semana.")
+    acogida = st.slider("¿Te has sentido bien recibido?", 1, 5, 3)
+    funciones = st.slider("¿Te han explicado bien las funciones?", 1, 5, 3)
+    dudas = st.slider("¿Supiste a quien acudir ante dudas?", 1, 5, 3)
+    comodidad = st.slider("¿Te sentiste cómodo/a en el entorno de trabajo?", 1, 5, 3)
     mejor = st.text_area("¿Qué fue lo mejor de tu primera semana?")
 
     st.subheader("Expectativas")

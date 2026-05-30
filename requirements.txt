@@ -27,3 +27,5 @@ google-api-python-client>=2.0.0
 XlsxWriter
 streamlit-echarts
 streamlit-aggrid==1.0.5
+extra-streamlit-components
+st-copy

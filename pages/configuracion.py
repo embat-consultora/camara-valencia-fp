@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import updateCiclosFormativos, get
+from modules.data_base import updateCiclosFormativos, get,getEqual,upsert
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import ciclosFormativosTablas,coloresCiclos
+from variables import ciclosFormativosTablas,emailImportantesTabla,formTabla
 
 # Configuración inicial
 apply_page_config()
@@ -17,14 +17,32 @@ def fetch_ciclos():
     if datos:
         return pd.DataFrame(datos)
     # Si no hay datos, devolvemos el "molde" con las columnas necesarias
-    return pd.DataFrame(columns=["id", "nombre", "abreviatura", "areas", "color"])
+    return pd.DataFrame(columns=["id", "nombre", "abreviatura", "areas"])
+def fetch_email_pymes():
+    email = getEqual(emailImportantesTabla, "seccion", "pymes")
+    if email:
+        st.session_state.email_pymes_id = email.get("id")
+        return email.get("email", "")
+    return ""
+
+def fetch_formularios():
+    datos = get(formTabla)
+    if datos:
+        return pd.DataFrame(datos)
+    return pd.DataFrame(columns=["id", "nombre","tipo", "titulo", "subtitulo", "descripcion"])
 
 # 2. Inicializar el estado de los datos una sola vez
 if "df_ciclos" not in st.session_state:
     st.session_state.df_ciclos = fetch_ciclos()
+if "email_pymes_id" not in st.session_state:
+    st.session_state.email_pymes_id = None
+if "email_pymes" not in st.session_state:
+    st.session_state.email_pymes = fetch_email_pymes()
 
-tabCiclos, tabCorreos = st.tabs(["Ciclos Formativos", "Correos Importantes"])
+if "df_formularios" not in st.session_state:
+    st.session_state.df_formularios = fetch_formularios()
 
+tabCiclos, tabCorreos, tabFormularios = st.tabs(["Ciclos Formativos", "Correos Importantes", "Formularios"])
 with tabCiclos:
     
     # Formulario para capturar los cambios del editor
@@ -70,3 +88,82 @@ with tabCiclos:
                 st.error(f"Error al guardar: {e}")
         else:
             st.info("No se realizaron cambios.")
+
+with tabCorreos:
+    st.subheader("Email Contacto Pymes")
+    
+    with st.form("form_email_pymes"):
+        email_input = st.text_input(
+            "Email de Pymes",
+            value=st.session_state.email_pymes,
+            key="input_email_pymes",
+            placeholder="ejemplo@pymes.com"
+        )
+        submit_email = st.form_submit_button("Guardar Email")
+    if submit_email:
+            try:
+                upsert(
+                        emailImportantesTabla, 
+                        { "email": email_input, 'seccion': "pymes"},keys=["seccion"])
+                    
+                st.session_state.email_pymes = email_input
+                st.toast("✅ Email guardado correctamente.")
+            except Exception as e:
+                st.error(f"Error al guardar email: {e}")
+
+
+with tabFormularios:
+    st.subheader("Editar Formularios")
+    tipos_disponibles = st.session_state.df_formularios['tipo'].unique().tolist()
+    
+    # Selectbox para elegir tipo
+    tipo_seleccionado = st.selectbox(
+        "Selecciona el tipo de formulario",
+        options=tipos_disponibles,
+        key="select_tipo_formulario"
+    )
+    
+    if tipo_seleccionado:
+        # Filtrar datos del tipo seleccionado
+        formulario_actual = st.session_state.df_formularios[
+            st.session_state.df_formularios['tipo'] == tipo_seleccionado
+        ].iloc[0].to_dict()
+        
+        with st.form(f"form_editar_formulario_{tipo_seleccionado}"):
+            st.caption(f"Editando: {formulario_actual.get('nombre', 'Formulario')}")
+            
+            titulo_input = st.text_input(
+                "Título",
+                value=formulario_actual.get('titulo', '')
+            )
+            
+            subtitulo_input = st.text_input(
+                "Subtítulo",
+                value=formulario_actual.get('subtitulo', '')
+            )
+            
+            descripcion_input = st.text_area(
+                "Descripción",
+                value=formulario_actual.get('descripcion', '')
+            )
+            
+            submit_form = st.form_submit_button("Guardar Cambios")
+        
+        if submit_form:
+            try:
+                # Preparar datos para upsert
+                datos_actualizar = {
+                    "tipo": tipo_seleccionado,
+                    "titulo": titulo_input,
+                    "subtitulo": subtitulo_input,
+                    "descripcion": descripcion_input
+                }
+                
+                upsert(formTabla, datos_actualizar, keys=["tipo"])
+                
+                st.success("✅ Formulario actualizado correctamente.")
+                st.session_state.df_formularios = fetch_formularios()
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error al guardar: {e}")
