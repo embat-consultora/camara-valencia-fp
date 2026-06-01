@@ -11,6 +11,19 @@ from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPr
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Alumnos Formación", page_icon="🏫", layout="centered")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
+
+    /* Esto aplica la fuente a toda la app */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Montserrat', sans-serif;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 st.image("./images/cv-fp.png", width=250)
 formValues = getEqual(formTabla,"tipo", "alumnos")
 TITLE = formValues[0].get("titulo", "Formulario de Formación en Empresa")

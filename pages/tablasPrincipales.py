@@ -227,14 +227,24 @@ with tab_alumnos:
                         if ciclo not in mapeo_ciclo_empresas:
                             mapeo_ciclo_empresas[ciclo] = []
                         
-                        mapeo_ciclo_empresas[ciclo].append({
-                            "nombre": nombre_empresa,
-                            "disponibles": disponibles,
-                            "oferta": oferta.get('id'),
-                            "email_empresa": email_empresa,
-                            "direccion_empresa": direccion_empresa,
-                            "localidad_empresa": localidad_empresa
-                        })
+                        entrada_existente = next(
+                            (e for e in mapeo_ciclo_empresas[ciclo] if e["nombre"] == nombre_empresa),
+                            None
+                        )
+
+                        if entrada_existente:
+                            # Acumular cupos si hay varias ofertas del mismo ciclo
+                            entrada_existente["disponibles"] += disponibles
+                        else:
+                            mapeo_ciclo_empresas[ciclo].append({
+                                "nombre": nombre_empresa,
+                                "disponibles": disponibles,
+                                "oferta": oferta.get('id'),
+                                "email_empresa": email_empresa,
+                                "direccion_empresa": direccion_empresa,
+                                "localidad_empresa": localidad_empresa
+                            })
+
 
             json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
             if not df_raw.empty:

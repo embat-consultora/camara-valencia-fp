@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,getFormsLinks,getCiclosYAreas
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -116,8 +116,8 @@ def load_data():
             practicas = []
     if rol_usuario == "tutor":
         tutorDatos = [t for t in tutores if t.get("email") == user_email]
-        tutorNombre = tutorDatos[0].get("nombre")
         if tutorDatos:
+            tutorNombre = tutorDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
             if p.get("tutor") is not None and p.get("tutor") == tutorNombre
@@ -293,7 +293,16 @@ def mostrar_lista_practicas():
             st.session_state.practica_seleccionada = selected_id
             st.session_state.page = "detalle"
             st.rerun()
-
+@st.dialog("Cancelación de Formación")
+def dialog_cancelacion(practica):
+    st.write(f"Por favor, indica el motivo de la cancelación")
+    motivo = st.text_input("", placeholder="Ej: El alumno no ha pasado la entrevista, la empresa ya no puede acoger, etc.")
+    
+    if st.button("Confirmar", type="primary"):
+        cancelarPractica(practica, motivo)
+        st.toast("✅  La Formación ha pasado a estado CANCELADA")
+        st.session_state.page = "lista"
+        st.rerun()
 def mostrar_carga_rapida():
      with st.form("carga_rapida"):
         st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
@@ -1075,10 +1084,13 @@ def seccion_planificacion(alumno, empresa, practica):
                 if uploaded_cal:
                     if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
-                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
+                            original_name = uploaded_cal.name
+                            if not original_name.lower().startswith("calendario"):
+                                original_name = f"calendario_{original_name}"
+                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{original_name}"
                             with open(temp_path, "wb") as f:
                                 f.write(uploaded_cal.getbuffer())
-                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
+                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, original_name)
                             st.success("Imagen guardada.")
                             st.rerun()
 

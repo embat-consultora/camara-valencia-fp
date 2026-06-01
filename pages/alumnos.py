@@ -215,7 +215,6 @@ with tab1:
                         data_alumnos,
                         {"id":alumno_id}
                     )
-                    st.success("Alumno actualizado correctamente")
                     st.toast("Alumno actualizado correctamente")
                     st.rerun()
 
