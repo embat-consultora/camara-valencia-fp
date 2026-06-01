@@ -116,8 +116,9 @@ def load_data():
             practicas = []
     if rol_usuario == "tutor":
         tutorDatos = [t for t in tutores if t.get("email") == user_email]
-        tutorNombre = tutorDatos[0].get("nombre")
+        
         if tutorDatos:
+            tutorNombre = tutorDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
             if p.get("tutor") is not None and p.get("tutor") == tutorNombre
@@ -1075,10 +1076,13 @@ def seccion_planificacion(alumno, empresa, practica):
                 if uploaded_cal:
                     if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
-                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
+                            original_name = uploaded_cal.name
+                            if not original_name.lower().startswith("calendario"):
+                                original_name = f"calendario_{original_name}"
+                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{original_name}"
                             with open(temp_path, "wb") as f:
                                 f.write(uploaded_cal.getbuffer())
-                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
+                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, original_name)
                             st.success("Imagen guardada.")
                             st.rerun()
 
@@ -1143,9 +1147,6 @@ def seccion_documentos(alumno, empresa, practicaId):
 
     folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
     files, folderId = list_drive_files(folder_name)
-    if rol_usuario != 'tutor':
-        if folderId:
-            st.link_button("Abrir carpeta", f"https://drive.google.com/drive/folders/{folderId}")
 
     if files:
         for f in files:

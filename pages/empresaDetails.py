@@ -32,6 +32,8 @@ if "practica_seleccionada" not in st.session_state:
 if "estados" not in st.session_state:
     st.session_state["estados"] = []
 # --- Traer todas las empresas ---
+anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 empresas = getEquals(empresasTabla, {"CIF": cif})
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
@@ -52,6 +54,12 @@ def fetch_practicas_tutores():
         p for p in practicaTodas 
         if p.get("status") not in [estadosPractica[3], estadosPractica[4]]
     ]
+
+    practicas = st.session_state.practicas
+    if anioFiltro != aniosList[0]: 
+        practicas = [p for p in practicas if p.get("anio") == anioFiltro]
+    if cursoFiltro != cursoList[0]:
+        practicas = [p for p in practicas if p.get("curso") == cursoFiltro]
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
@@ -126,9 +134,14 @@ with tabEmpresa:
 with tabOferta:
  # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
+
+        if anioFiltro != aniosList[0]: 
+            fps = [p for p in fps if p.get("anio") == anioFiltro]
+        if cursoFiltro != cursoList[0]:
+            fps = [p for p in fps if p.get("curso") == cursoFiltro]
         st.subheader(f"Formaciones ofrecidas")
         base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
-        st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}formEmpresa")
+        st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or estados[4]
@@ -182,11 +195,11 @@ with tabOferta:
                         default_index = 0
                    
         else:
-            st.info('No hay necesidades FP registradas para esta empresa.')     
+            st.info('No hay necesidades FP registradas para esta empresa o para el filtro seleccionado')     
 
 with tabTutores:
         st.subheader("Tutores")
-        st.caption('Aquí puedes administrar los tutores de tu empresa. Agrega, modifica o elimina usando la tabla, posiciona el mouse sobre la tabla y podrás ver las opciones. Luego preciona "Actualizar Tutores"')
+        st.caption('Aquí puedes administrar los tutores de tu empresa. Agrega, modifica o elimina usando la tabla, posiciona el ratón sobre la tabla y podrás ver las opciones. Luego preciona "Actualizar Tutores"')
         if st.session_state.tutores is None:
             st.session_state.tutores = getEquals(tutoresTabla,{"cif_empresa": cif})
         if not st.session_state.tutores:

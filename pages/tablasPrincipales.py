@@ -153,10 +153,11 @@ with tab_alumnos:
     anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
     cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
     df_raw = st.session_state.practicas_data
-    if anioFiltro != aniosList[0]: 
-        df_raw = df_raw[df_raw["anio_alumno"] == anioFiltro]
-    if cursoFiltro != cursoList[0]:
-        df_raw = df_raw[df_raw["curso_alumno"] == cursoFiltro]
+    if not df_raw.empty:
+        if anioFiltro != aniosList[0]:
+            df_raw = df_raw[df_raw["anio_alumno"] == anioFiltro]
+        if cursoFiltro != cursoList[0]:
+            df_raw = df_raw[df_raw["curso_alumno"] == cursoFiltro]
     
     if 'area' not in df_raw.columns:
             df_raw['area'] = None
@@ -226,15 +227,24 @@ with tab_alumnos:
                         
                         if ciclo not in mapeo_ciclo_empresas:
                             mapeo_ciclo_empresas[ciclo] = []
+                         # Buscar si la empresa ya existe en este ciclo
+                        entrada_existente = next(
+                            (e for e in mapeo_ciclo_empresas[ciclo] if e["nombre"] == nombre_empresa),
+                            None
+                        )
                         
-                        mapeo_ciclo_empresas[ciclo].append({
-                            "nombre": nombre_empresa,
-                            "disponibles": disponibles,
-                            "oferta": oferta.get('id'),
-                            "email_empresa": email_empresa,
-                            "direccion_empresa": direccion_empresa,
-                            "localidad_empresa": localidad_empresa
-                        })
+                        if entrada_existente:
+                            # Acumular cupos si hay varias ofertas del mismo ciclo
+                            entrada_existente["disponibles"] += disponibles
+                        else:
+                            mapeo_ciclo_empresas[ciclo].append({
+                                "nombre": nombre_empresa,
+                                "disponibles": disponibles,
+                                "oferta": oferta.get('id'),
+                                "email_empresa": email_empresa,
+                                "direccion_empresa": direccion_empresa,
+                                "localidad_empresa": localidad_empresa
+                            })
 
             json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
             if not df_raw.empty:

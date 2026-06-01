@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import updateCiclosFormativos, get,getEqual,upsert
+from modules.data_base import updateCiclosFormativos, get,getEqual,upsert,generateLink
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import ciclosFormativosTablas,emailImportantesTabla,formTabla
-
+import os
 # Configuración inicial
 apply_page_config()
 make_sidebar()
@@ -168,3 +168,8 @@ with tabFormularios:
                 
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
+        
+        if(tipo_seleccionado == "alumnos"):
+            st.info(f"Link del formulario: {os.getenv('FORM_ALUMNO')}")
+        elif(tipo_seleccionado == "empresa"):
+            st.info(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}")

@@ -2,7 +2,7 @@ title="Cámara Valencia - FP"
 logoutButton="Desloguearse"
 page_icon="./images/cv-fp.ico"
 companyIcon="./images/cv-fp.png"
-
+camaraLogo="./images/camara-logo.png"
 azul="#013d5f"
 celeste="2AD2C9"
 amarillo=""

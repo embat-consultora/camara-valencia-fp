@@ -12,6 +12,7 @@ from modules.emailSender import send_email
 from modules.drive_helper import list_drive_files,upload_to_drive
 from modules.forms_helper import  file_size_bytes
 import re
+
 apply_page_config()
 make_sidebar()
 
@@ -215,7 +216,6 @@ with tab1:
                         data_alumnos,
                         {"id":alumno_id}
                     )
-                    st.success("Alumno actualizado correctamente")
                     st.toast("Alumno actualizado correctamente")
                     st.rerun()
 

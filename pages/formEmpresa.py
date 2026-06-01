@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-import json
+from page_utils import apply_page_config
 from modules.forms_helper import required_ok, slug
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
 from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
@@ -8,6 +8,19 @@ from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,es
 # Config
 # ---------------------------------
 st.set_page_config(page_title="Empresas Formación", page_icon="🏢", layout="centered")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
+
+    /* Esto aplica la fuente a toda la app */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Montserrat', sans-serif;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 curso_academico = st.query_params.get("curso_academico","2026-2027")
 st.markdown("""
 <style>
@@ -224,6 +237,7 @@ if submit:
         "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
         "nombre_rellena_form": nombre_contacto.strip(),
         "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
+        "anio": curso_academico
     }
     res_emp = upsert(empresasTabla, payloadEmpresa, keys=["CIF"])
     if res_emp and res_emp.data:
@@ -244,6 +258,11 @@ if submit:
             "email": res_emp.data[0]["CIF"],
             "password": res_emp.data[0]["CIF"],
             "rol": "empresa",
+        }, keys=["email"])
+        upsertCustome(usuariosTabla, {
+            "email": nif_tutor,
+            "password": nif_tutor,
+            "rol": "tutor",
         }, keys=["email"])
 
     st.success("✅ ¡Formulario de empresa enviado correctamente!")
