@@ -2,19 +2,6 @@ import streamlit as st
 from modules.data_base import getEqual
 from variables import usuariosTabla
 
-# Función para redirigir según el rol del usuario
-def redirect_by_role():
-    rutas = {
-        "admin": "pages/dashboard_admin.py",
-        "psicologo": "pages/dashboard_psicologos.py",
-        "pm": "pages/pm_usuarios.py",
-        "consultora": "pages/consultora_calendar.py"
-    }
-    rol = st.session_state.get("role")
-    if rol in rutas:
-        st.switch_page(rutas[rol])
-    else:
-        st.error("Rol no reconocido.")
 
 # Cargar datos del usuario desde Supabase y guardar en session_state
 def load_user(email):

@@ -3,11 +3,12 @@ import pandas as pd
 from modules.data_base import getEquals, getEqual, upsert, updateTutores,getEquals, getPracticas
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, localidades, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica
+from variables import empresasTabla, necesidadFP, estados, aniosList,cursoList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive
 from pathlib import Path
 import uuid
+import os
 apply_page_config()
 make_sidebar()
 
@@ -31,6 +32,8 @@ if "practica_seleccionada" not in st.session_state:
 if "estados" not in st.session_state:
     st.session_state["estados"] = []
 # --- Traer todas las empresas ---
+anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 empresas = getEquals(empresasTabla, {"CIF": cif})
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
@@ -46,7 +49,17 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.error(f"Error al actualizar {label}: {e}")
 
 def fetch_practicas_tutores():
-    practicas = getPracticas(practicaTabla, {"empresa": cif})
+    practicaTodas = getPracticas(practicaTabla, {"empresa": cif})
+    practicas = [
+        p for p in practicaTodas 
+        if p.get("status") not in [estadosPractica[3], estadosPractica[4]]
+    ]
+
+    practicas = st.session_state.practicas
+    if anioFiltro != aniosList[0]: 
+        practicas = [p for p in practicas if p.get("anio") == anioFiltro]
+    if cursoFiltro != cursoList[0]:
+        practicas = [p for p in practicas if p.get("curso") == cursoFiltro]
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
@@ -78,7 +91,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
 # --- Tabs principales ---
-tabEmpresa, tabOferta,tabPractica, tabTutores = st.tabs(["Mi Empresa", "Ofertas", "Prácticas", "Tutores"])
+tabEmpresa, tabOferta,tabPractica, tabTutores = st.tabs(["Mi Empresa", "Ofertas", "Formaciones", "Tutores"])
 
 # -------------------------------------------------------------------
 # TAB 1: Buscar y visualizar empresas
@@ -121,13 +134,18 @@ with tabEmpresa:
 with tabOferta:
  # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Prácticas ofrecidas")
-        st.link_button("➕ Agregar nueva oferta de prácticas", "http://camara-valencia-fp.streamlit.app/formEmpresa", width='stretch')
-        st.caption('Oferta de prácticas actuales ')
+
+        if anioFiltro != aniosList[0]: 
+            fps = [p for p in fps if p.get("anio") == anioFiltro]
+        if cursoFiltro != cursoList[0]:
+            fps = [p for p in fps if p.get("curso") == cursoFiltro]
+        st.subheader(f"Formaciones ofrecidas")
+        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+        st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
         if fps:
             for i, fp in enumerate(fps, start=1):
-                estado_actual = fp.get("estado") or "Nuevo"
-                bg_color = "🟢" if estado_actual == "Nuevo" else "🔴"
+                estado_actual = fp.get("estado") or estados[4]
+                bg_color = "🟢" if estado_actual == estados[4] else "🔴"
 
                 with st.expander(
                     f"Oferta #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')} | {estado_actual} {bg_color}",
@@ -177,11 +195,11 @@ with tabOferta:
                         default_index = 0
                    
         else:
-            st.info('No hay necesidades FP registradas para esta empresa.')     
+            st.info('No hay necesidades FP registradas para esta empresa o para el filtro seleccionado')     
 
 with tabTutores:
         st.subheader("Tutores")
-        st.caption('Aquí puedes administrar los tutores de tu empresa. Agrega, modifica o elimina usando la tabla, posiciona el mouse sobre la tabla y podrás ver las opciones. Luego preciona "Actualizar Tutores"')
+        st.caption('Aquí puedes administrar los tutores de tu empresa. Agrega, modifica o elimina usando la tabla, posiciona el ratón sobre la tabla y podrás ver las opciones. Luego preciona "Actualizar Tutores"')
         if st.session_state.tutores is None:
             st.session_state.tutores = getEquals(tutoresTabla,{"cif_empresa": cif})
         if not st.session_state.tutores:
@@ -227,10 +245,16 @@ def mostrarLista():
             st.session_state["force_reload"] = True
             st.rerun()
     if not practicas:
-        st.info("No tienes prácticas asignadas aun.")
+        st.info("No tienes Formaciones asignadas aun.")
     else:
         data_for_grid = []
         for p in practicas:
+            anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+            cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
+            if st.session_state.get("index_academic", 0)>0 and p.get("anio", []) != anioFiltro:
+                continue
+            if st.session_state.get("index_curso", 0)>0 and p.get("curso") != cursoFiltro:
+                continue
             pid = p["id"]
             estados_p =  p.get("status", [])
 
@@ -239,58 +263,61 @@ def mostrarLista():
                 "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
                 "Empresa": p.get('empresas', {}).get('nombre'),
                 "Estado": estados_p,
+                "Fecha_inicio": p.get('fecha_inicio', '—'),
                 "Ciclo": p.get('ciclo_formativo', '—'),
-                "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar')
+                "Tutor Empresa": p.get('tutor', 'Sin asignar'),
+                "Gestor": p.get('gestor', 'Sin asignar')
             })
 
         df = pd.DataFrame(data_for_grid)
 
         if df.empty:
-            st.info("No hay prácticas asignadas aun")
+            st.info("No hay Formaciones asignadas aun para el curso académico seleccionado.")
+        else:
+            # 2. Configurar AgGrid
+            gb = GridOptionsBuilder.from_dataframe(df)
+            gb.configure_grid_options(localeText=locale_tabla_principal)
+            gb.configure_selection('single', use_checkbox=False) # Selección de fila completa
+            gb.configure_column("ID", hide=True) # Ocultamos el ID técnico
+            gb.configure_grid_options(domLayout='normal')
+            
+            # Tip de experto: Hacer que las columnas se ajusten automáticamente
+            gridOptions = gb.build()
 
-        # 2. Configurar AgGrid
-        gb = GridOptionsBuilder.from_dataframe(df)
-        gb.configure_selection('single', use_checkbox=False) # Selección de fila completa
-        gb.configure_column("ID", hide=True) # Ocultamos el ID técnico
-        gb.configure_grid_options(domLayout='normal')
-        
-        # Tip de experto: Hacer que las columnas se ajusten automáticamente
-        gridOptions = gb.build()
+            st.write("Selecciona una fila para ver el detalle:")
+            
+            # 3. Renderizar el Grid
+            response = AgGrid(
+                df,
+                gridOptions=gridOptions,
+                update_mode=GridUpdateMode.SELECTION_CHANGED, # Se dispara al hacer click
+                data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                fit_columns_on_grid_load=True,
+                theme='streamlit', # O 'balham', 'alpine'
+                height=400,
+                allow_unsafe_縫tml=True
+            )
 
-        st.write("Selecciona una fila para ver el detalle:")
-        
-        # 3. Renderizar el Grid
-        response = AgGrid(
-            df,
-            gridOptions=gridOptions,
-            update_mode=GridUpdateMode.SELECTION_CHANGED, # Se dispara al hacer click
-            data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-            fit_columns_on_grid_load=True,
-            theme='streamlit', # O 'balham', 'alpine'
-            height=400,
-            allow_unsafe_縫tml=True
-        )
+            # 4. Lógica de Navegación (Detección de Click)
+            selected_rows = response.get('selected_rows')
+            
+            # st-aggrid v0.3.3+ devuelve una lista o un DataFrame según configuración
+            if selected_rows is not None and len(selected_rows) > 0:
+                if isinstance(selected_rows, pd.DataFrame):
+                    selected_id = selected_rows.iloc[0]['ID']
+                else:
+                    selected_id = selected_rows[0]['ID']
 
-        # 4. Lógica de Navegación (Detección de Click)
-        selected_rows = response.get('selected_rows')
-        
-        # st-aggrid v0.3.3+ devuelve una lista o un DataFrame según configuración
-        if selected_rows is not None and len(selected_rows) > 0:
-            if isinstance(selected_rows, pd.DataFrame):
-                selected_id = selected_rows.iloc[0]['ID']
-            else:
-                selected_id = selected_rows[0]['ID']
-
-            # Seteamos el estado y redirigimos
-            st.session_state.practica_seleccionada = selected_id
-            st.session_state.page = "detalle"
-            st.rerun()
+                # Seteamos el estado y redirigimos
+                st.session_state.practica_seleccionada = selected_id
+                st.session_state.page = "detalle"
+                st.rerun()
 def mostrar_detalle():
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
 
     if not p:
-        st.error("Práctica no encontrada.")
+        st.error("Formación no encontrada.")
         return
 
     p["oferta_fp"] = p.get("oferta_fp") or {}
@@ -302,7 +329,7 @@ def mostrar_detalle():
     st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
     seccion_detalle(alumno, empresa, p, oferta)
     seccion_planificacion(alumno, empresa, p)
-    if st.button("⬅️ Volver"):
+    if st.button("⬅ Volver",type="primary"):
         st.session_state.page = "lista"
         st.rerun()
 
@@ -317,6 +344,8 @@ def seccion_detalle(alumno, empresa, p, oferta):
             st.write(f"**Área:** {area}")     
             proyecto = p.get("proyecto") or "No especificado"
             st.write(f"**Proyecto:** {proyecto}")      
+            st.write(f"**Curso Académico:** {p.get('anio', '—')}")  
+            st.write(f"**Curso:** {p.get('curso', '—')}")  
             gestor_actual = alumno.get("gestor")
             st.write(f"**Gestor:** {gestor_actual}")
 
@@ -324,7 +353,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
             st.write(f"**Empresa:** {empresa['nombre']}")
             st.write(f"**CIF:** {empresa['CIF']}")
             direccion = oferta.get("direccion_empresa") or empresa['direccion']
-            st.write(f"**Dirección práctica:** {direccion}") 
+            st.write(f"**Dirección formación:** {direccion}") 
             localidad = oferta.get("localidad_empresa") or empresa['localidad']
             st.write(f"**Localidad:** {localidad}")
 
@@ -349,7 +378,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
         pass
 
 def seccion_planificacion(alumno, empresa, practicaId):
-        st.subheader("📅 Planificación de Prácticas")
+        st.subheader("📅 Planificación de Formaciones")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
@@ -367,7 +396,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                     key=f"cal_up_{practicaId}"
                 )
                 if uploaded_cal:
-                    if st.button("Guardar en Drive", key=f"btn_save_cal_{practicaId}"):
+                    if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
                             temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
                             with open(temp_path, "wb") as f:
@@ -398,7 +427,7 @@ def seccion_planificacion(alumno, empresa, practicaId):
                                 unsafe_allow_html=True
                             )
                     
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'),width='stretch')
+                    st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'),width='stretch')
                 else:
                     st.markdown(
                         """
@@ -408,27 +437,27 @@ def seccion_planificacion(alumno, empresa, practicaId):
                         """,
                         unsafe_allow_html=True
                     )
-        if archivo_calendario:
-                file_id = archivo_calendario.get('id')
-                
-                if file_id:
-                    # Construimos la URL de previsualización oficial de Google Drive
-                    preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
-                    
-                    # Usamos un contenedor de Streamlit para el estilo
-                    with st.container():
-                        st.markdown(
-                            f"""
-                            <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
-                                <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                
-                    st.link_button("Abrir imagen completa en Drive", archivo_calendario.get('webViewLink'), width='stretch')
-        else:
-            st.write("No han subido calendario aun")
+                if archivo_calendario:
+                        file_id = archivo_calendario.get('id')
+                        
+                        if file_id:
+                            # Construimos la URL de previsualización oficial de Google Drive
+                            preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                            
+                            # Usamos un contenedor de Streamlit para el estilo
+                            with st.container():
+                                st.markdown(
+                                    f"""
+                                    <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+                                        <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+                        
+                            st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
+                else:
+                    st.write("No han subido calendario aun")
         pass
 
 with tabPractica:

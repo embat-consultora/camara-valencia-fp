@@ -29,7 +29,7 @@ def checkEstadoOferta(ofertaId):
             necesidadFP,
             {
                 "id": ofertaId,
-                "estado": estados[1],
+                "estado": estados[2],
                 "empresa": oferta.get("empresa"),
             },
             keys=["id"],
@@ -39,8 +39,8 @@ def checkEstadoOferta(ofertaId):
 # ---------------------------------
 apply_page_config()
 make_sidebar()
-st.set_page_config(page_title="Match", page_icon="🚀")
-st.title("🚀 MATCH")
+st.set_page_config(page_title="Matcheos", page_icon="🚀")
+st.title("🤝🏻 PANEL DE MATCHEOS")
 
 # ---------------------------------
 # Traer todas las ofertas (necesidadFP)
@@ -151,7 +151,7 @@ for oferta_data in ofertas:
                     or "No completado"
                 )
                 st.write(f"**Proyectos:**",proyecto  )
-                st.write(f"📦 Cupos disponibles: {cupos_disp}/{cupos_total}")
+                st.write(f"📦 Plazas disponibles: {cupos_disp}/{cupos_total}")
 
                 if cupos_disp <= 0:
                     st_custom_message("La oferta está cogida", color=verdeOk, emoji="✅")
@@ -186,13 +186,13 @@ for oferta_data in ofertas:
                                     if cupos_disp > 0:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
-                                                crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status="Nuevo")
+                                                crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4])
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
                                             except Exception as e:
                                                 st.error(f"❌ Error al crear el match: {e}")
                                     else:
-                                        st.info("Cupos completos para este ciclo.")
+                                        st.info("Plazas completos para este ciclo.")
                                 
                     #asignar alumnos manualmente
                     colAlumno, colMatch = st.columns([3, 1])
@@ -222,7 +222,7 @@ for oferta_data in ofertas:
                             dni_alumno = alumnoSeleccionado.split("(")[-1].replace(")", "")
                             if st.button("Asignar Alumno", key=f"match_manual_{oferta_id}_{ciclo}_{dni_alumno}"):
                                 try:
-                                    crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status="Nuevo")
+                                    crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status=estados[4])
                                     checkEstadoOferta(oferta_id)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
                                     st.rerun()
