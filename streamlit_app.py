@@ -23,7 +23,7 @@ st.set_page_config(page_title="Cámara FP - Inicio", page_icon=page_icon)
 cookie_manager = stx.CookieManager(key="main_cookie_manager")
 
 if not st.session_state.get("logged_in"):
-            st.session_state["logged_in"] = True
+            st.session_state["logged_in"] = False
             st.rerun()
 
 col1, col2, col3 = st.columns([1, 4, 1])

@@ -26,7 +26,7 @@ def make_sidebar():
             """,
             unsafe_allow_html=True
         )
-            if st.session_state["env"] == "prod":
+            if st.session_state["env"] == "test":
                 st.caption(f"Entorno: **{st.session_state['env']}**")
             st.caption(f"Rol: **{rol_amigable}**")
             st.caption(f"Usuario: **{user}**")
