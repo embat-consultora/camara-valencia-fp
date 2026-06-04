@@ -517,7 +517,7 @@ def generateLink(tipo):
     return url_completa
 
 def getLinkFromList(listForms):
-    base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+    base_url = os.getenv("URL", "https://camara-mcc.streamlit.app/")
     if isinstance(listForms, pd.DataFrame):
         if listForms.empty:
             return []
