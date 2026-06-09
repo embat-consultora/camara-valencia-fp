@@ -93,12 +93,12 @@ with col2:
     # Eliminamos el parámetro 'width=500' que no pertenece a st.container
     with st.container(key="my_white_container"):
         
-        url_logo = "https://github.com/user-attachments/assets/c1da5d43-519c-4f0e-9ab9-d7e78ad4cbd2" 
+        url_logo = "https://github-production-user-asset-6210df.s3.amazonaws.com/8386867/605006592-71649506-5c14-4f2b-8973-8886f3c1f2ea.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260609%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260609T094824Z&X-Amz-Expires=300&X-Amz-Signature=4510dd253f626b115cba433a1b970b7a3c5249493411e4f9a19bc3d56f599b62&X-Amz-SignedHeaders=host&response-content-type=image%2Fpng" 
         
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 25px;">
-                <img src="{url_logo}" style="width: 250px; max-width: 100%; height: auto; object-fit: contain;">
+                <img src="{url_logo}" style="width: 350px; max-width: 100%; height: auto; object-fit: contain;">
             </div>
             """,
             unsafe_allow_html=True)
