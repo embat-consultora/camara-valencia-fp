@@ -93,7 +93,7 @@ with col2:
     # Eliminamos el parámetro 'width=500' que no pertenece a st.container
     with st.container(key="my_white_container"):
         
-        url_logo = "https://private-user-images.githubusercontent.com/8386867/605006592-71649506-5c14-4f2b-8973-8886f3c1f2ea.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODA5OTkzMDYsIm5iZiI6MTc4MDk5OTAwNiwicGF0aCI6Ii84Mzg2ODY3LzYwNTAwNjU5Mi03MTY0OTUwNi01YzE0LTRmMmItODk3My04ODg2ZjNjMWYyZWEucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI2MDYwOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA2MDlUMDk1NjQ2WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9NGIzMTllY2E0NzZmODNjY2RhMDkwNjYxNDUwNWY1ZDBhYjcwMTYxY2Y0YjkxYTEzMmQ1MTQwZGM3MGUxM2ZhYSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmcmVzcG9uc2UtY29udGVudC10eXBlPWltYWdlJTJGcG5nIn0.d2EXP4nSAmzZPK5tuNLZpq2sTXmMrU79zzEQycKyC3I" 
+        url_logo = "https://github.com/user-attachments/assets/387c2e80-609b-4123-8c2c-d2e45d15eeda" 
         
         st.markdown(
             f"""
