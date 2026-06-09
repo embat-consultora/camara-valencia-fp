@@ -25,22 +25,22 @@ def get_base64(bin_file):
     with open(bin_file, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-img = get_base64("images/fondo.webp")
+# img = get_base64("images/fondo.webp")
 
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{img}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# st.markdown(
+#     f"""
+#     <style>
+#     .stApp {{
+#         background-image: url("data:image/jpg;base64,{img}");
+#         background-size: cover;
+#         background-position: center;
+#         background-repeat: no-repeat;
+#         background-attachment: fixed;
+#     }}
+#     </style>
+#     """,
+#     unsafe_allow_html=True
+# )
 cookie_manager = stx.CookieManager(key="main_cookie_manager")
 
 if not st.session_state.get("logged_in"):
