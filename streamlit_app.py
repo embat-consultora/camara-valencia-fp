@@ -93,7 +93,7 @@ with col2:
     # Eliminamos el parámetro 'width=500' que no pertenece a st.container
     with st.container(key="my_white_container"):
         
-        url_logo = "https://github-production-user-asset-6210df.s3.amazonaws.com/8386867/605006592-71649506-5c14-4f2b-8973-8886f3c1f2ea.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260609%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260609T094824Z&X-Amz-Expires=300&X-Amz-Signature=4510dd253f626b115cba433a1b970b7a3c5249493411e4f9a19bc3d56f599b62&X-Amz-SignedHeaders=host&response-content-type=image%2Fpng" 
+        url_logo = "https://private-user-images.githubusercontent.com/8386867/605006592-71649506-5c14-4f2b-8973-8886f3c1f2ea.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODA5OTkzMDYsIm5iZiI6MTc4MDk5OTAwNiwicGF0aCI6Ii84Mzg2ODY3LzYwNTAwNjU5Mi03MTY0OTUwNi01YzE0LTRmMmItODk3My04ODg2ZjNjMWYyZWEucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI2MDYwOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA2MDlUMDk1NjQ2WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9NGIzMTllY2E0NzZmODNjY2RhMDkwNjYxNDUwNWY1ZDBhYjcwMTYxY2Y0YjkxYTEzMmQ1MTQwZGM3MGUxM2ZhYSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmcmVzcG9uc2UtY29udGVudC10eXBlPWltYWdlJTJGcG5nIn0.d2EXP4nSAmzZPK5tuNLZpq2sTXmMrU79zzEQycKyC3I" 
         
         st.markdown(
             f"""
