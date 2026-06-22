@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "supabase": "^2.58.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0"
+  },
+  "scripts": {
+    "test-streamlit": "playwright test tests/streamlit-wakeup.spec.js --workers=1"
+  }
+}
