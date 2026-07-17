@@ -18,9 +18,11 @@ class StreamlitAppPage {
   async handleWakeupIfNeeded() {
     // El wakeup button está en la página principal, NO en el iframe
     const wakeupButton = this.page.getByTestId('wakeup-button-viewer');
+    console.log("Buscando el boton de wakeup")
     const isSleeping = await wakeupButton.isVisible({ timeout: 10000 }).catch(() => false);
     if (isSleeping) {
-      await wakeupButton.click();
+      console.log("Estaba dormida, haciendo click en el boton de wakeup")
+      await wakeupButton.click({force:true});
     }
   }
 
@@ -40,9 +42,11 @@ class StreamlitAppPage {
 test.describe('Streamlit Apps Wake-up @smoke', () => {
   test('Cámara Valencia FP app loads and wakes up', async ({ page }) => {
     const streamlitApp = new StreamlitAppPage(page);
-    
+    console.log("Navigating to Cámara Valencia FP app");
     await streamlitApp.navigateTo('https://camara-valencia-fp.streamlit.app/');
+    console.log("Veo si esta durmiendo");
     await streamlitApp.handleWakeupIfNeeded();
+    console.log("Ya la deberia haber despertado");
     await streamlitApp.waitForAppReady();   
     
     await streamlitApp.waitForEmailInput();   

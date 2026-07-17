@@ -292,6 +292,7 @@ with tab_alumnos:
                 
                 # Inyectamos las traducciones en las opciones principales del grid
                 gb.configure_grid_options(localeText=locale_tabla_principal)
+                gb.configure_grid_options(stopEditingWhenCellsLoseFocus=True)
                 gb.configure_default_column(editable=True, filter=True, resizable=True)
 
                 gb.configure_column("ciclo_acronimo", headerName="Ciclo", pinned='left', width=100, editable=False)
@@ -300,8 +301,8 @@ with tab_alumnos:
                 gb.configure_column("telefono", headerName="Telefono Alumno", width=150)
                 gb.configure_column("email_empresa", headerName="Email Empresa", width=200,editable=False )
                 gb.configure_column("comentarios_centro", headerName="Comentarios", width=200)
-                gb.configure_column("vehiculo", headerName="Vehículo", width=100)
-                gb.configure_column("localidad", headerName="Localidad", width=150)
+                gb.configure_column("vehiculo", headerName="Vehículo", width=100, editable=False)
+                gb.configure_column("localidad", headerName="Localidad", width=150, editable=False)
 
                 gb.configure_column("gestor", 
                     headerName="Gestor", 
@@ -518,7 +519,7 @@ with tab_alumnos:
                     df_display,
                     gridOptions=gridOptions,
                     allow_unsafe_jscode=True,
-                    update_on='modelChanged',
+                    update_on=[],
                     theme='alpine',
                     height=600,
                     key=f"grid_alumnos_v_{st.session_state.grid_version}"
@@ -531,7 +532,7 @@ with tab_alumnos:
                         try:
                             guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
                             st.cache_data.clear()
-                            st.success("✅ ¡Cambios guardados correctamente!")
+                            st.toast("✅ ¡Cambios guardados correctamente!")
                             st.session_state["data_loaded"] = False 
                             st.session_state["practicas_data"] = None
                             st.session_state.grid_version += 1

@@ -80,7 +80,7 @@ carpetaPractica="1a-s8ycno4rXBnennRUdodvJbrt-KgRHT"
 #emails
 bodyEmailsEmpresa= f"""Hola,
 
-Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
+Nos ponemos en contacto desde la Cámara FP de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
 Llena esta formulario si tiene alguna formación u oferta: {"{{form_link}}"}
 
@@ -89,7 +89,7 @@ Andrea
 """
 bodyEmailsAlumno= f"""Hola,
 
-Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
+Nos ponemos en contacto desde la Cámara FP de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
 Llena esta formulario si te interesaría participar en alguna Formación: {"{{form_link}}"}
 
@@ -107,7 +107,7 @@ opciones_motivo = [
 
 tipoPracticas= [
                     "Autogestionada",
-                    "Asignada por el centro"
+                    "Asignada por el Centro"
                 ]
 sectorEmpresa = [
   "Comercio minorista y mayorista",

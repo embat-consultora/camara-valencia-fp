@@ -183,13 +183,13 @@ with tab1:
                 requisitos = st.text_input("Requisitos adicionales (separados por comas)", value=val_requisitos)
                 raw_horas = alumno.get("horas_totales")
                 if pd.isna(raw_horas) or raw_horas is None:
-                    val_horas_totales = 7.0
+                    val_horas_totales = 0
                 else:
                     try:
-                        val_horas_totales = float(raw_horas)
+                        val_horas_totales = int(raw_horas)
                     except ValueError:
-                        val_horas_totales = 7.0
-                horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=0.5) 
+                        val_horas_totales = 7
+                horas_totales = st.number_input("Horas Totales", value=val_horas_totales,step=1) 
                 if st.button("💾 Actualizar alumno"):
                     data_alumnos = {
                             "nombre": new_nombre,
@@ -314,8 +314,8 @@ with tab2:
                 )
             ano = st.selectbox("Curso Académico *", options= aniosList)
             curso = st.selectbox("Curso *", options= cursoList, key="nuevo_curso")
-            val_horas_totales = 7.0
-            horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=0.5) 
+            val_horas_totales = 10
+            horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=1) 
 
             submitted = st.form_submit_button("Crear Alumno")
 
@@ -394,7 +394,7 @@ with tab2:
                 mime="text/csv"
             )
 
-        st.info("Sube un archivo CSV. Solo el DNI es obligatorio. El resto de las columnas son opcionales. Intenta que ninguna fila quede vacia")
+        st.info("Sube un archivo CSV. Solo el DNI es obligatorio. El resto de las columnas son opcionales.")
 
         # 2. File uploader
         uploaded_csv = st.file_uploader(
@@ -572,12 +572,48 @@ with tab3:
 
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
+    
     adjuntos = st.file_uploader(
-            "Adjuntar archivos", 
+            label="Adjuntar archivos (opcional, máximo 10 MB por archivo)",
             accept_multiple_files=True, 
             key="adjuntos_alumnos"
         )
-    if st.button("📨 Enviar Emails a Alumnos", disabled=not can_send):
+    st.html(
+    """
+    <style>
+
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+    display: none;
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+    content: 'Arrastre aquí los archivos';
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+    line-height: initial;
+    content: "Buscar";
+    text-indent: 0;
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+    line-height: initial;
+    content: "Límite 1MB por archivo";
+    text-indent: 0;
+    }
+
+    </style>
+    """
+)
+    if st.button("📨 Enviar Correo a Alumnos", disabled=not can_send):
         try:
             if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
                 fecha_envio = datetime.now().isoformat()

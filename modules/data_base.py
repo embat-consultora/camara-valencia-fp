@@ -611,13 +611,14 @@ def getPracticaByToken(token, tipo_form):
             return None
 
 
-def getMatches():
+def getMatches(ciclo):
     """
     Ejecuta la query de coincidencias entre ofertas y alumnos (ranking de match),
     incluyendo el nombre de la empresa.
     Retorna una lista de dicts (rows) con el resultado.
     """
-    query = """
+    ciclo_safe = str(ciclo).replace("'", "''")
+    query = f"""
     WITH ofertas_activas AS (
       SELECT
         of.*,
@@ -625,11 +626,13 @@ def getMatches():
       FROM oferta_fp of
       WHERE LOWER(of.estado) = 'nuevo'
         AND of.cupo_alumnos > 0
+        AND of.anio = '{ciclo_safe}'
     ),
     alumnos_disponibles AS (
       SELECT a.*
       FROM alumnos a
-      WHERE LOWER(a.estado) = 'sin empresa'
+      WHERE a.estado = 'Sin Empresa'
+      AND a.anio = '{ciclo_safe}'
     ),
     oferta_ciclos AS (
       SELECT
@@ -652,6 +655,7 @@ def getMatches():
         a.nombre AS alumno_nombre,
         a.apellido AS alumno_apellido,
         a.dni AS alumno_dni,
+        a.curso AS alumno_curso,
         oc.oferta_id,
         oc.empresa,
         oc.nombre_empresa,
@@ -716,6 +720,7 @@ def getMatches():
       r.alumno_nombre,
       r.alumno_apellido,
       r.alumno_dni,
+      r.alumno_curso AS curso,
       r.oferta_id,
       r.empresa,
       r.nombre_empresa,

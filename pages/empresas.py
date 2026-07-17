@@ -5,7 +5,7 @@ from modules.data_base import get, getEqual, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
+from variables import empresasTabla, necesidadFP, estados, aniosList, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -21,7 +21,8 @@ st.markdown(
 )
 
 base_url = os.getenv("URL")
-
+if "form_registro_key" not in st.session_state:
+    st.session_state.form_registro_key = 0
 # --- Traer todas las empresas ---
 empresas = get(empresasTabla)
 if not empresas:
@@ -42,7 +43,7 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 with tab1:
     col1, col2, col3,col4= st.columns([3, 2,2,2])
     with col1:
-        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa")
+        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa (presiona enter para aplicar)")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:
@@ -137,7 +138,7 @@ with tab1:
 
         # --- Mostrar FP asociadas ---
         fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Formación - {empresa['nombre']}")
+        st.subheader(f"Formaciones presentadas - {empresa['nombre']}")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or estados[4]
@@ -187,10 +188,16 @@ with tab1:
 
 
         else:
-            st.info(
-                'No hay necesidades FP registradas para esta empresa. '
-                f"Mandale el link para que nos avise: [Formulario]({base_url}forms?form=1)"
-            )
+            st.caption("No hay necesidades FP registradas para esta empresa. Elige el curso académico en el selector y envia el link a la empresa")
+            col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
+            with col1:
+                    st.selectbox(
+                        "Seleccione curso académico", 
+                        options=aniosList[1:], 
+                        key="selector_curso_ac_doc"
+                    )
+            
+            st.write(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}?curso_academico={st.session_state['selector_curso_ac_doc']}")
 
 
 # -------------------------------------------------------------------
@@ -201,7 +208,7 @@ with tab2:
     tabNuevo, tabBulk = st.tabs(["Nueva Empresa", "Carga Masiva (.csv)"])
     with tabNuevo:
         st.subheader("➕ Nueva Empresa")
-        with st.form("nueva_empresa_form"):
+        with st.form(f"nueva_empresa_form_{st.session_state.form_registro_key}"):
             nombre_empresa = st.text_input("Nombre de la empresa")
             direccion = st.text_input("Dirección")
             cp = st.text_input("Código Postal")
@@ -245,10 +252,15 @@ with tab2:
                             "rol": "empresa",
                         }, keys=["email"])
                         st.success("✅ Empresa creada correctamente")
-
+                        st.session_state.form_registro_key += 1
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error al crear la empresa: {e}")
+
+
+
+
+
 
     with tabBulk:
         st.write("📥 Cargar Empresa desde CSV")
@@ -284,7 +296,41 @@ with tab2:
             type=["csv"],
             key="upload_csv_empresa"
         )
+        st.html(
+            """
+            <style>
 
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+            display: none;
+            }
+
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+            content: 'Arrastre aquí los archivos';
+            }
+
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+            line-height: initial;
+            content: "Buscar";
+            text-indent: 0;
+            }
+
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+            line-height: initial;
+            content: "Límite 1MB por archivo";
+            text-indent: 0;
+            }
+
+            </style>
+            """
+        )
         if uploaded_csv:
             try:
                 # Leer TODO como string siempre → adiós floats y NaNs
@@ -370,7 +416,6 @@ with tab2:
 # -------------------------------------------------------------------
 # TAB 3: Formularios & Contacto
 # -------------------------------------------------------------------
-formUrl = os.getenv("FORM_EMPRESA")
 can_send = True
 with tab3:
     if "emailsList" not in st.session_state:
@@ -429,12 +474,31 @@ with tab3:
         st.markdown(f"- {e}")
 
     subject_al = st.text_input("Asunto del email", value="Formaciones", key="subj_al")
+    def actualizar_body_empresa():
+        curso = st.session_state["selector_curso_ac_doc_e"]
+        st.session_state["body_al"] = bodyEmailsEmpresa.replace(
+            "{{form_link}}", 
+            f"{os.getenv('FORM_EMPRESA')}?curso_academico={curso}"
+        )
+
+
+    st.selectbox(
+        "Seleccione curso académico", 
+        options=aniosList[1:], 
+        key="selector_curso_ac_doc_e",
+        on_change=actualizar_body_empresa
+    )
+
+    # Si es la primera carga y "body_al" no existe aún, inicialízalo
+    if "body_al" not in st.session_state:
+        actualizar_body_empresa()
+
     body_al = st.text_area(
         "Cuerpo del email",
         height=200,
-        value=bodyEmailsEmpresa.replace("{{form_link}}", formUrl),
         key="body_al"
     )
+
 
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
@@ -443,7 +507,7 @@ with tab3:
         accept_multiple_files=True, 
         key="adjuntos_empresas"
     )
-    if st.button("📨 Enviar Emails a Empresas", disabled=not can_send):
+    if st.button("📨 Enviar Correo a Empresas", disabled=not can_send):
         try:
             if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
                 fecha_envio = datetime.now().isoformat()

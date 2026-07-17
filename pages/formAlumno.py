@@ -28,7 +28,7 @@ st.image("./images/cv-fp.png", width=250)
 formValues = getEqual(formTabla,"tipo", "alumnos")
 TITLE = formValues[0].get("titulo", "Formulario de Formación en Empresa")
 SUBTITLE = formValues[0].get("subtitulo", "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa.")
-DESCRIPTION = formValues[0].get("description",
+DESCRIPTION = formValues[0].get("descripcion",
     "⚠️ **Importante**: La información que facilitéis será tenida en cuenta en el proceso de asignación, "
     "pero la decisión final dependerá de: el tipo de empresas solicitantes, los requisitos que planteen "
     "y vuestro perfil, potencial y desempeño académico. Por tanto, aunque intentaremos ajustarnos en la "
@@ -108,8 +108,44 @@ requisitos = st.text_area(
 )
 # Subida de CV
 st.subheader("Subir CV")
+st.caption("El formato del CV deberia ser parecido a este: https://www.canva.com/design/DAFALVufruI/4ShcVLpYttaeO7zeVptyBA/edit")
 st.caption("El nombre del archivo debe seguir el formato: Nombre_Apellidos_CV (ejemplo: Juan_Perez_12345678A.pdf)")
 cv_file = st.file_uploader("Selecciona tu CV (PDF/DOC/DOCX)", type=["pdf", "doc", "docx"], accept_multiple_files=False)
+st.html(
+    """
+    <style>
+
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+    display: none;
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+    content: 'Arrastre aquí los archivos';
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+    line-height: initial;
+    content: "Buscar";
+    text-indent: 0;
+    }
+
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+    line-height: initial;
+    content: "Límite 1MB por archivo";
+    text-indent: 0;
+    }
+
+    </style>
+    """
+)
 cv_too_big = False
 if cv_file is not None:
     size_bytes = file_size_bytes(cv_file)

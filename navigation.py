@@ -12,6 +12,7 @@ def load_env_once():
 
 def make_sidebar():
     load_env_once()
+
     rol = st.session_state.get("rol", "admin")
     user = st.session_state.get("username")
     rol_amigable = nombres_roles.get(rol, rol.capitalize())
