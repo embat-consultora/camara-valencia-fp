@@ -26,7 +26,7 @@ if "form_registro_key" not in st.session_state:
     st.session_state.form_registro_key = 0
 
 
-base_url = os.getenv("URL")
+base_url =  st.secrets["URL"] 
 
 # --- Traer alumnos ---
 alumnos = get(alumnosTabla)
@@ -487,7 +487,7 @@ with tab2:
 # -------------------------------------------------------------------
 # TAB 3: Formulario Alumno
 # -------------------------------------------------------------------
-formUrlAlumno = os.getenv("FORM_ALUMNO")
+formUrlAlumno = st.secrets["FORM_ALUMNO"] 
 can_send = True
 with tab3:
     if "emailsList" not in st.session_state:

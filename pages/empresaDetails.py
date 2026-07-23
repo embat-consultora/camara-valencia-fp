@@ -139,7 +139,7 @@ with tabOferta:
         if cursoFiltro != cursoList[0]:
             fps = [p for p in fps if p.get("curso") == cursoFiltro]
         st.subheader(f"Formaciones ofrecidas")
-        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+        base_url = st.secrets["URL"] 
         st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
         if fps:
             for i, fp in enumerate(fps, start=1):

@@ -1,14 +1,13 @@
 import streamlit as st
 import extra_streamlit_components as stx
-from time import sleep
+
 from variables import logoutButton,nombres_roles, aniosList,cursoList
-import os
 def get_current_page_name():
     return st.session_state.get("current_page", "")
 
 def load_env_once():
     if "env" not in st.session_state:
-        st.session_state["env"] = os.getenv("SUPABASE_ENV", "local")
+        st.session_state["env"] = st.secrets["supabase"]["SUPABASE_ENV"]
 
 from datetime import date
 
