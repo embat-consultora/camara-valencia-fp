@@ -169,7 +169,7 @@ with tabFormularios:
                 st.error(f"Error al guardar: {e}")
         
         if(tipo_seleccionado == "alumnos"):
-            st.info(f"Link del formulario: {st.secrets["FORM_ALUMNO"]} ")
+            st.info(f"Link del formulario: {st.secrets["urls"]["FORM_ALUMNO"]} ")
         elif(tipo_seleccionado == "empresa"):
             col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
             with col1:
@@ -179,4 +179,4 @@ with tabFormularios:
                     key="selector_curso_ac_doc"
                 )
             with col2:  
-                st.info(f"Link del formulario:  {st.secrets["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}")
+                st.info(f"Link del formulario:  {st.secrets["urls"]["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}")

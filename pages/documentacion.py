@@ -30,7 +30,7 @@ def show_documentacion():
 
     with col2:
         # Construimos la URL dinámica usando el valor actual del selectbox
-        url_form_empresas = f"{st.secrets["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}"
+        url_form_empresas = f"{st.secrets["urls"]["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}"
         colLink , colCopy = st.columns([3, 1])
         with colLink:
             st.info(url_form_empresas)

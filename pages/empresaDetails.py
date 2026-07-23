@@ -139,7 +139,7 @@ with tabOferta:
         if cursoFiltro != cursoList[0]:
             fps = [p for p in fps if p.get("curso") == cursoFiltro]
         st.subheader(f"Formaciones ofrecidas")
-        base_url = st.secrets["URL"] 
+        base_url = st.secrets["urls"]["URL"] 
         st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
         if fps:
             for i, fp in enumerate(fps, start=1):

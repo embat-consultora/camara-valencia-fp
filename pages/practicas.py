@@ -672,7 +672,7 @@ def mostrar_dashboard():
         st.write("### ⏳ Alumnos que no han respondido")
         # Filtramos los que se enviaron pero no tienen fecha_respuesta
         df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
-        base_url = st.secrets["URL"] 
+        base_url = st.secrets["urls"]["URL"] 
        
         listado_morosos = []
         for _, row in df_pendientes.iterrows():

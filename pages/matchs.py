@@ -63,7 +63,7 @@ with st.spinner("Cargando datos..."):
     if not ofertas_con_cupo:
         st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
         st.stop()
-base_url = st.secrets["URL"] 
+base_url = st.secrets["urls"]["URL"] 
 
 empresas_disponibles = []
 for o in ofertas_con_cupo:

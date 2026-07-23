@@ -526,12 +526,12 @@ def getFormsLinks(practica_id):
     return getLinkFromList(response.data)
 
 def generateLink(tipo):
-    base_url = st.secrets["URL"]  # Asegúrate de que esta variable esté definida en tus secretos
+    base_url = st.secrets["urls"]["URL"]  # Asegúrate de que esta variable esté definida en tus secretos
     url_completa = f"{base_url.rstrip('/')}/{tipo}"
     return url_completa
 
 def getLinkFromList(listForms):
-    base_url = st.secrets["URL"] 
+    base_url = st.secrets["urls"]["URL"] 
     if isinstance(listForms, pd.DataFrame):
         if listForms.empty:
             return []
