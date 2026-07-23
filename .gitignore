@@ -3,4 +3,6 @@ modules/__pycache__
 .streamlit/secrets.toml
 backups
 __pycache__/
+*.pyc
 node_modules/
+modules/__pycache__/
