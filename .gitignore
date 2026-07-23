@@ -1,4 +1,6 @@
- modules/__pycache__
- .devcontainer
- .streamlit/secrets.toml
- backups
+modules/__pycache__
+.devcontainer
+.streamlit/secrets.toml
+backups
+__pycache__/
+node_modules/
