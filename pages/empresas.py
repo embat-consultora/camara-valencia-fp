@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-from modules.data_base import get, getEqual, update, upsert,upsertCustome
+from modules.data_base import get, getEquals, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
+from variables import empresasTabla, necesidadFP, estados,aniosList, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email
 import re
@@ -21,7 +21,8 @@ st.markdown(
 )
 
 base_url = os.getenv("URL")
-
+if "form_registro_key" not in st.session_state:
+    st.session_state.form_registro_key = 0
 # --- Traer todas las empresas ---
 empresas = get(empresasTabla)
 if not empresas:
@@ -42,7 +43,7 @@ tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨
 with tab1:
     col1, col2, col3,col4= st.columns([3, 2,2,2])
     with col1:
-        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa")
+        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa (presiona enter para aplicar)")
     with col2:
         st.metric("Total Empresas", len(df_empresas))
     with col3:
@@ -101,10 +102,14 @@ with tab1:
 
     if not df_empresas.empty:
         empresa_options = {row["nombre"]: row["id"] for _, row in df_empresas.iterrows()}
-        selected_name = st.selectbox("Seleccionar empresa", list(empresa_options.keys()))
+        col1, col2 = st.columns([2, 4])
+        with col1:
+            selected_name = st.selectbox("Seleccionar empresa", list(empresa_options.keys()))
         empresa_id = empresa_options[selected_name]
         empresa = df_empresas[df_empresas["id"] == empresa_id].iloc[0].to_dict()
-        with st.expander(f"✏️ Editar empresa: {empresa['nombre']}", expanded=False):
+        tabEditar, tabOfertas = st.tabs(["✏️ Editar Empresa", "📄 Formaciones Presentadas"])
+        with tabEditar:
+            st.subheader(f"Editar Empresa: {empresa.get('nombre', '')}")
             new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
             new_direccion = st.text_input("Dirección", empresa.get("direccion", ""))
             try:
@@ -136,61 +141,71 @@ with tab1:
                 st.rerun()
 
         # --- Mostrar FP asociadas ---
-        fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
-        st.subheader(f"Formación - {empresa['nombre']}")
-        if fps:
-            for i, fp in enumerate(fps, start=1):
-                estado_actual = fp.get("estado") or estados[4]
-                bg_color = "🟢" if estado_actual == estados[4] else "🔴"
+        with tabOfertas:
+            anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+            fps = getEquals(necesidadFP, {"empresa": empresa["CIF"], "anio": anioFiltro})
+            st.subheader(f"Formaciones Presentadas - {empresa['nombre']} - Curso Académico: {anioFiltro}")
+            if fps:
+                for i, fp in enumerate(fps, start=1):
+                    estado_actual = fp.get("estado") or estados[4]
+                    bg_color = "🟢" if estado_actual == estados[4] else "🔴"
 
-                with st.expander(
-                    f"Formación #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')}",
-                    expanded=False
-                ):
-                    ciclos = fp.get("ciclos_formativos")
-                    puestos = fp.get("puestos")
+                    with st.expander(
+                        f"Formación #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')}",
+                        expanded=False
+                    ):
+                        ciclos = fp.get("ciclos_formativos")
+                        puestos = fp.get("puestos")
 
-                    if ciclos:
-                        st.write("🎓 Ciclos formativos y cantidad de alumnos:")
-                        data = [
-                            {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
-                            for ciclo, valores in ciclos.items()]
-                        df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
-                        st.dataframe(df_ciclos, hide_index=True, width='stretch')
+                        if ciclos:
+                            st.write("🎓 Ciclos formativos y cantidad de alumnos:")
+                            data = [
+                                {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
+                                for ciclo, valores in ciclos.items()]
+                            df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
+                            st.dataframe(df_ciclos, hide_index=True, width='stretch')
 
-                    if puestos:
-                        st.write("🧩 Puestos por ciclo formativo:")
-                        for ciclo, lista_puestos in puestos.items():
-                            cantidad_alumnos = None
-                            if ciclos and ciclo in ciclos:
-                                cantidad_alumnos = ciclos[ciclo]["alumnos"]
+                        if puestos:
+                            st.write("🧩 Puestos por ciclo formativo:")
+                            for ciclo, lista_puestos in puestos.items():
+                                cantidad_alumnos = None
+                                if ciclos and ciclo in ciclos:
+                                    cantidad_alumnos = ciclos[ciclo]["alumnos"]
 
-                            with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
-                                if lista_puestos:
-                                     for p in lista_puestos:
-                                        st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto']}")
-                                else:
-                                    st.markdown("_Sin áreas o proyectos registrados_")
-
-
-                    proyectos = fp.get("proyectos")
-                    requisitos = fp.get("requisitos")
-                    if proyectos:
-                        st.markdown(f"**Proyectos:** {proyectos}")
-                    if requisitos:
-                        st.markdown(f"**Requisitos:** {requisitos}")
-
-                    contrato = fp.get("contrato")
-                    vehiculo = fp.get("vehiculo")
-                    st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
-                    st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
+                                with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
+                                    if lista_puestos:
+                                        for p in lista_puestos:
+                                            st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto']}")
+                                    else:
+                                        st.markdown("_Sin áreas o proyectos registrados_")
 
 
-        else:
-            st.info(
-                'No hay necesidades FP registradas para esta empresa. '
-                f"Mandale el link para que nos avise: [Formulario]({base_url}forms?form=1)"
-            )
+                        proyectos = fp.get("proyectos")
+                        requisitos = fp.get("requisitos")
+                        if proyectos:
+                            st.markdown(f"**Proyectos:** {proyectos}")
+                        if requisitos:
+                            st.markdown(f"**Requisitos:** {requisitos}")
+
+                        contrato = fp.get("contrato")
+                        vehiculo = fp.get("vehiculo")
+                        st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
+                        st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
+
+
+            else:
+                st.warning("No hay formaciones registradas para esta empresa y curso académico.")
+                st.divider()    
+                st.write("No hay formaciones registradas para esta empresa. Elige el curso académico en el selector y envia el link a la empresa")
+                col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
+                with col1:
+                        st.selectbox(
+                            "Seleccione curso académico", 
+                            options=aniosList[1:], 
+                            key="selector_curso_ac_doc"
+                        )
+
+                st.write(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}?curso_academico={st.session_state['selector_curso_ac_doc']}")
 
 
 # -------------------------------------------------------------------
@@ -201,7 +216,7 @@ with tab2:
     tabNuevo, tabBulk = st.tabs(["Nueva Empresa", "Carga Masiva (.csv)"])
     with tabNuevo:
         st.subheader("➕ Nueva Empresa")
-        with st.form("nueva_empresa_form"):
+        with st.form(f"nueva_empresa_form_{st.session_state.form_registro_key}"):
             nombre_empresa = st.text_input("Nombre de la empresa")
             direccion = st.text_input("Dirección")
             cp = st.text_input("Código Postal")
@@ -245,6 +260,7 @@ with tab2:
                             "rol": "empresa",
                         }, keys=["email"])
                         st.success("✅ Empresa creada correctamente")
+                        st.session_state.form_registro_key += 1
 
                         st.rerun()
                     except Exception as e:
@@ -284,7 +300,36 @@ with tab2:
             type=["csv"],
             key="upload_csv_empresa"
         )
-
+        st.html(
+            """
+            <style>
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+            display: none;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+            content: 'Arrastre aquí los archivos';
+            }
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+            line-height: initial;
+            content: "Buscar";
+            text-indent: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+            line-height: initial;
+            content: "Límite 1MB por archivo";
+            text-indent: 0;
+            }
+            </style>
+            """
+        )
         if uploaded_csv:
             try:
                 # Leer TODO como string siempre → adiós floats y NaNs
@@ -429,10 +474,27 @@ with tab3:
         st.markdown(f"- {e}")
 
     subject_al = st.text_input("Asunto del email", value="Formaciones", key="subj_al")
+    def actualizar_body_empresa():
+        curso = st.session_state["selector_curso_ac_doc_e"]
+        st.session_state["body_al"] = bodyEmailsEmpresa.replace(
+            "{{form_link}}", 
+            f"{os.getenv('FORM_EMPRESA')}?curso_academico={curso}"
+        )
+
+
+    st.selectbox(
+        "Seleccione curso académico", 
+        options=aniosList[1:], 
+        key="selector_curso_ac_doc_e",
+        on_change=actualizar_body_empresa
+    )
+
+    # Si es la primera carga y "body_al" no existe aún, inicialízalo
+    if "body_al" not in st.session_state:
+        actualizar_body_empresa()
     body_al = st.text_area(
         "Cuerpo del email",
         height=200,
-        value=bodyEmailsEmpresa.replace("{{form_link}}", formUrl),
         key="body_al"
     )
 
@@ -443,7 +505,7 @@ with tab3:
         accept_multiple_files=True, 
         key="adjuntos_empresas"
     )
-    if st.button("📨 Enviar Emails a Empresas", disabled=not can_send):
+    if st.button("📨 Enviar Correo a Empresas", disabled=not can_send):
         try:
             if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
                 fecha_envio = datetime.now().isoformat()

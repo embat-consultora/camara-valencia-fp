@@ -60,7 +60,8 @@ def send_email(sender: str, password: str, recipients: list, subject: str, body:
                 # Añadimos la cabecera con el nombre del archivo
                 part.add_header(
                     "Content-Disposition",
-                    f"attachment; filename={uploaded_file.name}",
+                    "attachment",
+                    filename=uploaded_file.name,
                 )
                 msg.attach(part)
                 

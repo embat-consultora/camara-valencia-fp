@@ -24,9 +24,9 @@ from variables import (
 )
 load_dotenv()
 
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
-env = os.getenv("SUPABASE_ENV")
+url = st.secrets["supabase"]["SUPABASE_URL"]
+key = st.secrets["supabase"]["SUPABASE_KEY"]
+env = st.secrets["supabase"]["SUPABASE_ENV"]
 supabase: Client = create_client(url, key)
 
 # --- FUNCIÓN DE ACTUALIZACIÓN ---
@@ -63,35 +63,34 @@ def update_oferta_complex(oferta_id, df_editado, gestores_activos):
     }).eq("id", oferta_id).execute()
     
     return res
-def get_alumnos_con_practicas_consolidado():
+def get_alumnos_con_practicas_consolidado(anio, curso):
     ciclos_db = supabase.table(ciclosFormativosTablas).select("nombre, abreviatura").execute()
     mapa_ciclos = {c["nombre"]: c["abreviatura"] for c in ciclos_db.data}
-    sinEmpresa = (
-        supabase.table(alumnosTabla)
-        .select("""
-        *,
-        practicas_fp!left(
-            id,
-            alumno,
-            status,
-            area,
-            proyecto,
-            tutor_centro,
-            tutor,
-            gestor,
-            anio,
-            oferta, 
-            curso,
-            direccion,
-            localidad,
-            empresas(CIF, nombre, telefono, email_empresa)
-        )
-    """)
-        .eq("estado", "Sin Empresa")
-        .execute()
-    )
+    q = supabase.table(alumnosTabla).select("""
+            *,
+            practicas_fp!left(
+                id,
+                alumno,
+                status,
+                area,
+                proyecto,
+                tutor_centro,
+                tutor,
+                gestor,
+                anio,
+                oferta, 
+                curso,
+                direccion,
+                localidad,
+                empresas(CIF, nombre, telefono, email_empresa)
+            )
+        """).eq("estado", "Sin Empresa").eq("anio", anio)
+
+    if curso and curso.strip().lower() != "seleccionar":
+        q = q.eq("curso", curso)
+    sinEmpresa = (q.execute())
     draft = (
-        supabase.table("alumnos")
+        supabase.table(alumnosTabla)
         .select("""
             *,
             practicas_fp!inner(
@@ -111,6 +110,7 @@ def get_alumnos_con_practicas_consolidado():
             )
             """)
         .eq("practicas_fp.status", estados[5])
+        .eq("practicas_fp.anio", anio)
         .execute()
     )
 
@@ -374,9 +374,22 @@ def updateGestores(cambios, df_original):
         except Exception as e:
             raise Exception(f"Error al eliminar el gestor {email_gestor}: {e}")
         
-def getOfertasTabla():
-    response = supabase.table(necesidadFP).select("*, empresas(*, tutores(*))").execute()
-    return pd.DataFrame(response.data)
+def getOfertasTabla(anio=None):
+    query = supabase.table(necesidadFP).select("*, empresas(*, tutores(*))")
+    if anio is not None:
+        query = query.eq("anio", anio)
+    response = query.execute()
+    df = pd.DataFrame(response.data)
+    if df.empty:
+        return df
+
+    def tiene_disponibilidad(ciclos):
+        if not ciclos or not isinstance(ciclos, dict):
+            return False
+        return any((ciclo.get("disponibles") or 0) > 0 for ciclo in ciclos.values())
+
+    df = df[df["ciclos_formativos"].apply(tiene_disponibilidad)]
+    return df
 
 def updateOfertasTabla(update_payload, id_oferta):
     response = supabase.table(necesidadFP).update(update_payload).eq("id", id_oferta).execute()
@@ -611,13 +624,14 @@ def getPracticaByToken(token, tipo_form):
             return None
 
 
-def getMatches():
+def getMatches(ciclo):
     """
     Ejecuta la query de coincidencias entre ofertas y alumnos (ranking de match),
     incluyendo el nombre de la empresa.
     Retorna una lista de dicts (rows) con el resultado.
     """
-    query = """
+    ciclo_safe = str(ciclo).replace("'", "''")
+    query = f"""
     WITH ofertas_activas AS (
       SELECT
         of.*,
@@ -625,11 +639,13 @@ def getMatches():
       FROM oferta_fp of
       WHERE LOWER(of.estado) = 'nuevo'
         AND of.cupo_alumnos > 0
-    ),
+        AND of.anio = '{ciclo_safe}'    
+        ),
     alumnos_disponibles AS (
       SELECT a.*
       FROM alumnos a
-      WHERE LOWER(a.estado) = 'sin empresa'
+      WHERE a.estado = 'Sin Empresa'
+      AND a.anio = '{ciclo_safe}'
     ),
     oferta_ciclos AS (
       SELECT
@@ -652,6 +668,7 @@ def getMatches():
         a.nombre AS alumno_nombre,
         a.apellido AS alumno_apellido,
         a.dni AS alumno_dni,
+        a.curso AS alumno_curso,
         oc.oferta_id,
         oc.empresa,
         oc.nombre_empresa,
@@ -716,6 +733,7 @@ def getMatches():
       r.alumno_nombre,
       r.alumno_apellido,
       r.alumno_dni,
+      r.alumno_curso AS curso,
       r.oferta_id,
       r.empresa,
       r.nombre_empresa,
@@ -1085,6 +1103,10 @@ def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_f
             st.error(f"Error procesando feedback para {tipo}: {e}")
 
 def updateCiclosFormativos(cambios, df_original):
+    def _get_row_by_index(source, idx):
+        idx = int(idx)
+        return source.iloc[idx] if isinstance(source, pd.DataFrame) else source[idx]
+     
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         abreviatura = new_row.get("abreviatura", "").strip()
@@ -1101,7 +1123,7 @@ def updateCiclosFormativos(cambios, df_original):
                 raise Exception(f"Error al crear el ciclo {nombre}: {e}")
 
     for idx, mods in cambios["edited_rows"].items():
-            fila_orig = df_original[int(idx)]
+            fila_orig = _get_row_by_index(df_original, idx)
             id_ciclo = fila_orig["id"]
 
             try:
@@ -1114,7 +1136,7 @@ def updateCiclosFormativos(cambios, df_original):
                 raise Exception(f"Error al actualizar el ciclo {id_ciclo}: {e}")
     # 3. MANEJAR BORRADOS (Deleted)
     for idx in cambios["deleted_rows"]:
-        fila_orig = df_original.iloc[int(idx)]
+        fila_orig = _get_row_by_index(df_original, idx)
         id_ciclo = fila_orig["id"]
         nombre_ciclo = fila_orig["nombre"]
         

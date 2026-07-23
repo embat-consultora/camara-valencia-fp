@@ -175,7 +175,36 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
     key=f"up_{practicaId}"
 )
-
+st.html(
+    """
+    <style>
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+    display: none;
+    }
+    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+    content: 'Arrastre aquí los archivos';
+    }
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+    line-height: initial;
+    content: "Buscar";
+    text-indent: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+    text-indent: -9999px;
+    line-height: 0;
+    }
+    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+    line-height: initial;
+    content: "Límite 1MB por archivo";
+    text-indent: 0;
+    }
+    </style>
+    """
+)
 if uploaded_files:
     too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
     if too_big:

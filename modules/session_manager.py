@@ -22,7 +22,7 @@ def is_authenticated():
 
 def validate_get_user():
     if hasattr(st, "experimental_user") and st.experimental_user and st.experimental_user.is_logged_in:
-        if "role" not in st.session_state:
+        if "rol" not in st.session_state:
             email = st.email
             if load_user(email):
                 print('user loaded correctly')
@@ -37,4 +37,4 @@ def is_logged():
         st.warning("Redirigiendo al inicio de sesión...")
         st.session_state.logged_in = False
         st.session_state.redirected = True
-        st.switch_page("app.py")
+        st.switch_page("streamlit_app.py")

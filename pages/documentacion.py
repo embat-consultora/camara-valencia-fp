@@ -6,7 +6,7 @@ import os
 from st_copy import copy_button
 apply_page_config()
 make_sidebar()
-
+st.set_page_config(page_title="Documentación", page_icon="📚")
 # Simulación de rol si no existe (para pruebas)
 rol_usuario = st.session_state.get("rol")
 st.markdown(
@@ -30,7 +30,7 @@ def show_documentacion():
 
     with col2:
         # Construimos la URL dinámica usando el valor actual del selectbox
-        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
+        url_form_empresas = f"{os.getenv('FORM_EMPRESA')}?curso_academico={st.session_state['selector_curso_ac_doc']}"
         
         # Nos aseguramos de que la URL termine en / antes de los parámetros
         if not base_url.endswith("/"):
@@ -117,9 +117,6 @@ def show_documentacion():
         url_seguimiento = "https://drive.google.com/file/d/1l8tqTFbNsz07AqIvbGSoA-RWDoSkR30C/preview?usp=drive_link"
         st.link_button("Ver Manual Seguimiento", url_seguimiento)
 
-    # --- PIE DE PÁGINA ---
-    st.divider()
-    st.caption("v1.0.2 - Proyecto Cámara de Valencia - 2026")
 
 if __name__ == "__main__":
     show_documentacion()

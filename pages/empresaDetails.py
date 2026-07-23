@@ -295,7 +295,7 @@ def mostrarLista():
                 fit_columns_on_grid_load=True,
                 theme='streamlit', # O 'balham', 'alpine'
                 height=400,
-                allow_unsafe_縫tml=True
+                allow_unsafe_html=True
             )
 
             # 4. Lógica de Navegación (Detección de Click)
@@ -394,6 +394,36 @@ def seccion_planificacion(alumno, empresa, practicaId):
                     "Subir imagen del Calendario",
                     type=["png", "jpg", "jpeg"],
                     key=f"cal_up_{practicaId}"
+                )
+                st.html(
+                    """
+                    <style>
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                    display: none;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                    content: 'Arrastre aquí los archivos';
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                    line-height: initial;
+                    content: "Buscar";
+                    text-indent: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                    line-height: initial;
+                    content: "Límite 1MB por archivo";
+                    text-indent: 0;
+                    }
+                    </style>
+                    """
                 )
                 if uploaded_cal:
                     if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):

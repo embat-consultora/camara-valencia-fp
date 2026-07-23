@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import updateCiclosFormativos, get,getEqual,upsert,generateLink
+from modules.data_base import updateCiclosFormativos, get,getEqual,upsert
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import ciclosFormativosTablas,emailImportantesTabla,formTabla
+from variables import ciclosFormativosTablas,emailImportantesTabla,formTabla,aniosList
 import os
 # Configuración inicial
 apply_page_config()
 make_sidebar()
-
+st.set_page_config(page_title="Configuraciones", page_icon="🚀")
 st.markdown("<h2 style='text-align: center;'>Configuraciones</h2>", unsafe_allow_html=True)
 
 # 1. Función simple para traer datos
@@ -50,7 +50,7 @@ with tabCiclos:
     with st.form("form_gestion_ciclos"):
         # El editor siempre recibe el DataFrame del session_state
 
-        st.caption("Agrega o elimina los ciclos formativos. IMPORTANTE: Las áreas deben estar separadas por comas")
+        st.info("Agrega o elimina los ciclos formativos. IMPORTANTE: Las áreas deben estar separadas por comas y luego de realizar algún cambio presiona Enter")
         edited_df = st.data_editor(
             st.session_state.df_ciclos,
             column_config={
@@ -168,8 +168,17 @@ with tabFormularios:
                 
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
-        
+
+
         if(tipo_seleccionado == "alumnos"):
             st.info(f"Link del formulario: {os.getenv('FORM_ALUMNO')}")
         elif(tipo_seleccionado == "empresa"):
-            st.info(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}")
+            col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
+            with col1:
+                st.selectbox(
+                    "Seleccione curso académico", 
+                    options=aniosList[1:], 
+                    key="selector_curso_ac_doc"
+                )
+            with col2:  
+                st.info(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}?curso_academico={st.session_state['selector_curso_ac_doc']}")
