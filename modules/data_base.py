@@ -24,9 +24,10 @@ from variables import (
 )
 load_dotenv()
 
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
-env = os.getenv("SUPABASE_ENV")
+url = st.secrets["supabase"]["SUPABASE_URL"]
+key = st.secrets["supabase"]["SUPABASE_KEY"]
+env = st.secrets["supabase"]["SUPABASE_ENV"]
+
 supabase: Client = create_client(url, key)
 
 # --- FUNCIÓN DE ACTUALIZACIÓN ---
