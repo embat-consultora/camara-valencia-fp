@@ -107,7 +107,7 @@ opciones_motivo = [
 
 tipoPracticas= [
                     "Autogestionada",
-                    "Asignada por el centro"
+                    "Asignada por el Centro"
                 ]
 sectorEmpresa = [
   "Comercio minorista y mayorista",
