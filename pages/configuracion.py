@@ -51,7 +51,7 @@ with tabCiclos:
     with st.form("form_gestion_ciclos"):
         # El editor siempre recibe el DataFrame del session_state
 
-        st.caption("Agrega o elimina los ciclos formativos. IMPORTANTE: Las áreas deben estar separadas por comas")
+        st.info("Agrega o elimina los ciclos formativos. IMPORTANTE: Las áreas deben estar separadas por comas y luego de realizar algún cambio presiona Enter")
         edited_df = st.data_editor(
             st.session_state.df_ciclos,
             column_config={
@@ -68,11 +68,10 @@ with tabCiclos:
         )
         
         submit_btn = st.form_submit_button("Guardar Cambios")
-
     if submit_btn:
         # Obtenemos los cambios directamente desde la KEY del widget
         cambios = st.session_state.editor_tabla_ciclos
-        
+
         # Si hay cualquier tipo de cambio (edición, suma o borrado)
         if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
             try:

@@ -24,6 +24,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # CONFIG
 # ----------------------------------------------
 apply_page_config()
+
 make_sidebar()
 st.set_page_config(page_title="Formaciones en Empresas", page_icon="🚀")
 
@@ -143,8 +144,8 @@ def load_data():
     st.session_state["feedbacks"] = feedback
     st.session_state["data_loaded"] = True
     st.session_state["force_reload"] = False
-
-load_data()
+with st.spinner("Cargando datos de formaciones..."):
+    load_data()
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 practicas = st.session_state.practicas
@@ -1366,6 +1367,7 @@ def mostrar_detalle():
 # RENDER SEGÚN PÁGINA
 # ----------------------------------------------
 if st.session_state.page == "lista":
+    
     mostrar_lista()
 else:
     mostrar_detalle()

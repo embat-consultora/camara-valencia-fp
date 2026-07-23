@@ -63,35 +63,34 @@ def update_oferta_complex(oferta_id, df_editado, gestores_activos):
     }).eq("id", oferta_id).execute()
     
     return res
-def get_alumnos_con_practicas_consolidado():
+def get_alumnos_con_practicas_consolidado(anio, curso):
     ciclos_db = supabase.table(ciclosFormativosTablas).select("nombre, abreviatura").execute()
     mapa_ciclos = {c["nombre"]: c["abreviatura"] for c in ciclos_db.data}
-    sinEmpresa = (
-        supabase.table(alumnosTabla)
-        .select("""
-        *,
-        practicas_fp!left(
-            id,
-            alumno,
-            status,
-            area,
-            proyecto,
-            tutor_centro,
-            tutor,
-            gestor,
-            anio,
-            oferta, 
-            curso,
-            direccion,
-            localidad,
-            empresas(CIF, nombre, telefono, email_empresa)
-        )
-    """)
-        .eq("estado", "Sin Empresa")
-        .execute()
-    )
+    q = supabase.table(alumnosTabla).select("""
+            *,
+            practicas_fp!left(
+                id,
+                alumno,
+                status,
+                area,
+                proyecto,
+                tutor_centro,
+                tutor,
+                gestor,
+                anio,
+                oferta, 
+                curso,
+                direccion,
+                localidad,
+                empresas(CIF, nombre, telefono, email_empresa)
+            )
+        """).eq("estado", "Sin Empresa").eq("anio", anio)
+
+    if curso and curso.strip().lower() != "seleccionar":
+        q = q.eq("curso", curso)
+    sinEmpresa = (q.execute())
     draft = (
-        supabase.table("alumnos")
+        supabase.table(alumnosTabla)
         .select("""
             *,
             practicas_fp!inner(
@@ -111,6 +110,7 @@ def get_alumnos_con_practicas_consolidado():
             )
             """)
         .eq("practicas_fp.status", estados[5])
+        .eq("practicas_fp.anio", anio)
         .execute()
     )
 
@@ -374,9 +374,22 @@ def updateGestores(cambios, df_original):
         except Exception as e:
             raise Exception(f"Error al eliminar el gestor {email_gestor}: {e}")
         
-def getOfertasTabla():
-    response = supabase.table(necesidadFP).select("*, empresas(*, tutores(*))").execute()
-    return pd.DataFrame(response.data)
+def getOfertasTabla(anio=None):
+    query = supabase.table(necesidadFP).select("*, empresas(*, tutores(*))")
+    if anio is not None:
+        query = query.eq("anio", anio)
+    response = query.execute()
+    df = pd.DataFrame(response.data)
+    if df.empty:
+        return df
+
+    def tiene_disponibilidad(ciclos):
+        if not ciclos or not isinstance(ciclos, dict):
+            return False
+        return any((ciclo.get("disponibles") or 0) > 0 for ciclo in ciclos.values())
+
+    df = df[df["ciclos_formativos"].apply(tiene_disponibilidad)]
+    return df
 
 def updateOfertasTabla(update_payload, id_oferta):
     response = supabase.table(necesidadFP).update(update_payload).eq("id", id_oferta).execute()
@@ -1090,6 +1103,10 @@ def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_f
             st.error(f"Error procesando feedback para {tipo}: {e}")
 
 def updateCiclosFormativos(cambios, df_original):
+    def _get_row_by_index(source, idx):
+        idx = int(idx)
+        return source.iloc[idx] if isinstance(source, pd.DataFrame) else source[idx]
+
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         abreviatura = new_row.get("abreviatura", "").strip()
@@ -1106,20 +1123,19 @@ def updateCiclosFormativos(cambios, df_original):
                 raise Exception(f"Error al crear el ciclo {nombre}: {e}")
 
     for idx, mods in cambios["edited_rows"].items():
-            fila_orig = df_original[int(idx)]
-            id_ciclo = fila_orig["id"]
+        fila_orig = _get_row_by_index(df_original, idx)
+        id_ciclo = fila_orig["id"]
 
-            try:
-                # Actualizamos la tabla de gestores
-                update(ciclosFormativosTablas, mods, {"id": id_ciclo})
-                
-                    
-                # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
-            except Exception as e:
-                raise Exception(f"Error al actualizar el ciclo {id_ciclo}: {e}")
+        try:
+            # Actualizamos la tabla de gestores
+            update(ciclosFormativosTablas, mods, {"id": id_ciclo})
+
+            # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
+        except Exception as e:
+            raise Exception(f"Error al actualizar el ciclo {id_ciclo}: {e}")
     # 3. MANEJAR BORRADOS (Deleted)
     for idx in cambios["deleted_rows"]:
-        fila_orig = df_original.iloc[int(idx)]
+        fila_orig = _get_row_by_index(df_original, idx)
         id_ciclo = fila_orig["id"]
         nombre_ciclo = fila_orig["nombre"]
         

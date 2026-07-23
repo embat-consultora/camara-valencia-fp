@@ -10,6 +10,34 @@ def load_env_once():
     if "env" not in st.session_state:
         st.session_state["env"] = os.getenv("SUPABASE_ENV", "local")
 
+from datetime import date
+
+def get_index_anio_actual(anios_list, hoy=None):
+    hoy = hoy or date.today()
+    anio_actual = hoy.year
+    corte = date(anio_actual, 9, 1)
+
+    for idx, valor in enumerate(anios_list):
+        if valor == "Seleccionar":
+            continue
+
+        try:
+            anio_inicio_str, anio_fin_str = valor.split("-")
+            anio_inicio = int(anio_inicio_str)
+            anio_fin = int(anio_fin_str)
+        except ValueError:
+            continue  # ignora valores mal formateados
+
+        # Antes del 1 de septiembre: tomar donde el año actual esté después del '-'
+        if hoy < corte and anio_fin == anio_actual:
+            return idx
+
+        # Desde el 1 de septiembre: tomar donde el año actual esté antes del '-'
+        if hoy >= corte and anio_inicio == anio_actual:
+            return idx
+
+    return 0  # fallback: "Seleccionar"
+
 def make_sidebar():
     load_env_once()
 
@@ -37,7 +65,7 @@ def make_sidebar():
             if "index_curso" not in st.session_state:
                 st.session_state["index_curso"] = 0
             if "index_academic" not in st.session_state:
-                st.session_state["index_academic"] = 0
+                st.session_state["index_academic"] = get_index_anio_actual(aniosList)
         
             st.selectbox(
                 "**Curso Académico**",
