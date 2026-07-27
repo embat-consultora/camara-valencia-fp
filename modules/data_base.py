@@ -525,12 +525,12 @@ def getFormsLinks(practica_id):
     return getLinkFromList(response.data)
    
 def generateLink(tipo):
-    base_url = os.getenv("URL", "https://camara-mcc.streamlit.app/")
+    base_url = st.secrets["urls"]["URL"]
     url_completa = f"{base_url.rstrip('/')}/{tipo}"
     return url_completa
 
 def getLinkFromList(listForms):
-    base_url = os.getenv("URL", "https://camara-mcc.streamlit.app/")
+    base_url = st.secrets["urls"]["URL"]
     if isinstance(listForms, pd.DataFrame):
         if listForms.empty:
             return []

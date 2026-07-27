@@ -3,7 +3,19 @@ from modules.data_base import getPracticaByToken, upsert, update
 from variables import feedbackResponseTabla, forms, feedbackFormsTabla
 
 st.set_page_config(page_title="Feedback Adaptación", page_icon="📨")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
 
+    /* Esto aplica la fuente a toda la app */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Montserrat', sans-serif;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # --- Lógica de Validación (Fuera del form para no procesar accesos inválidos) ---
 token = st.query_params.get("token")
 tipo_form = st.query_params.get("tipo")

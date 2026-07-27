@@ -3,6 +3,20 @@ from modules.data_base import getPracticaByToken, upsert, update
 from variables import feedbackResponseTabla, feedbackFormsTabla, forms
 
 st.set_page_config(page_title="Feedback Inicial", page_icon="📨")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
+
+    /* Esto aplica la fuente a toda la app */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Montserrat', sans-serif;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 #http://localhost:8501/feedback_inicial?token=2a6aa3a62d6a47b1868793f78f6f1ce9&tipo=feedback_inicial
 # --- 1. Lógica de Parámetros y Seguridad ---
 token = st.query_params.get("token")

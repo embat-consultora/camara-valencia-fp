@@ -20,7 +20,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-base_url = os.getenv("URL")
+base_url = st.secrets["urls"]["URL"]
 if "form_registro_key" not in st.session_state:
     st.session_state.form_registro_key = 0
 # --- Traer todas las empresas ---
@@ -205,7 +205,7 @@ with tab1:
                             key="selector_curso_ac_doc"
                         )
 
-                st.write(f"Link del formulario:  {os.getenv('FORM_EMPRESA')}?curso_academico={st.session_state['selector_curso_ac_doc']}")
+                st.write(f"Link del formulario: {st.secrets["urls"]["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}")
 
 
 # -------------------------------------------------------------------

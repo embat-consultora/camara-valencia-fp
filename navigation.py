@@ -8,7 +8,7 @@ def get_current_page_name():
 
 def load_env_once():
     if "env" not in st.session_state:
-        st.session_state["env"] = os.getenv("SUPABASE_ENV", "local")
+        st.session_state["env"] = st.secrets["supabase"]["SUPABASE_ENV"]
 
 from datetime import date
 

@@ -2,7 +2,7 @@ import streamlit as st
 import extra_streamlit_components as stx
 from modules.data_base import getEqual
 from modules.session_manager import load_user, validate_get_user
-from variables import camaraLogo, page_icon,usuariosTabla
+from variables import page_icon,usuariosTabla
 import os
 # Configuración inicial
 st.markdown(
@@ -25,34 +25,36 @@ def get_base64(bin_file):
     with open(bin_file, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-# img = get_base64("images/fondo.webp")
-
-# st.markdown(
-#     f"""
-#     <style>
-#     .stApp {{
-#         background-image: url("data:image/jpg;base64,{img}");
-#         background-size: cover;
-#         background-position: center;
-#         background-repeat: no-repeat;
-#         background-attachment: fixed;
-#     }}
-#     </style>
-#     """,
-#     unsafe_allow_html=True
-# )
 cookie_manager = stx.CookieManager(key="main_cookie_manager")
+st.session_state["current_page"] = "streamlit_app"
 
-if not st.session_state.get("logged_in"):
-    saved_user_email = cookie_manager.get("saved_user_email")
-    if saved_user_email:
-        # Buscamos al usuario en la BD con el email de la cookie
-        response = getEqual(usuariosTabla, "email", saved_user_email)
-        if response:
-            user = response[0]
-            load_user(user["email"]) 
-            st.session_state["logged_in"] = True
-            st.rerun()
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+if not st.session_state["logged_in"]:
+    saved_email = cookie_manager.get("saved_user_email")
+    if saved_email:
+        load_user(saved_email)
+        st.session_state["logged_in"] = True
+        st.rerun()
+
+if st.session_state["logged_in"]:
+    rol = st.session_state.get("rol")
+    if rol == 'admin':
+        st.switch_page("pages/tablasPrincipales.py")
+    elif rol == 'empresa':
+        st.switch_page("pages/empresaDetails.py")
+    elif rol == 'gestor':
+        st.switch_page("pages/tablasPrincipales.py")
+    elif rol == 'tutor':
+        st.switch_page("pages/practicas.py")
+    elif rol == 'tutorCentro':
+        st.switch_page("pages/practicas.py")
+    elif rol == 'alumno':
+        st.switch_page("pages/alumno.py")
+    st.stop()
+
+
 
 col1, col2, col3 = st.columns([1, 4, 1])
 with col2:
@@ -141,30 +143,4 @@ with col2:
                     st.error("Usuario/Password Incorrecto")
             else:
                 st.error("Usuario/Password Incorrecto")
-
-
-
-env = os.getenv("SUPABASE_ENV")
-st.session_state["current_page"] = "streamlit_app"
-
-if st.session_state.get("logged_in"):
-    rol = st.session_state.get("rol", "admin")
-    if rol == 'admin':   
-        st.switch_page("pages/tablasPrincipales.py")
-    if rol == 'empresa':
-        st.switch_page("pages/empresaDetails.py")
-    if rol == 'gestor':
-        st.switch_page("pages/tablasPrincipales.py")
-    if rol == 'tutor':
-        st.switch_page("pages/practicas.py")
-    if rol == 'tutorCentro':
-        st.switch_page("pages/practicas.py")
-    if rol == 'alumno':
-        st.switch_page("pages/alumno.py")
-    st.stop()
-
-islogged =validate_get_user()
-if islogged:
-    st.switch_page("pages/tablasPrincipales.py")
-
 

@@ -36,7 +36,7 @@ st.image("./images/cv-fp.png", width=250)
 formValues = getEqual(formTabla,"tipo", "empresa")
 TITLE = formValues[0].get("titulo", "Formulario de Formación en Empresa")
 SUBTITLE = formValues[0].get("subtitulo", "Este formulario tiene como objetivo conocer vuestras preferencias para la Formación en Empresa.")
-DESCRIPTION = formValues[0].get("description",
+DESCRIPTION = formValues[0].get("descripcion",
     "⚙️ Objetivo: Este formulario permite registrar a vuestra empresa para participar en el Formación en Empresa (FE). Por favor, completad todos los campos con la información solicitada."
 )
 

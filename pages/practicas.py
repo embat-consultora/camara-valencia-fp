@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, crearPractica,getFormsLinks,getCiclosYAreas
+    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome,cancelarPractica, crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -144,7 +144,8 @@ def load_data():
     st.session_state["data_loaded"] = True
     st.session_state["force_reload"] = False
 
-load_data()
+with st.spinner("Cargando datos de formaciones..."):
+    load_data()
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 practicas = st.session_state.practicas
@@ -275,7 +276,7 @@ def mostrar_lista_practicas():
             fit_columns_on_grid_load=True,
             theme='streamlit', # O 'balham', 'alpine'
             height=400,
-            allow_unsafe_縫tml=True
+            allow_unsafe_html=True
         )
 
         # 4. Lógica de Navegación (Detección de Click)
@@ -294,6 +295,17 @@ def mostrar_lista_practicas():
             st.session_state.practica_seleccionada = selected_id
             st.session_state.page = "detalle"
             st.rerun()
+
+@st.dialog("Cancelación de Formación")
+def dialog_cancelacion(practica):
+    st.write(f"Por favor, indica el motivo de la cancelación")
+    motivo = st.text_input("", placeholder="Ej: El alumno no ha pasado la entrevista, la empresa ya no puede acoger, etc.")
+
+    if st.button("Confirmar", type="primary"):
+        cancelarPractica(practica, motivo)
+        st.toast("✅  La Formación ha pasado a estado CANCELADA")
+        st.session_state.page = "lista"
+        st.rerun()
 
 def mostrar_carga_rapida():
      with st.form("carga_rapida"):
@@ -563,148 +575,148 @@ def mostrar_dashboard():
     if not all_feedback_forms:
         st.info("No hay datos de envíos de feedback.")
         return
-
+    else:
     # Convertir a DataFrame para filtrar fácil
-    df_fb = pd.DataFrame(all_feedback_forms)
-    df_fb['fecha_real_envio'] = pd.to_datetime(df_fb['fecha_real_envio']).dt.date
+        df_fb = pd.DataFrame(all_feedback_forms)
+        df_fb['fecha_real_envio'] = pd.to_datetime(df_fb['fecha_real_envio']).dt.date
 
-    # Filtrar por rango de fecha
-    mask = (df_fb['fecha_real_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_real_envio'] <= fecha_fin_filtro)
-    df_filtrado = df_fb.loc[mask]
-    # 3. Métricas Principales (KPIs)
-    # Tipos: feedback_inicial, feedback_adaptacion, feedback_cierre
-    total_enviados = len(df_filtrado[df_filtrado['estado'] != 'pendiente'])
-    total_respondidos = len(df_filtrado[df_filtrado['fecha_respuesta'].notna()])
-    pct_respuesta = round((total_respondidos / total_enviados * 100) if total_enviados > 0 else 0)
-    pct_pendiente = 100 - pct_respuesta
+        # Filtrar por rango de fecha
+        mask = (df_fb['fecha_real_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_real_envio'] <= fecha_fin_filtro)
+        df_filtrado = df_fb.loc[mask]
+        # 3. Métricas Principales (KPIs)
+        # Tipos: feedback_inicial, feedback_adaptacion, feedback_cierre
+        total_enviados = len(df_filtrado[df_filtrado['estado'] != 'pendiente'])
+        total_respondidos = len(df_filtrado[df_filtrado['fecha_respuesta'].notna()])
+        pct_respuesta = round((total_respondidos / total_enviados * 100) if total_enviados > 0 else 0)
+        pct_pendiente = 100 - pct_respuesta
 
-    st.markdown("""
-    <style>
-    .kpi-card {
-        background: #f8f9fa;
-        border-radius: 16px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #e0e0e0;
-    }
-    .kpi-circle {
-        width: 110px; height: 110px;
-        border-radius: 50%;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        margin: 0 auto 10px auto;
-        font-weight: bold;
-    }
-    .kpi-title { font-size: 13px; color: #666; margin-bottom: 4px; }
-    .kpi-number { font-size: 32px; font-weight: 800; }
-    .kpi-pct { font-size: 13px; }
-    </style>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <style>
+        .kpi-card {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        .kpi-circle {
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            margin: 0 auto 10px auto;
+            font-weight: bold;
+        }
+        .kpi-title { font-size: 13px; color: #666; margin-bottom: 4px; }
+        .kpi-number { font-size: 32px; font-weight: 800; }
+        .kpi-pct { font-size: 13px; }
+        </style>
+        """, unsafe_allow_html=True)
 
-    st.subheader("📊 Métricas Envio Correos y Respuestas")
-    c1, c2, c3= st.columns(3)
+        st.subheader("📊 Métricas Envio Correos y Respuestas")
+        c1, c2, c3= st.columns(3)
 
-    with c1:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
-                <div class="kpi-number">{total_enviados}</div>
-                <div class="kpi-pct">Enviados</div>
-            </div>
-            <div class="kpi-title">Total Enviados</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c2:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
-                <div class="kpi-number">{total_respondidos}</div>
-                <div class="kpi-pct">{pct_respuesta}%</div>
-            </div>
-            <div class="kpi-title">Total Respondidos y %</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c3:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
-                <div class="kpi-number">{total_enviados - total_respondidos}</div>
-                <div class="kpi-pct">{pct_pendiente}%</div>
-            </div>
-            <div class="kpi-title">Total Pendientes Respuesta y %</div>
-        </div>""", unsafe_allow_html=True)
-
-    tipos = [
-        ("feedback_inicial", "Acogida", "#fff3e0", "#f57c00"),
-        ("feedback_adaptacion", "Adaptación", "#f3e5f5", "#8e24aa"),
-        ("feedback_cierre", "Cierre", "#e0f2f1", "#00897b"),
-    ]
-    st.subheader("📊 Métricas Por tipo")
-    col1, col2, col3 = st.columns(3)
-    for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos):  # reutiliza columnas o ajusta
-        count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
-        with col:
+        with c1:
             st.markdown(f"""
-            <div class="kpi-card" style="margin-top:12px">
-                <div class="kpi-circle" style="background:{bg}; color:{color};">
-                    <div class="kpi-number">{count}</div>
-                    <div class="kpi-pct">Completos</div>
+            <div class="kpi-card">
+                <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
+                    <div class="kpi-number">{total_enviados}</div>
+                    <div class="kpi-pct">Enviados</div>
                 </div>
-                <div class="kpi-title">{label}</div>
+                <div class="kpi-title">Total Enviados</div>
             </div>""", unsafe_allow_html=True)
 
-    st.divider()
+        with c2:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
+                    <div class="kpi-number">{total_respondidos}</div>
+                    <div class="kpi-pct">{pct_respuesta}%</div>
+                </div>
+                <div class="kpi-title">Total Respondidos y %</div>
+            </div>""", unsafe_allow_html=True)
 
-    # 4. Alumnos Pendientes de Respuesta
-    col_p1, col_p2 = st.columns([2, 1])
-    
-    with col_p1:
-        st.write("### ⏳ Alumnos que no han respondido")
-        # Filtramos los que se enviaron pero no tienen fecha_respuesta
-        df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
-        base_url = os.getenv("URL", "https://camara-valencia-fp.streamlit.app/")
-       
-        listado_morosos = []
-        for _, row in df_pendientes.iterrows():
-            practica = next((x for x in practicas if x["id"] == row['practica_id']), None)
-            if practica:
-                alumno_nom = f"{practica['alumnos']['nombre']} {practica['alumnos']['apellido']}"
-                tipo = row['tipo_form']
-                token = row['token']
-                link = f"{base_url.rstrip('/')}/{tipo}?token={token}&tipo={tipo}"
+        with c3:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
+                    <div class="kpi-number">{total_enviados - total_respondidos}</div>
+                    <div class="kpi-pct">{pct_pendiente}%</div>
+                </div>
+                <div class="kpi-title">Total Pendientes Respuesta y %</div>
+            </div>""", unsafe_allow_html=True)
 
-                listado_morosos.append({
-                    "Id": row['practica_id'],
-                    "Alumno": alumno_nom,
-                    "Email": row['email_destino'],
-                    "Formulario": row['tipo_form'].replace('_', ' ').title(),
-                    "Fecha Envío": row['fecha_real_envio'],
-                    "Recordatorio Enviado": row['recordatorio'] if row['recordatorio'] else "No enviado aún",
-                    "Link": f'<a href="{link}" target="_blank">Link</a>',
-                    "_tipo_form": row['tipo_form'],
-                })
+        tipos = [
+            ("feedback_inicial", "Acogida", "#fff3e0", "#f57c00"),
+            ("feedback_adaptacion", "Adaptación", "#f3e5f5", "#8e24aa"),
+            ("feedback_cierre", "Cierre", "#e0f2f1", "#00897b"),
+        ]
+        st.subheader("📊 Métricas Por tipo")
+        col1, col2, col3 = st.columns(3)
+        for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos):  # reutiliza columnas o ajusta
+            count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
+            with col:
+                st.markdown(f"""
+                <div class="kpi-card" style="margin-top:12px">
+                    <div class="kpi-circle" style="background:{bg}; color:{color};">
+                        <div class="kpi-number">{count}</div>
+                        <div class="kpi-pct">Completos</div>
+                    </div>
+                    <div class="kpi-title">{label}</div>
+                </div>""", unsafe_allow_html=True)
 
-        if listado_morosos:
-                df_mostrar = pd.DataFrame(listado_morosos)
-                columnas_visibles = [c for c in df_mostrar.columns if not c.startswith("_")]
-                st.markdown(df_mostrar[columnas_visibles].to_html(escape=False, index=False).replace('<th>', '<th style="text-align:center">'), unsafe_allow_html=True)
-        else:
-            st.success("¡Todos los alumnos han respondido!")
+        st.divider()
 
-    with col_p2:
-        st.write("### ⚡ Acciones")
-        st.info("Enviar recordatorio por correo a todos los alumnos pendientes de esta lista.")
+        # 4. Alumnos Pendientes de Respuesta
+        col_p1, col_p2 = st.columns([2, 1])
         
-        if st.button("🔔 Enviar Recordatorio Masivo", type="primary", width='stretch'):
-            if not df_pendientes.empty:
-                with st.spinner("Enviando recordatorios..."):
-                    emails_enviados, errores = enviarRecordatoriosMasivos(listado_morosos)
-                    if emails_enviados:
-                        st.success(f"✅ Recordatorios enviados a {emails_enviados} alumnos.")
-                    if errores:
-                        st.warning(f"⚠️ No se pudo enviar a: {', '.join(errores)}")
+        with col_p1:
+            st.write("### ⏳ Alumnos que no han respondido")
+            # Filtramos los que se enviaron pero no tienen fecha_respuesta
+            df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
+            base_url = st.secrets["urls"]["URL"]
+        
+            listado_morosos = []
+            for _, row in df_pendientes.iterrows():
+                practica = next((x for x in practicas if x["id"] == row['practica_id']), None)
+                if practica:
+                    alumno_nom = f"{practica['alumnos']['nombre']} {practica['alumnos']['apellido']}"
+                    tipo = row['tipo_form']
+                    token = row['token']
+                    link = f"{base_url.rstrip('/')}/{tipo}?token={token}&tipo={tipo}"
+
+                    listado_morosos.append({
+                        "Id": row['practica_id'],
+                        "Alumno": alumno_nom,
+                        "Email": row['email_destino'],
+                        "Formulario": row['tipo_form'].replace('_', ' ').title(),
+                        "Fecha Envío": row['fecha_real_envio'],
+                        "Recordatorio Enviado": row['recordatorio'] if row['recordatorio'] else "No enviado aún",
+                        "Link": f'<a href="{link}" target="_blank">Link</a>',
+                        "_tipo_form": row['tipo_form'],
+                    })
+
+            if listado_morosos:
+                    df_mostrar = pd.DataFrame(listado_morosos)
+                    columnas_visibles = [c for c in df_mostrar.columns if not c.startswith("_")]
+                    st.markdown(df_mostrar[columnas_visibles].to_html(escape=False, index=False).replace('<th>', '<th style="text-align:center">'), unsafe_allow_html=True)
             else:
-                st.warning("No hay nadie a quien reclamar.")
+                st.success("¡Todos los alumnos han respondido!")
+
+        with col_p2:
+            st.write("### ⚡ Acciones")
+            st.info("Enviar recordatorio por correo a todos los alumnos pendientes de esta lista.")
+            
+            if st.button("🔔 Enviar Recordatorio Masivo", type="primary", width='stretch'):
+                if not df_pendientes.empty:
+                    with st.spinner("Enviando recordatorios..."):
+                        emails_enviados, errores = enviarRecordatoriosMasivos(listado_morosos)
+                        if emails_enviados:
+                            st.success(f"✅ Recordatorios enviados a {emails_enviados} alumnos.")
+                        if errores:
+                            st.warning(f"⚠️ No se pudo enviar a: {', '.join(errores)}")
+                else:
+                    st.warning("No hay nadie a quien reclamar.")
 
 def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
     st.session_state["email_alumno"] = alumno.get("email_alumno")
@@ -1072,6 +1084,36 @@ def seccion_planificacion(alumno, empresa, practica):
                     "Subir imagen del Calendario",
                     type=["png", "jpg", "jpeg"],
                     key=f"cal_up_{practicaId}"
+                )
+                st.html(
+                    """
+                    <style>
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                    display: none;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                    content: 'Arrastre aquí los archivos';
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                    line-height: initial;
+                    content: "Buscar";
+                    text-indent: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                    line-height: initial;
+                    content: "Límite 1MB por archivo";
+                    text-indent: 0;
+                    }
+                    </style>
+                    """
                 )
                 if uploaded_cal:
                     if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):

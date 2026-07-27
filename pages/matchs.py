@@ -4,7 +4,7 @@ import json
 from modules.data_base import getMatches, upsert, getOfertaEmpresas,getEquals,crearPractica
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados
+from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados,aniosList 
 from datetime import datetime
 from modules.text_helper import st_custom_message
 import os
@@ -40,21 +40,34 @@ def checkEstadoOferta(ofertaId):
 apply_page_config()
 make_sidebar()
 st.set_page_config(page_title="Matcheos", page_icon="🚀")
+st.markdown(
+    "<h2 style='text-align: center;'>PANEL DE MATCH</h2>",
+    unsafe_allow_html=True
+)
+
+anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 st.title("🤝🏻 PANEL DE MATCHEOS")
 
 # ---------------------------------
 # Traer todas las ofertas (necesidadFP)
 # ---------------------------------
 with st.spinner("Cargando datos..."):
-    ofertas = getOfertaEmpresas(necesidadFP, {}) 
-    alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa"})
-    if not ofertas:
-        st.info("No se encontraron ofertas registradas.")
+    ofertas = getOfertaEmpresas(necesidadFP, {"anio": anioFiltro})
+    alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa", "anio": anioFiltro})
+    ofertas_con_cupo = [
+        oferta for oferta in ofertas
+        if any(
+            ciclo_data.get("disponibles", 0) > 0
+            for ciclo_data in (oferta.get("ciclos_formativos") or {}).values()
+        )
+    ]
+    if not ofertas_con_cupo:
+        st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
         st.stop()
-base_url = os.getenv("URL")
+base_url = st.secrets["urls"]["URL"] 
 
 empresas_disponibles = []
-for o in ofertas:
+for o in ofertas_con_cupo:
     empresa_info = o.get("empresas", {})
     if empresa_info and empresa_info.get("CIF"):
         empresas_disponibles.append({
@@ -70,6 +83,7 @@ with col1:
     empresa_seleccionada = st.selectbox("🏢 Filtrar por Empresa", options=empresa_opciones)
     
 # Filtrar ofertas según selección
+st.write(f"📅 Filtrando por curso académico: **{anioFiltro}**")
 if empresa_seleccionada != "Todas":
     cif_seleccionado = empresa_seleccionada.split("(")[-1].replace(")", "")
     ofertas = [o for o in ofertas if o.get("empresas", {}).get("CIF") == cif_seleccionado]
@@ -77,7 +91,7 @@ if empresa_seleccionada != "Todas":
 # ---------------------------------
 # Obtener datos del ranking SQL (posibles matches)
 # ---------------------------------
-ranking = getMatches()
+ranking = getMatches(anioFiltro)
 df_matches = pd.DataFrame(ranking) if ranking else pd.DataFrame()
 
 # ---------------------------------
@@ -186,7 +200,9 @@ for oferta_data in ofertas:
                                     if cupos_disp > 0:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
-                                                crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4])
+                                                curso = row['curso']
+                                                st.write(f"Curso del alumno: {curso}")
+                                                crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4], anio=anioFiltro, curso=curso)
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
                                             except Exception as e:
@@ -220,9 +236,10 @@ for oferta_data in ofertas:
                     with colMatch:  
                         if alumnoSeleccionado != "Selecciona":
                             dni_alumno = alumnoSeleccionado.split("(")[-1].replace(")", "")
+                            curso = alumno_info.get('curso', '1ro')
                             if st.button("Asignar Alumno", key=f"match_manual_{oferta_id}_{ciclo}_{dni_alumno}"):
                                 try:
-                                    crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status=estados[4])
+                                    crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status=estados[4], anio=anioFiltro, curso=curso)
                                     checkEstadoOferta(oferta_id)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
                                     st.rerun()
