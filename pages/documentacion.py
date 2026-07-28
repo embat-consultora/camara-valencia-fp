@@ -9,15 +9,8 @@ make_sidebar()
 st.set_page_config(page_title="Documentación", page_icon="📚")
 # Simulación de rol si no existe (para pruebas)
 rol_usuario = st.session_state.get("rol")
-st.markdown(
-    "<h2 style='text-align: center;'>Links Útiles</h2>",
-    unsafe_allow_html=True
-)
 
-def show_documentacion():
-    role = rol_usuario if rol_usuario else "admin" 
-    st.title("📚 Centro de Documentación")
-    # --- SECCIÓN 1: INTRODUCCIÓN SEGÚN ROL ---
+def get_documentation_links():
     st.header("Link útiles")
     col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
 
@@ -38,8 +31,13 @@ def show_documentacion():
             st.caption("")
             copy_button( url_form_empresas, tooltip="Copiar Link", copied_label="Copiado!")
 
+def show_documentacion():
+    role = rol_usuario if rol_usuario else "admin" 
+    st.title("📚 Centro de Documentación")
+    # --- SECCIÓN 1: INTRODUCCIÓN SEGÚN ROL ---
+    if role == "admin" or role == "gestor" or role == "empresa":
+        get_documentation_links()
     st.header("1. Tu Rol en el Proyecto")
-    
     if role == "admin" or role == "gestor":
         st.write("""
         Como **Administrador**, tienes la visión global del sistema. Tu objetivo es asegurar que la conexión 

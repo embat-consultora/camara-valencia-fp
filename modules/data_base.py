@@ -827,7 +827,10 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 return int(float(val))
             except:
                 return 0
-
+        def clean_oferta(val):
+            if val is None or val == '' or (isinstance(val, float) and pd.isna(val)):
+                return None
+            return int(val)
         # 3. EXTRAER VALORES ACTUALES
         curr_comentarios = clean_str(row.get('comentarios_centro'))
         curr_obs = clean_str(row.get('observaciones_seguimiento'))
@@ -877,7 +880,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         nuevo_puesto = row.get('puesto')
         antiguo_puesto= row_orig.get('puesto')
         nueva_oferta = clean_int(row.get('oferta'))
-        antigua_oferta = clean_int(row_orig.get('oferta'))
+        antigua_oferta = clean_oferta(row_orig.get('oferta'))
         antigua_direccion = row_orig.get('direccion_empresa')
         nueva_direccion = row.get('direccion_empresa')
         antigua_localidad= row_orig.get('localidad_empresa')

@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
-from modules.data_base import getEquals, getEqual, upsert, updateTutores,getEquals, getPracticas
 from page_utils import apply_page_config
+from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, aniosList,cursoList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica,locale_tabla_principal
+from variables import empresasTabla, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive
 from pathlib import Path
 import uuid
-import os
 apply_page_config()
 make_sidebar()
 
@@ -33,7 +32,6 @@ if "estados" not in st.session_state:
     st.session_state["estados"] = []
 # --- Traer todas las empresas ---
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
-cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 empresas = getEquals(empresasTabla, {"CIF": cif})
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
@@ -49,17 +47,11 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.error(f"Error al actualizar {label}: {e}")
 
 def fetch_practicas_tutores():
-    practicaTodas = getPracticas(practicaTabla, {"empresa": cif})
+    practicaTodas = getPracticas(practicaTabla, {"empresa": cif, "anio": anioFiltro})
     practicas = [
         p for p in practicaTodas 
         if p.get("status") not in [estadosPractica[3], estadosPractica[4]]
     ]
-    practicas = st.session_state.practicas
-    if anioFiltro != aniosList[0]: 
-        practicas = [p for p in practicas if p.get("anio") == anioFiltro]
-    if cursoFiltro != cursoList[0]:
-        practicas = [p for p in practicas if p.get("curso") == cursoFiltro]
-
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
@@ -78,18 +70,6 @@ fetch_practicas_tutores()
 practicas = st.session_state["practicas"]
 tutores = st.session_state["tutores"]
 
-def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
-    nuevo_valor = st.session_state.get(key_widget)
-    if nuevo_valor:
-        try:
-            payload = {
-                columna_id: dni_o_id, 
-                campo_a_actualizar: nuevo_valor
-            }
-            upsert(tabla, payload, keys=[columna_id])
-            st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
-        except Exception as e:
-            st.error(f"Error al actualizar {label}: {e}")
 # --- Tabs principales ---
 tabEmpresa, tabOferta,tabPractica, tabTutores = st.tabs(["Mi Empresa", "Ofertas", "Formaciones", "Tutores"])
 
@@ -128,19 +108,24 @@ with tabEmpresa:
                         "email_empresa": new_email
                     }, keys=["CIF"])
 
-                st.toast("Empresa actualizada correctamente")
-                st.rerun()
+                st.toast("Empresa actualizada correctamente",duration='short', icon="✅"); 
+
     
 with tabOferta:
  # --- Mostrar FP asociadas ---
-        fps = getEqual(necesidadFP, "empresa", empresa["CIF"])
+        anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+
+        fps = getEquals(necesidadFP, {"empresa": empresa["CIF"], "anio": anioFiltro})
         if anioFiltro != aniosList[0]: 
             fps = [p for p in fps if p.get("anio") == anioFiltro]
-        if cursoFiltro != cursoList[0]:
-            fps = [p for p in fps if p.get("curso") == cursoFiltro]
         st.subheader(f"Formaciones ofrecidas")
-        base_url = st.secrets["urls"]["URL"] 
-        st.caption(f"Oferta de formaciones actuales - Agregar nueva: {base_url}/formEmpresa")
+
+        if str(anioFiltro).strip().lower() == "seleccionar":
+                anioFiltroLink = aniosList[1]
+        else:
+                anioFiltroLink = anioFiltro
+        url_form_empresas = f"{st.secrets["urls"]["FORM_EMPRESA"]}?curso_academico={anioFiltroLink}"
+        st.caption(f"Agregar nueva (seleccione el curso académico): {url_form_empresas}")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or estados[4]
@@ -196,7 +181,6 @@ with tabOferta:
         else:
            st.info('No hay necesidades FP registradas para esta empresa o para el filtro seleccionado')     
   
-
 with tabTutores:
         st.subheader("Tutores")
         st.caption('Aquí puedes administrar los tutores de tu empresa. Agrega, modifica o elimina usando la tabla, posiciona el ratón sobre la tabla y podrás ver las opciones. Luego preciona "Actualizar Tutores"')
@@ -232,10 +216,10 @@ with tabTutores:
                         nombre = row.get("nombre", "Sin Nombre").strip()
                         email = row.get("email", "").strip()
                         if not email or "@" not in email:
-                            st.error(f"Email inválido para {nombre}"); st.stop()
+                            st.error(f"Email inválido para {nombre}, , corrobore que no tiene filas vacias, si las tiene eliminelas"); st.stop()
                     
                     res = updateTutores(cambios, df_tutores, cif=cif)
-                    st.toast("✅ Guardado"); 
+                    st.toast("✅ Guardado",duration='short', icon="✅"); 
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -245,25 +229,23 @@ def mostrarLista():
             st.session_state["force_reload"] = True
             st.rerun()
     if not practicas:
-        st.info("No tienes Formaciones asignadas aun.")
+        st.info("No tienes Formaciones asignadas aun o no existen para el curso académico o curso seleccionado.")
     else:
         data_for_grid = []
         for p in practicas:
+            
             anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
-            cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
             if st.session_state.get("index_academic", 0)>0 and p.get("anio", []) != anioFiltro:
-                continue
-            if st.session_state.get("index_curso", 0)>0 and p.get("curso") != cursoFiltro:
                 continue
             pid = p["id"]
             estados_p =  p.get("status", [])
-
             data_for_grid.append({
                 "ID": pid,
                 "Alumno": f"{p.get('alumnos', {}).get('nombre')} {p.get('alumnos', {}).get('apellido')}",
                 "Empresa": p.get('empresas', {}).get('nombre'),
                 "Estado": estados_p,
-                "Fecha_inicio": p.get('fecha_inicio', '—'),
+                "Fecha Inicio": p.get('fecha_inicio', '—'),
+                "Fecha Fin": p.get('fecha_fin', '—'),
                 "Ciclo": p.get('ciclo_formativo', '—'),
                 "Tutor Empresa": p.get('tutor', 'Sin asignar'),
                 "Gestor": p.get('gestor', 'Sin asignar')
@@ -317,8 +299,9 @@ def mostrar_detalle():
     p = next((x for x in practicas if x["id"] == practicaId), None)
 
     if not p:
-        st.error("Formación no encontrada.")
-        return
+        st.session_state.page = "lista"
+        st.rerun()
+   
 
     p["oferta_fp"] = p.get("oferta_fp") or {}
     p["empresas"] = p.get("empresas") or {}
@@ -472,27 +455,9 @@ def seccion_planificacion(alumno, empresa, practicaId):
                         """,
                         unsafe_allow_html=True
                     )
-                if archivo_calendario:
-                        file_id = archivo_calendario.get('id')
-                        
-                        if file_id:
-                            # Construimos la URL de previsualización oficial de Google Drive
-                            preview_url = f"https://drive.google.com/file/d/{file_id}/preview"
-                            
-                            # Usamos un contenedor de Streamlit para el estilo
-                            with st.container():
-                                st.markdown(
-                                    f"""
-                                    <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
-                                        <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True
-                                )
-                        
-                            st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
-                else:
-                    st.write("No han subido calendario aun")
+              
+                # else:
+                #     st.write("No han subido calendario aun")
         pass
 
 with tabPractica:
