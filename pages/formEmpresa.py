@@ -221,8 +221,7 @@ if submit:
         "nif_responsable_legal": nie_responsable.strip(),
         "horario": str(horario_inicio) + " - " + str(horario_fin),
         "pagina_web": pagina_web.strip(),
-        "sectorEmpresa": sector.strip(),
-        "anio": curso_academico
+        "sectorEmpresa": sector.strip()
 
     }
     ofertaPayload={

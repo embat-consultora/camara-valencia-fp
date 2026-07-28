@@ -109,14 +109,14 @@ def load_data():
         if gestorDatos:
             practicas = [
             p for p in practicas 
-            if p.get("alumnos") is not None and p.get("alumnos").get("gestor") == gestorNombre
+            if p.get("gestor") is not None and p.get("gestor") == gestorNombre
         ]
             
         else:
             practicas = []
+   
     if rol_usuario == "tutor":
-        tutorDatos = [t for t in tutores if t.get("email") == user_email]
-        
+        tutorDatos = [t for t in tutores if t.get("nif") == user_email]
         if tutorDatos:
             tutorNombre = tutorDatos[0].get("nombre")
             practicas = [
@@ -228,7 +228,7 @@ def mostrar_lista_practicas():
         with colFiltro:
             estadoFiltro = st.multiselect("**Estado**", options= estados,placeholder="Seleccione uno o más estados", default=[estados[0], estados[1], estados[4]], key="estados_tabla")
         if not practicas:
-            st.info("No tienes formaciones asignadas aun.")
+            st.info("No tienes formaciones asignadas aun para este curso académico")
             st.session_state.practicas_filtradas = []
             return
         data_for_grid = []
@@ -247,7 +247,7 @@ def mostrar_lista_practicas():
                 "Estado": estados_p,
                 "Fecha Inicio": p.get('fecha_inicio', '—'),
                 "Ciclo": p.get('ciclo_formativo', '—'),
-                "Gestor": p.get('alumnos', {}).get('gestor', 'Sin asignar'),
+                "Gestor": p.get('gestor', 'Sin asignar'),
                 "Curso Académico": f"{p.get('anio', '—')}/{p.get('curso', '—')}"
             })
         st.session_state.practicas_filtradas = practicas_filtradas_raw
@@ -576,15 +576,17 @@ def mostrar_dashboard():
         st.info("No hay datos de envíos de feedback.")
         return
     else:
-    # Convertir a DataFrame para filtrar fácil
+        # Convertir a DataFrame para filtrar fácil
         df_fb = pd.DataFrame(all_feedback_forms)
-        df_fb['fecha_real_envio'] = pd.to_datetime(df_fb['fecha_real_envio']).dt.date
-
-        # Filtrar por rango de fecha
-        mask = (df_fb['fecha_real_envio'] >= fecha_inicio_filtro) & (df_fb['fecha_real_envio'] <= fecha_fin_filtro)
+        df_fb['fecha_envio'] = pd.to_datetime(df_fb['fecha_envio'], errors='coerce')
+        # Convertimos los filtros a Timestamp, no la columna a date
+        ts_inicio = pd.Timestamp(fecha_inicio_filtro)
+        ts_fin = pd.Timestamp(fecha_fin_filtro) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        mask = (df_fb['fecha_envio'] >= ts_inicio) & (df_fb['fecha_envio'] <= ts_fin)
         df_filtrado = df_fb.loc[mask]
         # 3. Métricas Principales (KPIs)
         # Tipos: feedback_inicial, feedback_adaptacion, feedback_cierre
+        total_pendientes = len(df_filtrado[df_filtrado['estado'] == 'pendiente'])
         total_enviados = len(df_filtrado[df_filtrado['estado'] != 'pendiente'])
         total_respondidos = len(df_filtrado[df_filtrado['fecha_respuesta'].notna()])
         pct_respuesta = round((total_respondidos / total_enviados * 100) if total_enviados > 0 else 0)
@@ -614,9 +616,17 @@ def mostrar_dashboard():
         """, unsafe_allow_html=True)
 
         st.subheader("📊 Métricas Envio Correos y Respuestas")
-        c1, c2, c3= st.columns(3)
-
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-circle" style="background:#f3e5f5; color:#8e24aa;">
+                    <div class="kpi-number">{total_pendientes}</div>
+                    <div class="kpi-pct">Total</div>
+                </div>
+                <div class="kpi-title">Pendiente de Envio</div>
+            </div>""", unsafe_allow_html=True)
+        with c2:
             st.markdown(f"""
             <div class="kpi-card">
                 <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
@@ -626,7 +636,7 @@ def mostrar_dashboard():
                 <div class="kpi-title">Total Enviados</div>
             </div>""", unsafe_allow_html=True)
 
-        with c2:
+        with c3:
             st.markdown(f"""
             <div class="kpi-card">
                 <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
@@ -636,7 +646,7 @@ def mostrar_dashboard():
                 <div class="kpi-title">Total Respondidos y %</div>
             </div>""", unsafe_allow_html=True)
 
-        with c3:
+        with c4:
             st.markdown(f"""
             <div class="kpi-card">
                 <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
@@ -674,7 +684,7 @@ def mostrar_dashboard():
             st.write("### ⏳ Alumnos que no han respondido")
             # Filtramos los que se enviaron pero no tienen fecha_respuesta
             df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
-            base_url = st.secrets["urls"]["URL"]
+            base_url = st.secrets["urls"]["URL"] 
         
             listado_morosos = []
             for _, row in df_pendientes.iterrows():
@@ -747,7 +757,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             lista_nombres_gestores = [g["nombre"] for g in gestores]
             if "No asignado" not in lista_nombres_gestores:
                 lista_nombres_gestores.insert(0, "No asignado")
-            gestor_actual = alumno.get("gestor")
+            gestor_actual = p.get("gestor")
             try:
                 indice_gestor = lista_nombres_gestores.index(gestor_actual) if gestor_actual in lista_nombres_gestores else 0
             except:
@@ -765,7 +775,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     key=clave_gestor,
                     on_change=handle_update,
                     # Pasamos la KEY en lugar del valor
-                    args=(alumnosTabla, alumno['dni'], "gestor", "dni", clave_gestor, "Gestor")
+                    args=(practicaTabla, p['id'], "gestor", "id", clave_gestor, "Gestor")
                 )
         tutores_filtrados = [g for g in tutores if g["cif_empresa"] == empresa['CIF']]
         lista_nombres_tutores = [g["nombre"] for g in tutores_filtrados]
@@ -1199,11 +1209,45 @@ def seccion_documentos(alumno, empresa, practicaId):
     if rol_usuario != 'tutor':
         uploaded_files = st.file_uploader(
             "Subir archivos",
-            type=["pdf", "doc", "docx", "odt"],
+            type=["pdf", "doc", "docx", "odt", "jpg", "jpeg", "png"],
             accept_multiple_files=True,
             key=f"up_{practicaId}"
         )
+        st.html(
+                    """
+                    <style>
 
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                    display: none;
+                    }
+
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                    content: 'Arrastre aquí los archivos';
+                    }
+
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                    line-height: initial;
+                    content: "Buscar";
+                    text-indent: 0;
+                    }
+
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                    line-height: initial;
+                    content: "Límite 1MB por archivo";
+                    text-indent: 0;
+                    }
+
+                    </style>
+                    """
+                )
         if uploaded_files:
             too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
             if too_big:
@@ -1309,7 +1353,7 @@ def mostrar_detalle():
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
     if not p:
-        st.error("Formación no encontrada.")
+        st.error("Formación no encontrada, intente cambiando el curso académico.")
         st.session_state.page = "lista"
         return
     if p.get("status") == estados[2] or p.get("status") == estados[3]:
