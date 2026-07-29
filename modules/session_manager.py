@@ -1,0 +1,40 @@
+import streamlit as st
+from modules.data_base import getEqual
+from variables import usuariosTabla
+
+
+# Cargar datos del usuario desde Supabase y guardar en session_state
+def load_user(email):
+    response = getEqual(usuariosTabla, "email", email)
+    if response:
+        user = response[0]
+        st.session_state.username = user["email"]
+        st.session_state.rol = user["rol"]
+        st.session_state.logged_in = True
+        return True
+    return False
+
+def is_authenticated():
+    return (
+        st.session_state.get("logged_in") or
+        (hasattr(st, "experimental_user") and st.experimental_user and st.experimental_user.is_logged_in)
+    )
+
+def validate_get_user():
+    if hasattr(st, "experimental_user") and st.experimental_user and st.experimental_user.is_logged_in:
+        if "rol" not in st.session_state:
+            email = st.email
+            if load_user(email):
+                print('user loaded correctly')
+                return True
+            else:
+                st.error("Tu cuenta de Google no está autorizada.")
+                st.stop()
+
+# Verificación inicial en cualquier página protegida
+def is_logged():
+    if not is_authenticated():
+        st.warning("Redirigiendo al inicio de sesión...")
+        st.session_state.logged_in = False
+        st.session_state.redirected = True
+        st.switch_page("streamlit_app.py")

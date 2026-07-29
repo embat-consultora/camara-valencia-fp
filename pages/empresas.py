@@ -1,0 +1,526 @@
+import streamlit as st
+import pandas as pd
+import os
+from modules.data_base import get, getEquals, update, upsert,upsertCustome
+from page_utils import apply_page_config
+from pathlib import Path
+from navigation import make_sidebar
+from variables import empresasTabla, necesidadFP, estados,aniosList, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
+from datetime import datetime
+from modules.emailSender import send_email
+import re
+import tempfile
+
+apply_page_config()
+make_sidebar()
+
+st.set_page_config(page_title="Empresas", page_icon="🏢")
+st.markdown(
+    "<h2 style='text-align: center;'>EMPRESAS</h2>",
+    unsafe_allow_html=True
+)
+
+base_url = st.secrets["urls"]["URL"]
+if "form_registro_key" not in st.session_state:
+    st.session_state.form_registro_key = 0
+# --- Traer todas las empresas ---
+empresas = get(empresasTabla)
+if not empresas:
+    st.warning("No hay empresas registradas")
+    st.stop()
+
+df_empresas = pd.DataFrame(empresas)
+df_empresas = df_empresas[df_empresas["CIF"] != "00000000"]
+# --- Tabs principales ---
+tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨 Formularios & Contacto"])
+
+# -------------------------------------------------------------------
+# TAB 1: Buscar y visualizar empresas
+# -------------------------------------------------------------------
+
+# obtener la carpeta temporal correcta (Windows, Linux o Mac)
+
+with tab1:
+    col1, col2, col3,col4= st.columns([3, 2,2,2])
+    with col1:
+        search = st.text_input("🔍 Buscar por nombre de empresa", placeholder="Buscar Empresa (presiona enter para aplicar)")
+    with col2:
+        st.metric("Total Empresas", len(df_empresas))
+    with col3:
+        tipo = st.radio(
+            "Descarga por",
+            ["Fecha", "Alfabético"]
+        )
+    with col4:
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = temp_dir / f"empresas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        if tipo == "Fecha":
+            df_empresas.sort_values(by="created_at", ascending=False, inplace=True)
+        else: 
+            df_empresas.sort_values(by="nombre", ascending=True, inplace=True)
+        df_empresas.to_excel(temp_path, index=False)
+        with open(temp_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar empresas (.xlsx)",
+                data=f,
+                file_name=temp_path.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    if search:
+        df_empresas = df_empresas[df_empresas["nombre"].str.contains(search, case=False, na=False)]
+
+    df_empresas["created_at"] = pd.to_datetime(df_empresas["created_at"], errors="coerce")
+    df_empresas = df_empresas.sort_values("created_at", ascending=False)
+    df_empresas["created_at_fmt"] = df_empresas["created_at"].dt.strftime("%d/%m/%Y")
+    cols_map = {
+        "created_at_fmt":"Creada",
+        "CIF": "CIF",
+        "nombre": "Nombre",
+        "direccion": "Dirección",
+        "localidad": "Localidad",
+        "telefono": "Teléfono",
+        "email_empresa": "Email"
+    }
+    df_view = df_empresas[list(cols_map.keys())].rename(columns=cols_map)
+
+    # --- HIGHLIGHT A LA FILA MÁS RECIENTE ---
+    ultima_fecha = df_empresas["created_at"].max().date()
+
+    def highlight_last_row(row):
+        if pd.to_datetime(row["Creada"]).date() == ultima_fecha:
+            return ["background-color: #fff3b0"] * len(row)  # amarillo suave
+        return [""] * len(row)
+
+    df_styled = df_view.style.apply(highlight_last_row, axis=1)
+
+    st.dataframe(
+        df_styled,
+        hide_index=True,
+        width='stretch'
+    )
+
+    if not df_empresas.empty:
+        empresa_options = {row["nombre"]: row["id"] for _, row in df_empresas.iterrows()}
+        col1, col2 = st.columns([2, 4])
+        with col1:
+            selected_name = st.selectbox("Seleccionar empresa", list(empresa_options.keys()))
+        empresa_id = empresa_options[selected_name]
+        empresa = df_empresas[df_empresas["id"] == empresa_id].iloc[0].to_dict()
+        tabEditar, tabOfertas = st.tabs(["✏️ Editar Empresa", "📄 Formaciones Presentadas"])
+        with tabEditar:
+            st.subheader(f"Editar Empresa: {empresa.get('nombre', '')}")
+            new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
+            new_direccion = st.text_input("Dirección", empresa.get("direccion", ""))
+            try:
+                current_loc = empresa.get("localidad", "")
+                default_index_loc = localidades.index(current_loc)
+            except (ValueError, TypeError):
+                default_index_loc = 10
+            new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc, key=f"localidad_emp_{empresa_id}")
+            new_cif = st.text_input("CIF", empresa.get("CIF", ""))
+            new_telefono = st.text_input("Teléfono", empresa.get("telefono", ""))
+            new_email = st.text_input("Email", empresa.get("email_empresa", ""))
+
+            if st.button("💾 Actualizar empresa"):
+                update(
+                    empresasTabla,
+                    {
+                        "nombre": new_nombre,
+                        "direccion": new_direccion,
+                        "localidad": new_localidad,
+                        "CIF": new_cif,
+                        "telefono": new_telefono,
+                        "email_empresa": new_email
+                    },{
+                    "id":empresa_id
+                    }
+
+                )
+                st.success("Empresa actualizada correctamente")
+                st.rerun()
+
+        # --- Mostrar FP asociadas ---
+        with tabOfertas:
+            anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
+            fps = getEquals(necesidadFP, {"empresa": empresa["CIF"], "anio": anioFiltro})
+            st.subheader(f"Formaciones Presentadas - {empresa['nombre']} - Curso Académico: {anioFiltro}")
+            if fps:
+                for i, fp in enumerate(fps, start=1):
+                    estado_actual = fp.get("estado") or estados[4]
+                    bg_color = "🟢" if estado_actual == estados[4] else "🔴"
+
+                    with st.expander(
+                        f"Formación #{i} | Fecha: {pd.to_datetime(fp.get('created_at')).strftime('%d/%m/%Y')}",
+                        expanded=False
+                    ):
+                        ciclos = fp.get("ciclos_formativos")
+                        puestos = fp.get("puestos")
+
+                        if ciclos:
+                            st.write("🎓 Ciclos formativos y cantidad de alumnos:")
+                            data = [
+                                {"Ciclo": ciclo, "Alumnos": valores["alumnos"], "Disponibles": valores["disponibles"]}
+                                for ciclo, valores in ciclos.items()]
+                            df_ciclos = pd.DataFrame(data, columns=["Ciclo",  "Alumnos", "Disponibles"])
+                            st.dataframe(df_ciclos, hide_index=True, width='stretch')
+
+                        if puestos:
+                            st.write("🧩 Puestos por ciclo formativo:")
+                            for ciclo, lista_puestos in puestos.items():
+                                cantidad_alumnos = None
+                                if ciclos and ciclo in ciclos:
+                                    cantidad_alumnos = ciclos[ciclo]["alumnos"]
+
+                                with st.expander(f"{ciclo} ({cantidad_alumnos if cantidad_alumnos else 'Sin datos'} alumnos)"):
+                                    if lista_puestos:
+                                        for p in lista_puestos:
+                                            st.write(f"- Área: {p['area']} — Proyecto: {p['proyecto']}")
+                                    else:
+                                        st.markdown("_Sin áreas o proyectos registrados_")
+
+
+                        proyectos = fp.get("proyectos")
+                        requisitos = fp.get("requisitos")
+                        if proyectos:
+                            st.markdown(f"**Proyectos:** {proyectos}")
+                        if requisitos:
+                            st.markdown(f"**Requisitos:** {requisitos}")
+
+                        contrato = fp.get("contrato")
+                        vehiculo = fp.get("vehiculo")
+                        st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
+                        st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
+
+
+            else:
+                st.warning("No hay formaciones registradas para esta empresa y curso académico.")
+                st.divider()    
+                st.write("No hay formaciones registradas para esta empresa. Elige el curso académico en el selector y envia el link a la empresa")
+                col1, col2 = st.columns([1, 2], vertical_alignment="bottom")
+                with col1:
+                        st.selectbox(
+                            "Seleccione curso académico", 
+                            options=aniosList[1:], 
+                            key="selector_curso_ac_doc"
+                        )
+
+                st.write(f"Link del formulario: {st.secrets["urls"]["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}")
+
+
+# -------------------------------------------------------------------
+# TAB 2: Crear nueva empresa
+# -------------------------------------------------------------------
+
+with tab2:
+    tabNuevo, tabBulk = st.tabs(["Nueva Empresa", "Carga Masiva (.csv)"])
+    with tabNuevo:
+        st.subheader("➕ Nueva Empresa")
+        with st.form(f"nueva_empresa_form_{st.session_state.form_registro_key}"):
+            nombre_empresa = st.text_input("Nombre de la empresa")
+            direccion = st.text_input("Dirección")
+            cp = st.text_input("Código Postal")
+            localidad = st.selectbox("Localidad *", options=localidades)
+            cif = st.text_input("CIF *")
+            nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario")
+            telefono_contacto = st.text_input("Teléfono de contacto")
+            email_contacto = st.text_input("Email de contacto")
+            nombre_responsable = st.text_input("Nombre del responsable legal")
+            nie_responsable = st.text_input("NIF del responsable legal")
+            horario = st.text_input("Horario Empresa")
+            pagina_web = st.text_input("Página web")
+            col1, col2 = st.columns(2)
+            submitted = st.form_submit_button("Crear Empresa")
+            if submitted:
+                if not cif or cif.strip() == "":
+                    st.warning("⚠️ El campo CIF es obligatorio")
+                else:
+                    try:
+                        upsert(
+                            empresasTabla,
+                            {
+                                "nombre": nombre_empresa,
+                                "direccion": direccion,
+                                "localidad": localidad,
+                                "codigo_postal": cp,
+                                "CIF": cif.strip(),
+                                "telefono": telefono_contacto,
+                                "email_empresa": email_contacto,
+                                "nombre_rellena": nombre_contacto,
+                                "responsable_legal": nombre_responsable,
+                                "nif_responsable_legal": nie_responsable,
+                                "horario": horario,
+                                "pagina_web": pagina_web,
+                            },
+                            keys=["CIF"],
+                        )
+                        usuario = upsertCustome(usuariosTabla, {
+                            "email": cif.strip(),
+                            "password": cif.strip(),
+                            "rol": "empresa",
+                        }, keys=["email"])
+                        st.success("✅ Empresa creada correctamente")
+                        st.session_state.form_registro_key += 1
+
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al crear la empresa: {e}")
+
+    with tabBulk:
+        st.write("📥 Cargar Empresa desde CSV")
+        # 1. Excel de muestra
+        sample_df = pd.DataFrame({
+            "CIF": [""],# obligatorio
+            "nombre": [""],
+            "direccion": [""],
+            "codigo_postal": [""],
+            "localidad": [""],
+            "email_empresa": [""],
+            "telefono": [""],
+            "tutor": [""],
+            "tutor_email": [""],
+            "nif_tutor":[""]
+        })
+        sample_csv_path = Path(tempfile.gettempdir()) / "empresa_muestra.csv"
+        sample_df.to_csv(sample_csv_path, index=False, encoding="utf-8")
+
+        with open(sample_csv_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Descargar CSV de ejemplo",
+                data=f,
+                file_name="empresa_muestra.csv",
+                mime="text/csv"
+            )
+
+        st.info("Sube un archivo CSV. Solo el CIF es obligatorio. El resto de las columnas son opcionales. Intenta que ninguna fila quede vacia")
+
+        # 2. File uploader
+        uploaded_csv = st.file_uploader(
+            "Subir archivo CSV (.csv)",
+            type=["csv"],
+            key="upload_csv_empresa"
+        )
+        st.html(
+            """
+            <style>
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+            display: none;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+            content: 'Arrastre aquí los archivos';
+            }
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+            line-height: initial;
+            content: "Buscar";
+            text-indent: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+            text-indent: -9999px;
+            line-height: 0;
+            }
+            [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+            line-height: initial;
+            content: "Límite 1MB por archivo";
+            text-indent: 0;
+            }
+            </style>
+            """
+        )
+        if uploaded_csv:
+            try:
+                # Leer TODO como string siempre → adiós floats y NaNs
+                df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
+
+                st.write("📄 **Vista previa del archivo cargado:**")
+                st.dataframe(df_csv.head(),width='stretch')
+
+                # Validar presencia de columna DNI
+                if "CIF" not in df_csv.columns:
+                    st.error("❌ El archivo debe incluir la columna 'CIF'.")
+                    st.stop()
+
+                if st.button("🚀 Subir empresas desde CSV"):
+                    creados = 0
+                    errores = []
+
+                    # Iterar filas
+                    for _, row in df_csv.iterrows():
+
+                        # 1️⃣ Saltar fila completamente vacía
+                        if not any(str(v).strip() for v in row.values):
+                            continue
+
+                        # 2️⃣ Normalizar DNI
+                        cif_raw = row.get("CIF", "").strip()
+                        cif = re.sub(r"\.0+$", "", cif_raw)  # eliminar .0 si CSV viene de Excel
+                        cif = cif.strip()
+
+                        if not cif:
+                            errores.append("Fila sin CIF — omitida.")
+                            continue
+
+                        # 3️⃣ Construir payload limpio
+                        data = {
+                            "CIF": cif,
+                            "nombre": row.get("nombre", "").strip(),
+                            "direccion": row.get("direccion", "").strip(),
+                            "codigo_postal": row.get("codigo_postal", "").strip(),
+                            "email_empresa": row.get("email_empresa", "").strip(),
+                            "localidad": row.get("localidad", "").strip(),
+                            "telefono": row.get("telefono", "").strip(),
+                        }
+
+                        data_tutor = {
+                            "nombre": row.get("tutor", "").strip(),
+                            "email": row.get("tutor_email", "").strip(),
+                            "nif":row.get("nif_tutor", "").strip(),
+                            "cif_empresa": cif,
+                        }
+                        # 4️⃣ Insert/update
+                        try:
+                            upsert(empresasTabla, data, keys=["CIF"])
+                            usuario = upsertCustome(usuariosTabla, {
+                            "email": data.get("CIF"),
+                            "password": data.get("CIF"),
+                            "rol": "empresa",
+                        }, keys=["email"])
+                            if data_tutor.get("nombre") and data_tutor.get("email"):
+                                upsertCustome(tutoresTabla, data_tutor, keys=["email"])
+                                upsertCustome(usuariosTabla, {
+                                "email": data_tutor.get("email"),
+                                "password": data_tutor.get("nif") if data_tutor.get("nif") else "123456",
+                                "rol": "tutor",}, keys=["email"])
+                            creados += 1
+                        except Exception as e:
+                            errores.append(f"CIF {cif}: {e}")
+
+                    # Resultado del proceso
+                    st.success(f"🎉 {creados} empresas creadas o actualizadas correctamente.")
+
+                    if errores:
+                        st.warning("⚠️ Errores encontrados:")
+                        for err in errores:
+                            st.write("- " + err)
+
+                    #st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error leyendo el CSV: {e}")
+ 
+
+# -------------------------------------------------------------------
+# TAB 3: Formularios & Contacto
+# -------------------------------------------------------------------
+formUrl = os.getenv("FORM_EMPRESA")
+can_send = True
+with tab3:
+    if "emailsList" not in st.session_state:
+        st.session_state.emailsList = []
+    st.write("🎓 Contactar Empresas")
+    
+    if not empresas:
+        st.warning("No hay empresas registrados")
+        st.stop()
+
+    df_empresas = pd.DataFrame(empresas)[["CIF", "nombre", "email_empresa"]]
+    df_clean = df_empresas.dropna(subset=["nombre", "email_empresa"]).drop_duplicates()
+    emailsEmpresasClean =df_clean["email_empresa"].dropna().unique().tolist()
+    nombreEmpresasClean =df_clean["nombre"].dropna().unique().tolist()
+    col1, col2 = st.columns([3, 2])
+    with col2:
+        checked = st.checkbox("Seleccionar todos", value=False, key="select_all_empresas")
+    with col1:
+        empresas_seleccionadas = st.multiselect(
+            "Selecciona empresas", placeholder="Selecciona un valor",
+            options=nombreEmpresasClean,disabled=st.session_state.select_all_empresas
+        )
+    emails_manual_empresas = st.text_area(
+        "Agregar emails manualmente (separados por coma)",
+        placeholder="ejemplo1@mail.com, ejemplo2@mail.com",
+        key="emails_manual_empresas"
+    )
+    EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+    valid_emails = []
+    invalid_emails = []
+    if emails_manual_empresas.strip():
+        raw_list = [e.strip() for e in emails_manual_empresas.split(",") if e.strip()]
+        for e in raw_list:
+            if EMAIL_REGEX.match(e):
+                valid_emails.append(e.lower())
+            else:
+                invalid_emails.append(e)
+
+        valid_emails = list(dict.fromkeys(valid_emails))
+
+        if invalid_emails:
+            can_send = False
+            st.warning(f"Puede que falte alguna coma o que tengas correos inválidos: {', '.join(invalid_emails)}")
+    
+    if checked:
+        allEmails = emailsEmpresasClean.copy()
+        emails_de_seleccion = list(set(allEmails))
+    else:
+        emails_de_seleccion = list(set(df_clean[df_clean["nombre"].isin(empresas_seleccionadas)]["email_empresa"].unique().tolist()))
+
+    final_list = list(set(emails_de_seleccion + valid_emails))
+    st.session_state.emailsList = final_list
+    
+    st.write("**Destinatarios seleccionados:**")
+    for e in st.session_state.emailsList:
+        st.markdown(f"- {e}")
+
+    subject_al = st.text_input("Asunto del email", value="Formaciones", key="subj_al")
+    def actualizar_body_empresa():
+        curso = st.session_state["selector_curso_ac_doc_e"]
+        st.session_state["body_al"] = bodyEmailsEmpresa.replace(
+            "{{form_link}}", 
+            f"{os.getenv('FORM_EMPRESA')}?curso_academico={curso}"
+        )
+
+
+    st.selectbox(
+        "Seleccione curso académico", 
+        options=aniosList[1:], 
+        key="selector_curso_ac_doc_e",
+        on_change=actualizar_body_empresa
+    )
+
+    # Si es la primera carga y "body_al" no existe aún, inicialízalo
+    if "body_al" not in st.session_state:
+        actualizar_body_empresa()
+    body_al = st.text_area(
+        "Cuerpo del email",
+        height=200,
+        key="body_al"
+    )
+
+    email_sender = st.secrets['email']['gmail']
+    email_password = st.secrets['email']['password']
+    adjuntos = st.file_uploader(
+        "Adjuntar archivos", 
+        accept_multiple_files=True, 
+        key="adjuntos_empresas"
+    )
+    if st.button("📨 Enviar Correo a Empresas", disabled=not can_send):
+        try:
+            if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
+                fecha_envio = datetime.now().isoformat()
+
+                for email in final_list:
+                    empresa = df_empresas[df_empresas["email_empresa"] == email]
+
+                    if not empresa.empty:
+                        cif = empresa["CIF"].values[0]
+                        upsert(
+                            empresaEstadosTabla,
+                            {"empresa": cif, "email_enviado": fecha_envio},
+                            keys=["empresa"]
+                        )
+                st.success("Emails enviados correctamente! 🚀")
+        except Exception as e:
+            st.error(f"Falló el envío de mail: {e}")
+

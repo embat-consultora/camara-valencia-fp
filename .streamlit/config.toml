@@ -1,0 +1,9 @@
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"
+[theme]
+primaryColor="#172b47"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#P3025C"
+textColor="#262730"
+font="Montserrat"
