@@ -12,7 +12,7 @@ import uuid
 
 apply_page_config()
 make_sidebar()
-st.set_page_config(page_title="🧠 Mi Formación en Empresa", page_icon="🧑‍🎓")
+st.set_page_config(page_title="Mi Formación en Empresa", page_icon="🧑‍🎓")
 st.markdown(
     "<h2 style='text-align: center;'>🏢 MI FORMACIÓN EN EMPRESA</h2>",
     unsafe_allow_html=True
@@ -32,7 +32,7 @@ def fetch_practicas_alumno():
     todas_las_practicas = getPracticas(practicaTabla, {"alumno": dniAlumno})
     practica_res = [
     p for p in todas_las_practicas 
-    if p.get("status") not in [estados[3], estados[2]]  # Excluir prácticas con estado "Canceladas" o "Finalizada"
+    if p.get("status") not in [estados[3], estados[2],estados[5]]  # Excluir prácticas con estado "Canceladas" o "Finalizada" o "Borrador"
 ]
     st.session_state["practicas"] = practica_res
     return practica_res
@@ -94,8 +94,8 @@ with col2:
 st.divider( )
 
 st.write(f"**Estado de Formación:** `{practica.get('status', '—')}`")
-st.write(f"**Fecha Inicio:** `{practica.get('fecha_inicio', '—')}`")
-st.write(f"**Fecha Fin:** `{practica.get('fecha_fin', '—')}`")
+st.write(f"**Fecha Inicio:** `{practica.get('fecha_inicio') or 'Aún no configurada'}`")
+st.write(f"**Fecha Fin:** `{practica.get('fecha_fin') or 'Aún no configurada'}`")
 st.divider( )
 
 if (practica.get('status') is not None and practica.get('status') == estados[1]):

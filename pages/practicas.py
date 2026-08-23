@@ -10,7 +10,7 @@ from navigation import make_sidebar
 from datetime import datetime, timedelta
 from modules.drive_helper import list_drive_files, upload_to_drive
 from modules.forms_helper import file_size_bytes
-from modules.emailSender import enviarRecordatoriosMasivos
+from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email
 from pathlib import Path
 from modules.feedback_helper import render_feedback_card
 import uuid
@@ -377,11 +377,13 @@ def mostrar_carga_rapida():
                             "telefono": new_emp_tel,
                             "email_empresa": new_emp_email
                         }, keys=["CIF"])
-                        usuario = upsertCustome(usuariosTabla, {
+                        usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                     "email": new_emp_cif,
                                     "password": new_emp_cif,
                                     "rol": "empresa",
-                                }, keys=["email"])
+                                }, keys=["email"], return_created=True)
+                        if usuario_creado and new_emp_cif:
+                                send_welcome_email(new_emp_email, new_emp_cif)
                         # B. Alta Alumno
                         upsert(alumnosTabla, {
                             "dni": new_alu_dni,
@@ -395,6 +397,13 @@ def mostrar_carga_rapida():
                             "curso": curso,
                             "estado": estadosAlumno[1]
                         }, keys=["dni"])
+                        usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                                    "email": new_alu_dni,
+                                    "password": new_alu_dni,
+                                    "rol": "alumno",
+                                }, keys=["email"], return_created=True)
+                        if usuario_creado and new_alu_dni:
+                            send_welcome_email(new_alu_email, new_alu_dni)
 
                         # C. Crear la formación (Vincular)
                         # Usamos los parámetros que requiere tu función crearPractica
@@ -414,8 +423,8 @@ def mostrar_carga_rapida():
                         )
 
                         st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
-                        st.success(f"✅ Se ha creado un usuario y contraseña para la empresa - usuario: {new_emp_cif} password: {new_emp_cif}")
-
+                        st.success(f"✅ Se ha creado y enviado un usuario y contraseña para la empresa")
+                        st.success(f"✅ Se ha creado y enviado un usuario y contraseña para el alumno")
                     except Exception as e:
                         st.error(f"❌ Error en el proceso: {str(e)}")
 def guardar_anexo_automatico(practica_id, campo_bd, key_widget):
@@ -818,6 +827,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
 
 def seccion_programar(p):
     with st.expander("📅 Fechas de la Formación", expanded=True):
+
         f_inicio_db = p.get('fecha_inicio')
         f_fin_db = p.get('fecha_fin')
         if f_inicio_db and f_fin_db:
@@ -861,7 +871,22 @@ def seccion_programar(p):
         with colCancel:
             st.write("")  # Espaciado
             st.write("")  # Espaciado
-                        
+            st.markdown(
+                f"""
+                <style>
+                div[class*="st-key-cancelar_{p['id']}"] button {{
+                    background-color: #e53935 !important;
+                    border-color: #e53935 !important;
+                    color: #fff !important;
+                }}
+                div[class*="st-key-cancelar_{p['id']}"] button:hover {{
+                    background-color: #c62828 !important;
+                    border-color: #c62828 !important;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
             if st.button("Cancelar Formación", key=f"cancelar_{p['id']}", type="primary"):
                 dialog_cancelacion(p)
         
@@ -1302,6 +1327,7 @@ def mostrar_detalle_cancelada(p):
     seccion_documentacion_cancelado(alumno, empresa)
 
 def seccion_detalle_cancelado(alumno, empresa, p, oferta):
+    st.error(f"ℹ️ **Estado:** {p.get('status')} — **Motivo:** {p.get('motivo') or 'No especificado'}", icon="🚀")
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**Alumno:** {alumno.get('nombre', '')} {alumno.get('apellido', '')}")
@@ -1374,6 +1400,7 @@ def mostrar_detalle():
         tutor_actual = p.get("tutor") 
         tutorCentro_actual = p.get("tutor_centro") 
         st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
+        st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
         planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento y Feedback", "Documentación"])
         if rol_usuario == 'tutor':
             with planificacionTab:

@@ -1,7 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
-import os
 import pandas as pd
 import uuid
 from datetime import datetime, timedelta
@@ -212,13 +211,14 @@ def getEmpresasYOfertas():
     return res.data
 
 def updateTutores(cambios, df_original, cif=None):
+    from modules.emailSender import send_welcome_email
+
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         telefono = new_row.get("telefono", "").strip()
-        nif=new_row.get("nif", "").strip()
+        nif= new_row.get("nif", "").strip()
         cif_final = cif or new_row.get("cif_empresa", "").strip()
         email = new_row.get("email", "").strip().lower()
-        password = new_row.get("password_temp") or new_row.get("password", "123456")
         if email and nombre:
             try:
                 add(tutoresTabla, {
@@ -228,11 +228,13 @@ def updateTutores(cambios, df_original, cif=None):
                     "cif_empresa":cif_final,
                     "telefono":telefono
                 })
-                add("usuarios", {
-                    "email": email,
-                    "password": password,
+                usuario, usuario_creado = upsertCustome("usuarios", {
+                    "email": nif,
+                    "password": nif,
                     "rol": "tutor"
-                })
+                }, keys=["email"], return_created=True)
+                if usuario_creado:
+                    send_welcome_email(email, nif)
             except Exception as e:
                 raise Exception(f"Error al crear el usuario {email}: {e}")
 
@@ -257,13 +259,13 @@ def updateTutores(cambios, df_original, cif=None):
     for idx in cambios["deleted_rows"]:
         fila_orig = df_original.iloc[int(idx)]
         id_tutor = fila_orig["id"]
-        email_tutor = fila_orig["email"]
-        
+        nif_tutor = fila_orig["nif"]
+      
         try:
             delete(tutoresTabla, "id", id_tutor)
-            delete("usuarios", "email", email_tutor)
+            delete("usuarios", "email", nif_tutor)
         except Exception as e:
-            st.error(f"Error al eliminar {email_tutor}: {e}")
+            st.error(f"Error al eliminar {nif_tutor}: {e}")
         
 
 
@@ -491,7 +493,7 @@ def upsert(tableName, data,keys):
     response = supabase.table(tableName).upsert(data, on_conflict=keys).execute()
     return response
 
-def upsertCustome(tableName, data, keys):
+def upsertCustome(tableName, data, keys, return_created=False):
     query = supabase.table(tableName).select("*")
 
     for key in keys:
@@ -500,6 +502,7 @@ def upsertCustome(tableName, data, keys):
     existing_record = query.execute()
 
     # 2. Lógica de decisión
+    created = not existing_record.data
     if existing_record.data:
         # Si existe, actualizamos
         # Filtramos para asegurarnos de actualizar el registro correcto
@@ -510,7 +513,9 @@ def upsertCustome(tableName, data, keys):
         response = update_query.execute()
     else:
         response = supabase.table(tableName).insert(data).execute()
-        
+
+    if return_created:
+        return response, created
     return response
 def saveAuthToken(data):
     return supabase.table('auth_tokens').insert(data).execute()

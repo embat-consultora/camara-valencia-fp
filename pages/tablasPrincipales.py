@@ -7,6 +7,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 from datetime import datetime
 from variables import locale_tabla_principal, aniosList, cursoList
 # Configuración inicial
+st.set_page_config( layout="wide")
 apply_page_config()
 make_sidebar()
 

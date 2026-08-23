@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 from modules.forms_helper import required_ok, slug
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
+from modules.emailSender import send_welcome_email
 from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
 # ---------------------------------
 # Config
@@ -62,28 +63,56 @@ st.write("DATOS DE LA EMPRESA Y PERSONA DE CONTACTO")
 col1, col2 = st.columns(2)
 with col1:
     nombre_empresa = input_requerido("Nombre de la empresa *", key="nombre_empresa")
-    sector = st.selectbox("Sector de la empresa *", (sectorEmpresa), key="sector")
-    direccion = input_requerido("Dirección *", key="direccion")
-    cp = input_requerido("Código Postal *", key="cp")
-    localidad = st.selectbox("Localidad *", (localidades), key="localidad")
-    cif = input_requerido("CIF *", key="cif")
-    horario_inicio = st.time_input("Horario Empresa inicio *", step=900, key="inicio")
-    pagina_web = st.text_input("Página web")
 with col2:
     nombre_contacto = input_requerido("Nombre de la persona que rellena el formulario *", key="nombre_contacto")
+
+col1, col2 = st.columns(2)
+with col1:
+    sector = st.selectbox("Sector de la empresa *", (sectorEmpresa), key="sector")
+with col2:
     telefono_contacto = input_requerido("Teléfono de contacto *", key="telefono_contacto")
+
+col1, col2 = st.columns(2)
+with col1:
+    direccion = input_requerido("Dirección *", key="direccion")
+with col2:
     email_contacto = input_requerido("Email de contacto *", key="email_contacto")
+
+col1, col2 = st.columns(2)
+with col1:
+    cp = input_requerido("Código Postal *", key="cp")
+with col2:
     nombre_responsable = input_requerido("Nombre del responsable legal *", key="nombre_responsable")
+
+col1, col2 = st.columns(2)
+with col1:
+    localidad = st.selectbox("Localidad *", (localidades), key="localidad")
+with col2:
     nie_responsable = input_requerido("NIF del responsable legal *", key="nie_responsable")
+
+col1, col2 = st.columns(2)
+with col1:
+    cif = input_requerido("CIF *", key="cif")
+with col2:
     horario_fin = st.time_input("Horario Empresa fin *", step=900)
+
+col1, col2 = st.columns(2)
+with col1:
+    horario_inicio = st.time_input("Horario Empresa inicio *", step=900, key="inicio")
+with col2:
+    pagina_web = st.text_input("Página web")
 st.divider()
 st.write("DATOS DEL TUTOR DE LA EMPRESA (PERSONA QUE SE ENCARGARÁ DE SEGUIR AL ALUMNO EN FORMACIONES)")
 col1, col2 = st.columns(2)
 with col1:
     nombre_tutor = input_requerido("Nombre Completo del tutor *", key="nombre_tutor")
-    nif_tutor = input_requerido("NIF del tutor *", key="nif_tutor")
 with col2:
     email_tutor = input_requerido("Email del tutor *", key="email_tutor")
+
+col1, col2 = st.columns(2)
+with col1:
+    nif_tutor = input_requerido("NIF del tutor *", key="nif_tutor")
+with col2:
     telefono_tutor = input_requerido("Teléfono del tutor *", key="telefono_tutor")
 st.divider()
 st.write("DIRECCIÓN DEL CENTRO DE TRABAJO DONDE SE REALIZARÁN LAS FORMACIONES")
@@ -208,61 +237,65 @@ submit = st.button("Enviar formulario", disabled=not can_submit)
 # ---------------------------------
 # Submit
 # ---------------------------------
-if submit:
-    payloadEmpresa = {
-        "nombre": nombre_empresa.strip(),
-        "direccion": direccion.strip(),
-        "codigo_postal": cp.strip(),
-        "localidad": localidad.strip(),
-        "CIF": cif.strip().upper(),
-        "telefono": telefono_contacto.strip(),
-        "email_empresa": email_contacto.strip().lower(),
-        "responsable_legal": nombre_responsable.strip(),
-        "nif_responsable_legal": nie_responsable.strip(),
-        "horario": str(horario_inicio) + " - " + str(horario_fin),
-        "pagina_web": pagina_web.strip(),
-        "sectorEmpresa": sector.strip()
+with st.spinner("⏳ Enviando formulario, por favor espera..."):
+    if submit:
+        payloadEmpresa = {
+            "nombre": nombre_empresa.strip(),
+            "direccion": direccion.strip(),
+            "codigo_postal": cp.strip(),
+            "localidad": localidad.strip(),
+            "CIF": cif.strip().upper(),
+            "telefono": telefono_contacto.strip(),
+            "email_empresa": email_contacto.strip().lower(),
+            "responsable_legal": nombre_responsable.strip(),
+            "nif_responsable_legal": nie_responsable.strip(),
+            "horario": str(horario_inicio) + " - " + str(horario_fin),
+            "pagina_web": pagina_web.strip(),
+            "sectorEmpresa": sector.strip()
 
-    }
-    ofertaPayload={
-        "contrato": posible_contrato,
-        "vehiculo": vehiculo,
-        "ciclos_formativos": cantidades,
-        "puestos": puestos_seleccionados,
-        "requisitos": requisitos.strip(),
-        "estado": estados[4],
-        "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
-        "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
-        "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
-        "nombre_rellena_form": nombre_contacto.strip(),
-        "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
-        "anio": curso_academico
-    }
-    res_emp = upsert(empresasTabla, payloadEmpresa, keys=["CIF"])
-    if res_emp and res_emp.data:
-        upsert(empresaEstadosTabla,
-                {"empresa": res_emp.data[0]["CIF"], "form_completo": datetime.now().isoformat()},
-                keys=["empresa"],
-            )
-        tutor = upsertCustome(tutoresTabla, {
-            "cif_empresa": res_emp.data[0]["CIF"],
-            "nombre": nombre_tutor.strip(),
-            "nif": nif_tutor.strip().upper(),
-            "email": email_tutor.strip().lower(),
-            "telefono": telefono_tutor.strip()
-        }, keys=["nif"])
-        ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
-        oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
-        usuario = upsertCustome(usuariosTabla, {
-            "email": res_emp.data[0]["CIF"],
-            "password": res_emp.data[0]["CIF"],
-            "rol": "empresa",
-        }, keys=["email"]),
-        upsertCustome(usuariosTabla, {
-            "email": nif_tutor,
-            "password": nif_tutor,
-            "rol": "tutor",
-        }, keys=["email"])
+        }
+        ofertaPayload={
+            "contrato": posible_contrato,
+            "vehiculo": vehiculo,
+            "ciclos_formativos": cantidades,
+            "puestos": puestos_seleccionados,
+            "requisitos": requisitos.strip(),
+            "estado": estados[4],
+            "direccion_empresa": direccion.strip() if not direccion_centro.strip() else direccion_centro.strip(),
+            "cp_empresa": cp.strip() if not cp_centro.strip() else cp_centro.strip(),
+            "localidad_empresa": localidad.strip() if not localidad_centro.strip() else localidad_centro.strip(),
+            "nombre_rellena_form": nombre_contacto.strip(),
+            "cupo_alumnos": sum(v["alumnos"] for v in cantidades.values()) if cantidades else 0,
+            "anio": curso_academico
+        }
+        res_emp = upsert(empresasTabla, payloadEmpresa, keys=["CIF"])
+        if res_emp and res_emp.data:
+            upsert(empresaEstadosTabla,
+                    {"empresa": res_emp.data[0]["CIF"], "form_completo": datetime.now().isoformat()},
+                    keys=["empresa"],
+                )
+            tutor = upsertCustome(tutoresTabla, {
+                "cif_empresa": res_emp.data[0]["CIF"],
+                "nombre": nombre_tutor.strip(),
+                "nif": nif_tutor.strip().upper(),
+                "email": email_tutor.strip().lower(),
+                "telefono": telefono_tutor.strip()
+            }, keys=["nif"])
+            ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
+            oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+            usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                "email": res_emp.data[0]["CIF"],
+                "password": res_emp.data[0]["CIF"],
+                "rol": "empresa",
+            }, keys=["email"], return_created=True)
+            if usuario_creado and email_contacto.strip():
+                send_welcome_email(email_contacto.strip().lower(), res_emp.data[0]["CIF"])
+            usuarioT, usuario_creadoT = upsertCustome(usuariosTabla, {
+                "email": nif_tutor,
+                "password": nif_tutor,
+                "rol": "tutor",
+            }, keys=["email"], return_created=True)
+            if usuario_creadoT and email_tutor.strip():
+                send_welcome_email(email_tutor.strip().lower(), nif_tutor)
 
-
-    st.success("✅ ¡Formulario de empresa enviado correctamente!")
+        st.success("✅ ¡Formulario de empresa enviado correctamente!")

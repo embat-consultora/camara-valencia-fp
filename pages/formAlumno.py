@@ -1,11 +1,12 @@
 import streamlit as st
 from pathlib import Path
 from datetime import datetime
-import json, uuid
+import  uuid
+from modules.emailSender import send_email, send_welcome_email
 from modules.drive_helper import upload_to_drive
-from modules.data_base import upsert,getCiclosYAreas, getEqual
+from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
 from modules.forms_helper import required_ok, file_size_bytes, slug
-from variables import carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
+from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 
 # ---------------------------------
 # Config
@@ -58,22 +59,38 @@ st.subheader("Datos personales")
 col1, col2 = st.columns(2)
 with col1:
     nombre = input_requerido("Nombre *", key="nombre_alumno")
-    email = input_requerido("Email *", key="email_alumno")
-    dni = input_requerido("DNI/NIE *", key="dni_alumno")
-    cp = input_requerido("Código Postal *", key="cp_alumno")
-    telefono = st.text_input("Teléfono *", key="tel_alumno")
 with col2:
     apellidos = input_requerido("Apellidos *", key="apellidos_alumno")
+
+col1, col2 = st.columns(2)
+with col1:
+    email = input_requerido("Email *", key="email_alumno")
+with col2:
     direccion = input_requerido("Dirección *", key="direccion_alumno")
+
+col1, col2 = st.columns(2)
+with col1:
+    dni = input_requerido("DNI/NIE *", key="dni_alumno")
+with col2:
     localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
+
+col1, col2 = st.columns(2)
+with col1:
+    cp = input_requerido("Código Postal *", key="cp_alumno")
+with col2:
     sexo = st.selectbox("Sexo *", ("Prefiero No especificar","Femenino", "Masculino"), key="sexo_alumno")
+
+col1, col2 = st.columns(2)
+with col1:
+    telefono = st.text_input("Teléfono *", key="tel_alumno")
+with col2:
     nuss = st.text_input("NUSS", key="nuss_alumno")
     
 
 vehiculo = st.radio("¿Dispones de vehículo? *", ["Sí", "No"], horizontal=True)
 
 st.subheader("Tipo de formación")
-tipo_practica = st.radio(
+tipo_practica = st.radio(   
     "Indica si tu formación es autogestionada o si prefieres que sea asignada por el centro:",
     tipoPracticas,
     index=None,
@@ -205,6 +222,18 @@ if submit:
                 "requisitos": requisitos.strip(),
         }
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
+
+        if res_al and res_al.data:
+            try:
+                usuario = upsertCustome(usuariosTabla, {
+                            "email": payload["dni"],
+                            "password": payload["dni"],
+                            "rol": "alumno",
+                        }, keys=["email"])
+                send_welcome_email(email.strip().lower(), payload["dni"])
+            except Exception as e:
+                st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
+
         upsert(
             alumnoEstadosTabla,
             {"alumno": res_al.data[0]["dni"], "form_completo": datetime.now().isoformat()},

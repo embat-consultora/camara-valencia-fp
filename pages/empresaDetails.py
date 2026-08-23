@@ -50,7 +50,7 @@ def fetch_practicas_tutores():
     practicaTodas = getPracticas(practicaTabla, {"empresa": cif, "anio": anioFiltro})
     practicas = [
         p for p in practicaTodas 
-        if p.get("status") not in [estadosPractica[3], estadosPractica[4]]
+        if p.get("status") not in [ estadosPractica[5]]
     ]
     estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
@@ -208,21 +208,22 @@ with tabTutores:
                             key="editor_tutores",
                             width='stretch'
                         )
-        if st.button("Actualizar Tutores"):
-            cambios = st.session_state["editor_tutores"]
-            if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
-                try:
-                    for row in cambios["added_rows"]:
-                        nombre = row.get("nombre", "Sin Nombre").strip()
-                        email = row.get("email", "").strip()
-                        if not email or "@" not in email:
-                            st.error(f"Email inválido para {nombre}, , corrobore que no tiene filas vacias, si las tiene eliminelas"); st.stop()
-                    
-                    res = updateTutores(cambios, df_tutores, cif=cif)
-                    st.toast("✅ Guardado",duration='short', icon="✅"); 
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+        with st.spinner("⏳ procesando tutores, por favor espera..."):
+            if st.button("Actualizar Tutores"):
+                cambios = st.session_state["editor_tutores"]
+                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+                    try:
+                        for row in cambios["added_rows"]:
+                            nombre = row.get("nombre", "Sin Nombre").strip()
+                            email = row.get("email", "").strip()
+                            if not email or "@" not in email:
+                                st.error(f"Email inválido para {nombre}, , corrobore que no tiene filas vacias, si las tiene eliminelas"); st.stop()
+                        
+                        res = updateTutores(cambios, df_tutores, cif=cif)
+                        st.toast("✅ Guardado",duration='short', icon="✅"); 
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
 def mostrarLista():
     if st.button("🔄 Actualizar", key="btn_refresh"):
@@ -233,7 +234,6 @@ def mostrarLista():
     else:
         data_for_grid = []
         for p in practicas:
-            
             anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
             if st.session_state.get("index_academic", 0)>0 and p.get("anio", []) != anioFiltro:
                 continue
@@ -317,6 +317,11 @@ def mostrar_detalle():
         st.rerun()
 
 def seccion_detalle(alumno, empresa, p, oferta):
+        if p.get("status") == estadosPractica[3]:
+            st.error(f"ℹ️ **Estado:** {p.get('status')} — **Motivo:** {p.get('motivo') or 'No especificado'}", icon="🚀")
+            
+        else:
+            st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**Alumno:** {alumno['nombre']} {alumno['apellido']}")
@@ -329,7 +334,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
             st.write(f"**Proyecto:** {proyecto}")      
             st.write(f"**Curso Académico:** {p.get('anio', '—')}")  
             st.write(f"**Curso:** {p.get('curso', '—')}")  
-            gestor_actual = alumno.get("gestor")
+            gestor_actual = p.get("gestor")
             st.write(f"**Gestor:** {gestor_actual}")
 
         with col2:
@@ -346,26 +351,47 @@ def seccion_detalle(alumno, empresa, p, oferta):
             tutor_actual = p.get("tutor") 
             indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
             clave_tutor = f"tutor_{alumno['id']}"
-            st.selectbox(
-                "**Tutor Empresa**",
-                options=lista_nombres_tutores,
-                index=indice_tutor,
-                key=clave_tutor,
-                on_change=handle_update,
-                args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor")
-            )
+            if p.get("status") == estadosPractica[3]:
+                st.write(f"**Tutor Empresa:** {tutor_actual or 'No asignado'}")
+            elif p.get("status") in [estadosPractica[5]]:
+                st.selectbox(
+                    "**Tutor Empresa**",
+                    options=lista_nombres_tutores,
+                    index=indice_tutor,
+                    key=clave_tutor,
+                    on_change=handle_update,
+                    args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor")
+                )
 
             tutorc_actual = p.get("tutor_centro") 
             st.write(f"**Tutor Centro:** {tutorc_actual}")
         
         pass
 
-def seccion_planificacion(alumno, empresa, practicaId):
+def seccion_planificacion(alumno, empresa, practica):
         st.subheader("📅 Planificación de Formaciones")
+        practicaId = practica.get("id")
+        cancelada = practica.get("status") == estadosPractica[3]
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
-        
+
+        if cancelada:
+            if archivo_calendario and archivo_calendario.get('id'):
+                preview_url = f"https://drive.google.com/file/d/{archivo_calendario.get('id')}/preview"
+                st.markdown(
+                    f"""
+                    <div style="border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+                        <iframe src="{preview_url}" width="100%" height="500px" frameborder="0"></iframe>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                st.link_button("Abrir imagen completa", archivo_calendario.get('webViewLink'), width='stretch')
+            else:
+                st.info("No hay calendario subido para esta formación.")
+            return
+
         with st.expander("Generar Calendario", expanded=False):
             col_cal1, col_cal2 = st.columns([1, 1.5]) # Ajustamos el ancho para la imagen
             with col_cal1:

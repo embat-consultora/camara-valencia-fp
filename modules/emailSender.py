@@ -85,6 +85,18 @@ def send_email(sender: str, password: str, recipients: list, subject: str, body:
         raise e
 
 
+def send_welcome_email(email: str, dni: str) -> bool:
+    """Envía el email de bienvenida al alumno con su usuario/contraseña (el DNI)."""
+    email_sender = st.secrets['email']['gmail']
+    email_password = st.secrets['email']['password']
+    url = st.secrets['urls']['URL']
+
+    subject = "Bienvenido a FP Cámara"
+    body = f"Bienvenido a FP Cámara, tu usuario es '{dni}' y tu contraseña es '{dni}'. Accede en: {url}"
+
+    return send_email(email_sender, email_password, [email], subject, body, [])
+
+
 def enviarRecordatoriosMasivos(listado_morosos):
     try:
         email_sender = st.secrets['email']['gmail']

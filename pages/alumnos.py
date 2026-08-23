@@ -3,12 +3,12 @@ import pandas as pd
 import os
 import uuid
 from pathlib import Path
-from modules.data_base import get, update, upsert,getEqual,logError,getCiclosYAreas
+from modules.data_base import get, update, upsert,getEqual,logError,getCiclosYAreas,upsertCustome
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import alumnosTabla, aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,alumnoEstadosTabla,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla
+from variables import usuariosTabla,alumnosTabla, aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,alumnoEstadosTabla,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla
 from datetime import datetime
-from modules.emailSender import send_email
+from modules.emailSender import send_email, send_welcome_email
 from modules.drive_helper import list_drive_files,upload_to_drive
 from modules.forms_helper import  file_size_bytes
 import re
@@ -190,33 +190,46 @@ with tab1:
                     except ValueError:
                         val_horas_totales = 7
                 horas_totales = st.number_input("Horas Totales", value=val_horas_totales,step=1) 
-                if st.button("💾 Actualizar alumno"):
-                    data_alumnos = {
-                            "nombre": new_nombre,
-                            "apellido": new_apellido,
-                            "direccion": new_direccion,
-                            "localidad": new_localidad,
-                            "codigo_postal": new_codigoPostal,
-                            "dni": new_dni,
-                            "NIA": new_nia,
-                            "telefono": new_telefono,
-                            "email_alumno": new_email,
-                            "tipoPractica": new_tipo_practica,
-                            "anio": ano.strip(),
-                            "curso": curso.strip(),
-                            "ciclo_formativo": selected_ciclo,
-                            "preferencias_fp": selected_pref,
-                            "vehiculo": "Sí" if vehiculo_selected else "No",
-                            "requisitos": requisitos,
-                            "horas_totales": horas_totales
-                        }
-                    update(
-                        alumnosTabla,
-                        data_alumnos,
-                        {"id":alumno_id}
-                    )
-                    st.toast("Alumno actualizado correctamente")
-                    st.rerun()
+                with st.spinner(f"Procesando alumo..por favor espere"):
+                    if st.button("💾 Actualizar alumno"):
+                        data_alumnos = {
+                                "nombre": new_nombre,
+                                "apellido": new_apellido,
+                                "direccion": new_direccion,
+                                "localidad": new_localidad,
+                                "codigo_postal": new_codigoPostal,
+                                "dni": new_dni,
+                                "NIA": new_nia,
+                                "telefono": new_telefono,
+                                "email_alumno": new_email,
+                                "tipoPractica": new_tipo_practica,
+                                "anio": ano.strip(),
+                                "curso": curso.strip(),
+                                "ciclo_formativo": selected_ciclo,
+                                "preferencias_fp": selected_pref,
+                                "vehiculo": "Sí" if vehiculo_selected else "No",
+                                "requisitos": requisitos,
+                                "horas_totales": horas_totales
+                            }
+                        res_al = update(
+                            alumnosTabla,
+                            data_alumnos,
+                            {"id":alumno_id}
+                        )
+                        if res_al and res_al.data:
+                            try:
+                                usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                                            "email": new_dni,
+                                            "password": new_dni,
+                                            "rol": "alumno",
+                                        }, keys=["email"], return_created=True)
+                                if usuario_creado and new_dni:
+                                    send_welcome_email(new_email, new_dni)
+                            except Exception as e:
+                                st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
+
+                        st.toast("Alumno actualizado correctamente")
+                        st.rerun()
 
 
             with subtab3:
@@ -336,7 +349,7 @@ with tab2:
             else:
                 # Si pasa la validación, procedemos al guardado
                 try:
-                    upsert(
+                    res_al = upsert(
                         alumnosTabla,
                         {
                             "nombre": new_nombre,
@@ -358,6 +371,17 @@ with tab2:
                         }, keys=["dni"]
                     )
                     st.success("✅ Nuevo alumno agregado correctamente")
+                    if res_al and res_al.data:
+                        try:
+                            usuario = upsertCustome(usuariosTabla, {
+                                        "email": new_dni,
+                                        "password": new_dni,
+                                        "rol": "alumno",
+                                    }, keys=["email"])
+                            send_welcome_email(new_email, new_dni)
+                        except Exception as e:
+                            st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
+
                     st.session_state.form_registro_key += 1
                     st.rerun()
                 except Exception as e:
@@ -464,7 +488,19 @@ with tab2:
 
                             # 4️⃣ Insert/update
                             try:
-                                upsert(alumnosTabla, data, keys=["dni"])
+                                res_al = upsert(alumnosTabla, data, keys=["dni"])
+                                if res_al and res_al.data:
+                                    try:
+                                        usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                                                    "email": dni,
+                                                    "password": dni,
+                                                    "rol": "alumno",
+                                                }, keys=["email"], return_created=True)
+                                        if usuario_creado and data["email_alumno"]:
+                                            send_welcome_email(data["email_alumno"], dni)
+                                    except Exception as e:
+                                        st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
+            
                                 creados += 1
                                     
                             except Exception as e:
