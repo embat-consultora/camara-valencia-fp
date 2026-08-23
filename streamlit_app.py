@@ -1,9 +1,8 @@
 import streamlit as st
 import extra_streamlit_components as stx
 from modules.data_base import getEqual
-from modules.session_manager import load_user, validate_get_user
+from modules.session_manager import load_user
 from variables import page_icon, usuariosTabla
-import os
 import base64
 
 st.markdown("""
@@ -13,7 +12,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="Cámara FP - Inicio", page_icon=page_icon)
+st.set_page_config(page_title="Cámara FP - Inicio", page_icon=page_icon, layout="centered")
 def get_base64(bin_file):
     with open(bin_file, "rb") as f:
         return base64.b64encode(f.read()).decode()
