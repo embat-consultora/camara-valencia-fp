@@ -7,7 +7,7 @@ from pathlib import Path
 from navigation import make_sidebar
 from variables import empresasTabla, necesidadFP, estados, aniosList, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
-from modules.emailSender import send_email
+from modules.emailSender import send_email,send_welcome_email
 import re
 import tempfile
 
@@ -259,6 +259,8 @@ with tab2:
                             "password": cif.strip(),
                             "rol": "empresa",
                         }, keys=["email"])
+                        send_welcome_email(email_contacto, cif.strip())
+                        st.success("✅ Se ha enviado un correo a la empresa con las credenciales")
                         st.success("✅ Empresa creada correctamente")
                         st.session_state.form_registro_key += 1
                         st.rerun()
@@ -351,71 +353,75 @@ with tab2:
                 if "CIF" not in df_csv.columns:
                     st.error("❌ El archivo debe incluir la columna 'CIF'.")
                     st.stop()
+                with st.spinner(f"Procesando alumos."):
+                    if st.button("🚀 Subir empresas desde CSV"):
+                        creados = 0
+                        errores = []
 
-                if st.button("🚀 Subir empresas desde CSV"):
-                    creados = 0
-                    errores = []
+                        # Iterar filas
+                        for _, row in df_csv.iterrows():
 
-                    # Iterar filas
-                    for _, row in df_csv.iterrows():
+                            # 1️⃣ Saltar fila completamente vacía
+                            if not any(str(v).strip() for v in row.values):
+                                continue
 
-                        # 1️⃣ Saltar fila completamente vacía
-                        if not any(str(v).strip() for v in row.values):
-                            continue
+                            # 2️⃣ Normalizar DNI
+                            cif_raw = row.get("CIF", "").strip()
+                            cif = re.sub(r"\.0+$", "", cif_raw)  # eliminar .0 si CSV viene de Excel
+                            cif = cif.strip()
 
-                        # 2️⃣ Normalizar DNI
-                        cif_raw = row.get("CIF", "").strip()
-                        cif = re.sub(r"\.0+$", "", cif_raw)  # eliminar .0 si CSV viene de Excel
-                        cif = cif.strip()
+                            if not cif:
+                                errores.append("Fila sin CIF — omitida.")
+                                continue
 
-                        if not cif:
-                            errores.append("Fila sin CIF — omitida.")
-                            continue
+                            # 3️⃣ Construir payload limpio
+                            data = {
+                                "CIF": cif,
+                                "nombre": row.get("nombre", "").strip(),
+                                "direccion": row.get("direccion", "").strip(),
+                                "codigo_postal": row.get("codigo_postal", "").strip(),
+                                "email_empresa": row.get("email_empresa", "").strip(),
+                                "localidad": row.get("localidad", "").strip(),
+                                "telefono": row.get("telefono", "").strip(),
+                            }
 
-                        # 3️⃣ Construir payload limpio
-                        data = {
-                            "CIF": cif,
-                            "nombre": row.get("nombre", "").strip(),
-                            "direccion": row.get("direccion", "").strip(),
-                            "codigo_postal": row.get("codigo_postal", "").strip(),
-                            "email_empresa": row.get("email_empresa", "").strip(),
-                            "localidad": row.get("localidad", "").strip(),
-                            "telefono": row.get("telefono", "").strip(),
-                        }
+                            data_tutor = {
+                                "nombre": row.get("tutor", "").strip(),
+                                "email": row.get("tutor_email", "").strip(),
+                                "nif":row.get("nif_tutor", "").strip(),
+                                "cif_empresa": cif,
+                            }
+                            # 4️⃣ Insert/update
+                            try:
+                                upsert(empresasTabla, data, keys=["CIF"])
+                                usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                                            "email": data.get("CIF"),
+                                            "password": data.get("CIF"),
+                                            "rol": "empresa",
+                                        }, keys=["email"], return_created=True)
+                                if usuario_creado and data.get("CIF"):
+                                    send_welcome_email(data.get("email_empresa"), data.get("CIF"))
+                                if data_tutor.get("nombre") and data_tutor.get("email"):
+                                    upsertCustome(tutoresTabla, data_tutor, keys=["email"])
+                                    usuarioT, usuario_creadoT =  upsertCustome(usuariosTabla, {
+                                    "email": data_tutor.get("email"),
+                                    "password": data_tutor.get("nif") if data_tutor.get("nif") else "123456",
+                                    "rol": "tutor",}, keys=["email"], return_created=True)
+                                    if usuario_creadoT and data_tutor.get("nif"):
+                                        send_welcome_email(data_tutor.get("email"), data_tutor.get("nif"))
+                                creados += 1
+                            except Exception as e:
+                                errores.append(f"CIF {cif}: {e}")
 
-                        data_tutor = {
-                            "nombre": row.get("tutor", "").strip(),
-                            "email": row.get("tutor_email", "").strip(),
-                            "nif":row.get("nif_tutor", "").strip(),
-                            "cif_empresa": cif,
-                        }
-                        # 4️⃣ Insert/update
-                        try:
-                            upsert(empresasTabla, data, keys=["CIF"])
-                            usuario = upsertCustome(usuariosTabla, {
-                            "email": data.get("CIF"),
-                            "password": data.get("CIF"),
-                            "rol": "empresa",
-                        }, keys=["email"])
-                            if data_tutor.get("nombre") and data_tutor.get("email"):
-                                upsertCustome(tutoresTabla, data_tutor, keys=["email"])
-                                upsertCustome(usuariosTabla, {
-                                "email": data_tutor.get("email"),
-                                "password": data_tutor.get("nif") if data_tutor.get("nif") else "123456",
-                                "rol": "tutor",}, keys=["email"])
-                            creados += 1
-                        except Exception as e:
-                            errores.append(f"CIF {cif}: {e}")
+                        # Resultado del proceso
+                        st.success(f"🎉 {creados} empresas creadas o actualizadas correctamente.")
 
-                    # Resultado del proceso
-                    st.success(f"🎉 {creados} empresas creadas o actualizadas correctamente.")
+                        if errores:
+                            st.warning("⚠️ Errores encontrados:")
+                            for err in errores:
+                                st.write("- " + err)
 
-                    if errores:
-                        st.warning("⚠️ Errores encontrados:")
-                        for err in errores:
-                            st.write("- " + err)
-
-                    #st.rerun()
+                        #st.rerun()
 
             except Exception as e:
                 st.error(f"❌ Error leyendo el CSV: {e}")
