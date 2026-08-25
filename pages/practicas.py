@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import os
-import time
 from modules.data_base import (
-    getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
+    finalizarPractica,getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -12,6 +10,7 @@ from modules.drive_helper import list_drive_files, upload_to_drive
 from modules.forms_helper import file_size_bytes
 from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email
 from pathlib import Path
+import json
 from modules.feedback_helper import render_feedback_card
 import uuid
 from variables import (
@@ -26,8 +25,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 apply_page_config()
 
 make_sidebar()
-st.set_page_config(page_title="Formaciones en Empresas", page_icon="🚀")
-
 now = datetime.now().isoformat()
 
 # ----------------------------------------------
@@ -60,11 +57,16 @@ if "fecha_fin_widget" not in st.session_state:
     st.session_state["fecha_fin_widget"] = None
 if "email_alumno" not in st.session_state:
     st.session_state["email_alumno"] = None
+if "edit_disabled" not in st.session_state:
+    st.session_state["edit_disabled"] = None
 rol_usuario = st.session_state.get("rol")
 
 col_refresh, col_volver = st.columns([1, 0.15])
 with col_refresh:
-    st.title("🧠 Formaciones en Empresa")
+    if st.session_state.page == "lista":
+        st.title("Formaciones en Empresa", text_alignment="center")
+    else:
+        st.title("Datos formación en Empresa", text_alignment="center")
 with col_volver:
     if st.button("🔄 Actualizar", key="btn_refresh"):
         st.session_state["force_reload"] = True
@@ -92,7 +94,6 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
             st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
-
 
 
 # ----------------------------------------------
@@ -190,6 +191,7 @@ def contarAnexos(practicas: list) -> int:
 # PAGINA: LISTA
 # ----------------------------------------------
 def mostrar_lista():
+    st.set_page_config(page_title="Formaciones en Empresas", page_icon="🚀")
     tabs_visibles = ["📋 Listado de FE"]
     label_anexos = "📃 Anexos"
     if rol_usuario == 'admin':
@@ -304,6 +306,17 @@ def dialog_cancelacion(practica):
     if st.button("Confirmar", type="primary"):
         cancelarPractica(practica, motivo)
         st.toast("✅  La Formación ha pasado a estado CANCELADA")
+        st.session_state.page = "lista"
+        st.rerun()
+
+@st.dialog("Finalizar de Formación")
+def dialog_finalizar(practica):
+    st.write(f"Vas a finalizar la formación. Escribe alguna observación si lo deseas (opcional)")
+    comentario = st.text_input("", placeholder="Ej: El alumno has finalizado la formación con éxito, la empresa ha decidido no continuar, etc.")
+    
+    if st.button("Confirmar", type="primary"):
+        finalizarPractica(practica, comentario)
+        st.toast("✅  La Formación ha pasado a estado FINALIZADA")
         st.session_state.page = "lista"
         st.rerun()
 def mostrar_carga_rapida():
@@ -456,7 +469,8 @@ def mostrar_anexos_practica(practica):
                 value=bool(practica.get('anexos_creados')),
                 key=f"chk_creado_{practica_id}",
                 on_change=guardar_anexo_automatico,
-                args=(practica_id, 'anexos_creados', f"chk_creado_{practica_id}")
+                args=(practica_id, 'anexos_creados', f"chk_creado_{practica_id}"),
+                disabled=st.session_state["edit_disabled"]
             )
         
         with col2:
@@ -465,7 +479,8 @@ def mostrar_anexos_practica(practica):
                 value=bool(practica.get('anexos_enviados')),
                 key=f"chk_enviados_{practica_id}",
                 on_change=guardar_anexo_automatico,
-                args=(practica_id, 'anexos_enviados', f"chk_enviados_{practica_id}")
+                args=(practica_id, 'anexos_enviados', f"chk_enviados_{practica_id}"),
+                disabled=st.session_state["edit_disabled"]
             )
             
         with col3:
@@ -474,7 +489,8 @@ def mostrar_anexos_practica(practica):
                 value=bool(practica.get('anexos_firmados')),
                 key=f"chk_firmados_{practica_id}",
                 on_change=guardar_anexo_automatico,
-                args=(practica_id, 'anexos_firmados', f"chk_firmados_{practica_id}")
+                args=(practica_id, 'anexos_firmados', f"chk_firmados_{practica_id}"),
+                disabled=st.session_state["edit_disabled"]
             )
             
         with col4:
@@ -483,7 +499,8 @@ def mostrar_anexos_practica(practica):
                 value=bool(practica.get('doc_sao_entregada')),
                 key=f"chk_sao_{practica_id}",
                 on_change=guardar_anexo_automatico,
-                args=(practica_id, 'doc_sao_entregada', f"chk_sao_{practica_id}")
+                args=(practica_id, 'doc_sao_entregada', f"chk_sao_{practica_id}"),
+                disabled=st.session_state["edit_disabled"]
             )
 def mostrar_anexos():
     if not practicas:
@@ -783,7 +800,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     key=clave_gestor,
                     on_change=handle_update,
                     # Pasamos la KEY en lugar del valor
-                    args=(practicaTabla, p['id'], "gestor", "id", clave_gestor, "Gestor")
+                    args=(practicaTabla, p['id'], "gestor", "id", clave_gestor, "Gestor"),
+                    disabled=st.session_state["edit_disabled"]
                 )
         tutores_filtrados = [g for g in tutores if g["cif_empresa"] == empresa['CIF']]
         lista_nombres_tutores = [g["nombre"] for g in tutores_filtrados]
@@ -802,7 +820,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     index=indice_tutor,
                     key=clave_tutor,
                     on_change=handle_update,
-                    args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor")
+                    args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor"),
+                    disabled=st.session_state["edit_disabled"]
                 )
         lista_nombres_tutoresCentro = [g["nombre"] for g in tutoresCentro]
         if "No asignado" not in lista_nombres_tutoresCentro:
@@ -820,14 +839,14 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     index=indice_tutorc,
                     key=clave_tutorc,
                     on_change=handle_update,
-                    args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutorc, "TutorCentro")
+                    args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutorc, "TutorCentro"),
+                    disabled=st.session_state["edit_disabled"]
                 )
 
         pass
 
 def seccion_programar(p):
-    with st.expander("📅 Fechas de la Formación", expanded=True):
-
+    with st.expander("📅 Programación de la Formación", expanded=True):
         f_inicio_db = p.get('fecha_inicio')
         f_fin_db = p.get('fecha_fin')
         if f_inicio_db and f_fin_db:
@@ -846,17 +865,19 @@ def seccion_programar(p):
                 with col_ini:
                     nueva_f_ini = st.date_input(
                         "Fecha Inicio", 
-                        value=fecha_inicio_val
+                        value=fecha_inicio_val,
+                        disabled=st.session_state["edit_disabled"]
                     )
 
                 with col_fin:
                     nueva_f_fin = st.date_input(
                         "Fecha Fin (Prevista)", 
-                        value=fecha_fin_val
+                        value=fecha_fin_val,
+                        disabled=st.session_state["edit_disabled"]
                     )
                 
                 # Botón de guardado dentro del formulario
-                submit_save = st.form_submit_button("💾 Guardar")
+                submit_save = st.form_submit_button("💾 Guardar",  disabled=st.session_state["edit_disabled"])
 
             if submit_save:
                 payload_practica = {
@@ -868,28 +889,27 @@ def seccion_programar(p):
                 st.success("Fechas actualizadas")
                 st.rerun()
 
+def seccion_gestion(p):
+    with st.expander("Gestión de la Formación", expanded=True):
+        f_inicio_db = p.get('fecha_inicio')
+        f_fin_db = p.get('fecha_fin_real')
+
+        fecha_inicio_texto = f_inicio_db or "Sin asignar aún"
+        fecha_fin_texto = f_fin_db or "Sin asignar aún"
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Fecha de inicio:** {fecha_inicio_texto}")
+        with col2:
+            st.write(f"**Fecha de fin Real:** {fecha_fin_texto}")
+        colForm , col, colCancel = st.columns([3,0.5, 1])
+        with colForm:
+            if st.button("Finalizar Formación", key=f"finalizar_{p['id']}", type="primary", disabled=st.session_state["edit_disabled"]):
+                dialog_finalizar(p)       
+
         with colCancel:
-            st.write("")  # Espaciado
-            st.write("")  # Espaciado
-            st.markdown(
-                f"""
-                <style>
-                div[class*="st-key-cancelar_{p['id']}"] button {{
-                    background-color: #e53935 !important;
-                    border-color: #e53935 !important;
-                    color: #fff !important;
-                }}
-                div[class*="st-key-cancelar_{p['id']}"] button:hover {{
-                    background-color: #c62828 !important;
-                    border-color: #c62828 !important;
-                }}
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
-            if st.button("Cancelar Formación", key=f"cancelar_{p['id']}", type="primary"):
-                dialog_cancelacion(p)
-        
+            if st.button("Cancelar Formación", key=f"cancelar_{p['id']}", type="secondary", disabled= st.session_state["edit_disabled"]):
+                dialog_cancelacion(p)       
+                
 def feedback_formaciones(practica):
     practicaId=practica.get('id')
     alumno = practica.get('alumnos', {})
@@ -897,9 +917,9 @@ def feedback_formaciones(practica):
     fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
 
     if(practica.get('status') is not None and practica.get('status') != estados[1]):
-        st.info(f"ℹ️ **Estado:** Formación {practica.get('status')}", icon="🚀")
+        st.info(f"ℹ️ **Estado:** {practica.get('status')}", icon="🚀")
     else:
-        st.info(f"ℹ️ **Estado:** Formación {practica.get('status')}", icon="🚀")
+        st.info(f"ℹ️ **Estado:** {practica.get('status')}", icon="🚀")
         if len(feedbacks_forms) <= 0:
             fecha_inicio_dt = datetime.fromisoformat(practica.get('fecha_inicio'))
             fecha_fin_dt = datetime.fromisoformat(practica.get('fecha_fin'))
@@ -1100,13 +1120,13 @@ def actualizar_fecha(key_nombre, id_registro, tipo):
         st.toast("✅ Fecha actualizada")
 
 def seccion_planificacion(alumno, empresa, practica):
-    with st.expander("🗓️ Planificación de Formación"):
+    with st.expander("🗓️ Calendario de Formación"):
         practicaId = practica.get("id")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
 
-        if rol_usuario == 'admin':
+        if rol_usuario == 'admin'and st.session_state["edit_disabled"]==False:   
             col_cal1, col_cal2 = st.columns([1, 2]) # Ajustamos el ancho para la imagen
             with col_cal1:
                 url_generador = linkCalendar
@@ -1198,7 +1218,7 @@ def seccion_planificacion(alumno, empresa, practica):
                         """,
                         unsafe_allow_html=True
                     )
-        if rol_usuario != 'admin':   
+        elif rol_usuario != 'admin' or st.session_state["edit_disabled"]==True:   
             if archivo_calendario:
                     file_id = archivo_calendario.get('id')
                     
@@ -1301,6 +1321,7 @@ def seccion_documentos(alumno, empresa, practicaId):
         pass
 
 def mostrar_detalle_cancelada(p):
+    st.set_page_config(page_title="Datos formación en Empresas", page_icon="🚀")
     if not p:
         st.error("Formación no encontrada.")
         return
@@ -1382,13 +1403,14 @@ def seccion_documentacion_cancelado(alumno,empresa):
         st.warning("No hay archivos.")
 
 def mostrar_detalle():
+    st.set_page_config(page_title="Datos formación en Empresas", page_icon="🚀")
     practicaId = st.session_state.practica_seleccionada
     p = next((x for x in practicas if x["id"] == practicaId), None)
     if not p:
         st.error("Formación no encontrada, intente cambiando el curso académico.")
         st.session_state.page = "lista"
         return
-    if p.get("status") == estados[2] or p.get("status") == estados[3]:
+    if p.get("status") == estados[3]:
         mostrar_detalle_cancelada(p)
     else:
         p["oferta_fp"] = p.get("oferta_fp") or {}
@@ -1400,12 +1422,32 @@ def mostrar_detalle():
         tutor_actual = p.get("tutor") 
         tutorCentro_actual = p.get("tutor_centro") 
         st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
-        st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
+        st.session_state["edit_disabled"] = p.get("status") == estados[2]
+
+        comentario = None
+        if p.get("status") == estados[2]:
+            comentarios_raw = p.get("datos_cierre")
+            if isinstance(comentarios_raw, dict):
+                comentarios = comentarios_raw
+            elif isinstance(comentarios_raw, str) and comentarios_raw:
+                try:
+                    comentarios = json.loads(comentarios_raw)
+                except json.JSONDecodeError:
+                    comentarios = {}
+            else:
+                comentarios = {}
+            comentario = comentarios.get("comentario")
+
+        if comentario:
+            st.info(f"✅ **Estado:** {p.get('status')} — **Comentarios:** {comentario}", icon="🚀")
+        else:
+            st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
         planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento y Feedback", "Documentación"])
         if rol_usuario == 'tutor':
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
                 seccion_planificacion(alumno,empresa, p)
+                seccion_gestion(p)
             with seguimientoTab:
                 seccion_feedback_tutor(practicaId, p, tutor_actual, True)
             with documentacionTab:
@@ -1416,6 +1458,7 @@ def mostrar_detalle():
                 mostrar_anexos_practica(p)
                 seccion_programar(p)
                 seccion_planificacion(alumno,empresa, p)
+                seccion_gestion(p)
             with seguimientoTab:
                 seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
                 st.divider()

@@ -971,6 +971,16 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
         
         #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
+def finalizarPractica(practica, comentario):
+    practicaId = practica.get("id")
+    datos_cierre = {
+                "comentario": comentario
+            }
+    payload_practica = {"id": int(practicaId),"status":estados[2],
+                        "datos_cierre": datos_cierre,
+                         "fecha_fin_real": datetime.now().isoformat()
+                        }
+    upsert(practicaTabla, payload_practica, keys=["id"])
 def cancelarPractica(practica, motivo):
     practicaId = practica.get("id")
     alumnoDni = practica.get("alumno")
