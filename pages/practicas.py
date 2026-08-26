@@ -1,19 +1,18 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    finalizarPractica,getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
+    generarFormularioCierre,finalizarPractica,getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from datetime import datetime, timedelta
 from modules.drive_helper import list_drive_files, upload_to_drive
 from modules.forms_helper import file_size_bytes
-from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email
+from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email,send_feedback_tutor_email
 from pathlib import Path
-import json
 from modules.feedback_helper import render_feedback_card
 import uuid
-from variables import (
+from variables import (forms as formsFeedback, 
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
     empresasTabla,tipoPracticas,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList,locale_tabla_principal
@@ -59,8 +58,13 @@ if "email_alumno" not in st.session_state:
     st.session_state["email_alumno"] = None
 if "edit_disabled" not in st.session_state:
     st.session_state["edit_disabled"] = None
+if "feedback_response" not in st.session_state:
+    st.session_state["feedback_response"] = None
+if "data_loaded" not in st.session_state:
+    st.session_state["data_loaded"] = False
+if "force_reload" not in st.session_state:
+    st.session_state["force_reload"] = True
 rol_usuario = st.session_state.get("rol")
-
 col_refresh, col_volver = st.columns([1, 0.15])
 with col_refresh:
     if st.session_state.page == "lista":
@@ -70,10 +74,66 @@ with col_refresh:
 with col_volver:
     if st.button("🔄 Actualizar", key="btn_refresh"):
         st.session_state["force_reload"] = True
+        st.session_state["data_loaded"] = False
         st.rerun()
 # ----------------------------------------------
 # FETCH FUNCTIONS
 # ----------------------------------------------
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_ciclos_areas_cached():
+    return getCiclosYAreas()
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def fetch_base_data_cached(statuses_key):
+    practicas = getPracticas(
+        practicaTabla,
+        conditions=None,
+        in_filters={"status": list(statuses_key)},
+    )
+    tutores = getEquals(tutoresTabla, {})
+    tutoresCentro = getEquals(tutoresCentroTabla, {})
+    feedback = get(feedbackResponseTabla)
+    estados_db = getEquals(practicaEstadosTabla, {})
+    gestores = get(gestoresTabla)
+    return practicas, tutores, tutoresCentro, feedback, estados_db, gestores
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_feedback_forms_cached(practica_id):
+    return getEquals(feedbackFormsTabla, {"practica_id": practica_id})
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_feedback_forms_sent_cached(practica_id):
+    return getEquals(feedbackFormsTabla, {"practica_id": practica_id}, not_equals={"estado": "pendiente", "tipo_form": forms[3]})
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_feedback_responses_cached(practica_id):
+    return getEquals(feedbackResponseTabla, {"practica_id": practica_id})
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_all_feedback_forms_cached():
+    return get(feedbackFormsTabla)
+
+
+@st.cache_data(ttl=180, show_spinner=False)
+def list_drive_files_cached(folder_name):
+    return list_drive_files(folder_name)
+
+
+def invalidate_runtime_caches():
+    fetch_base_data_cached.clear()
+    get_feedback_forms_cached.clear()
+    get_feedback_forms_sent_cached.clear()
+    get_feedback_responses_cached.clear()
+    get_all_feedback_forms_cached.clear()
+    list_drive_files_cached.clear()
+    st.session_state["force_reload"] = True
+    st.session_state["data_loaded"] = False
+
+
 def fetch_practicas_tutores():
     practicas = getPracticas(practicaTabla,  conditions=None,
     in_filters={"status": [estados[0], estados[1], estados[2], estados[3],estados[4]]})    
@@ -81,7 +141,7 @@ def fetch_practicas_tutores():
     tutoresCentro = getEquals(tutoresCentroTabla, {})
     return practicas, tutores,tutoresCentro
 
-ciclos_opts,prefs_opts_dict = getCiclosYAreas()
+ciclos_opts,prefs_opts_dict = fetch_ciclos_areas_cached()
 def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, label):
     nuevo_valor = st.session_state.get(key_widget)
     if nuevo_valor:
@@ -91,6 +151,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
                 campo_a_actualizar: nuevo_valor
             }
             upsert(tabla, payload, keys=[columna_id])
+            invalidate_runtime_caches()
             st.toast(f"✅ {label} actualizado a: {nuevo_valor}")
         except Exception as e:
             st.error(f"Error al actualizar {label}: {e}")
@@ -100,16 +161,13 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
 # CARGA DE DATOS
 # ----------------------------------------------
 def load_data():
-    practicas, tutores, tutoresCentro = fetch_practicas_tutores()
-    feedback =get(feedbackResponseTabla)
-    estados = getEquals(practicaEstadosTabla, {})
-    estados_map = {e["practicaId"]: e for e in estados}
+    practicas, tutores, tutoresCentro, feedback, estados_db, gestores = fetch_base_data_cached(tuple(estados[:5]))
+    estados_map = {e["practicaId"]: e for e in estados_db}
     user_email = st.session_state.get("username")
-    gestores = get(gestoresTabla)
     if rol_usuario == "gestor":
         gestorDatos = [g for g in gestores if g.get("email") == user_email]
-        gestorNombre = gestorDatos[0].get("nombre")
         if gestorDatos:
+            gestorNombre = gestorDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
             if p.get("gestor") is not None and p.get("gestor") == gestorNombre
@@ -130,8 +188,8 @@ def load_data():
             practicas = []
     if rol_usuario == "tutorCentro":
         tutorCentroDatos = [t for t in tutoresCentro if t.get("email") == user_email]
-        tutorCentroNombre = tutorCentroDatos[0].get("nombre")
         if tutorCentroDatos:
+            tutorCentroNombre = tutorCentroDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
             if p.get("tutor_centro") is not None and p.get("tutor_centro") == tutorCentroNombre
@@ -146,8 +204,9 @@ def load_data():
     st.session_state["feedbacks"] = feedback
     st.session_state["data_loaded"] = True
     st.session_state["force_reload"] = False
-with st.spinner("Cargando datos de formaciones..."):
-    load_data()
+if st.session_state.get("force_reload") or not st.session_state.get("data_loaded") or not st.session_state.get("practicas"):
+    with st.spinner("Cargando datos de formaciones..."):
+        load_data()
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 practicas = st.session_state.practicas
@@ -305,20 +364,51 @@ def dialog_cancelacion(practica):
     
     if st.button("Confirmar", type="primary"):
         cancelarPractica(practica, motivo)
+        invalidate_runtime_caches()
         st.toast("✅  La Formación ha pasado a estado CANCELADA")
         st.session_state.page = "lista"
         st.rerun()
 
 @st.dialog("Finalizar de Formación")
 def dialog_finalizar(practica):
-    st.write(f"Vas a finalizar la formación. Escribe alguna observación si lo deseas (opcional)")
-    comentario = st.text_input("", placeholder="Ej: El alumno has finalizado la formación con éxito, la empresa ha decidido no continuar, etc.")
-    
+    st.write(f"Vas a finalizar la formación. Al confirmar se enviará el formulario de cierre al tutor de empresa")
+
+    tutor_empresa = st.session_state.get(
+        f"tutor_empresa_{practica.get('id')}"
+    ) or {}
+
+    tutor_email = tutor_empresa.get("email")
+
+    if not tutor_email:
+        tutor_email = (
+            practica.get("empresas") or {}
+        ).get("email_empresa")
+
+        st.warning(
+            "El tutor de empresa no fue asignado. "
+            "Se enviará el correo a la empresa."
+        )
     if st.button("Confirmar", type="primary"):
-        finalizarPractica(practica, comentario)
-        st.toast("✅  La Formación ha pasado a estado FINALIZADA")
+        finalizarPractica(practica)
+        link_cierre = generarFormularioCierre(practica.get("id"), tutor_email)
+        alumno = practica.get("alumnos") or {}
+        nombre_alumno = f"{alumno.get('nombre', '')} {alumno.get('apellido', '')}".strip()
+        sent = send_feedback_tutor_email(
+            tutor_email,
+            nombre_alumno,
+            datetime.now().strftime("%d/%m/%Y"),
+            link_cierre,
+        )
+        if not sent:
+            st.error("❌ Error enviando email al tutor de empresa. Por favor, revisa la configuración de correo.")
+            return
+        else:
+            st.toast("✅ Se ha enviado email a tutor de empresa con el formulario de cierre")
+        invalidate_runtime_caches()
+        st.toast("✅ La Formación ha pasado a estado FINALIZADA")
         st.session_state.page = "lista"
         st.rerun()
+
 def mostrar_carga_rapida():
      with st.form("carga_rapida"):
         st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
@@ -438,6 +528,7 @@ def mostrar_carga_rapida():
                         st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
                         st.success(f"✅ Se ha creado y enviado un usuario y contraseña para la empresa")
                         st.success(f"✅ Se ha creado y enviado un usuario y contraseña para el alumno")
+                        invalidate_runtime_caches()
                     except Exception as e:
                         st.error(f"❌ Error en el proceso: {str(e)}")
 def guardar_anexo_automatico(practica_id, campo_bd, key_widget):
@@ -452,6 +543,7 @@ def guardar_anexo_automatico(practica_id, campo_bd, key_widget):
     try:
         res = upsert(practicaTabla, payload_practica, keys=["id"])
         if res and getattr(res, 'data', None):
+            invalidate_runtime_caches()
             st.toast(f"✅ Estado actualizado")
     except Exception as e:
         st.error(f"Error al actualizar la base de datos: {e}")
@@ -581,6 +673,7 @@ def mostrar_anexos():
                 
                 st.toast("✅ Anexos actualizados correctamente.")
                 st.session_state.df_key += 1
+                invalidate_runtime_caches()
                 st.session_state["force_reload"] = True 
                 st.rerun()
 
@@ -593,7 +686,7 @@ def mostrar_dashboard():
     with col_f2:
         fecha_fin_filtro = st.date_input("Hasta", value=datetime.now())
 
-    all_feedback_forms = get(feedbackFormsTabla) 
+    all_feedback_forms = get_all_feedback_forms_cached()
     ids_permitidos = [p["id"] for p in practicas]
     all_feedback_forms = [f for f in all_feedback_forms if f.get("practica_id") in ids_permitidos
 ]
@@ -710,10 +803,11 @@ def mostrar_dashboard():
             # Filtramos los que se enviaron pero no tienen fecha_respuesta
             df_pendientes = df_filtrado[(df_filtrado['estado'] == 'enviado') & (df_filtrado['fecha_respuesta'].isna())]
             base_url = st.secrets["urls"]["URL"] 
+            practicas_by_id = {item["id"]: item for item in practicas}
         
             listado_morosos = []
             for _, row in df_pendientes.iterrows():
-                practica = next((x for x in practicas if x["id"] == row['practica_id']), None)
+                practica = practicas_by_id.get(row['practica_id'])
                 if practica:
                     alumno_nom = f"{practica['alumnos']['nombre']} {practica['alumnos']['apellido']}"
                     tipo = row['tipo_form']
@@ -811,6 +905,20 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
         with colTutor:
             clave_tutor = f"tutor_{alumno['id']}"
+            tutor_seleccionado = st.session_state.get(
+                clave_tutor,
+                tutor_actual,
+            )
+
+            tutor_empresa = next(
+                (
+                    tutor for tutor in tutores_filtrados
+                    if tutor.get("nombre") == tutor_seleccionado
+                ),
+                {},
+            )
+
+            st.session_state[f"tutor_empresa_{p['id']}"] = tutor_empresa
             if rol_usuario != 'admin':
                 st.write(f"**Tutor Empresa:** {tutor_actual}")
             else:
@@ -822,7 +930,9 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     on_change=handle_update,
                     args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor"),
                     disabled=st.session_state["edit_disabled"]
-                )
+                    )
+                
+
         lista_nombres_tutoresCentro = [g["nombre"] for g in tutoresCentro]
         if "No asignado" not in lista_nombres_tutoresCentro:
             lista_nombres_tutoresCentro.insert(0, "No asignado")
@@ -885,7 +995,9 @@ def seccion_programar(p):
                                 "fecha_inicio": nueva_f_ini.isoformat(),
                                 "fecha_fin": nueva_f_fin.isoformat()
                             }
-                upsert(practicaTabla, payload_practica, keys=["id"])
+                res = upsert(practicaTabla, payload_practica, keys=["id"])
+                if res and getattr(res, 'data', None):
+                    invalidate_runtime_caches()
                 st.success("Fechas actualizadas")
                 st.rerun()
 
@@ -913,7 +1025,7 @@ def seccion_gestion(p):
 def feedback_formaciones(practica):
     practicaId=practica.get('id')
     alumno = practica.get('alumnos', {})
-    feedbacks_forms = getEquals(feedbackFormsTabla, {"practica_id": practicaId})
+    feedbacks_forms = get_feedback_forms_cached(practicaId)
     fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
 
     if(practica.get('status') is not None and practica.get('status') != estados[1]):
@@ -924,6 +1036,7 @@ def feedback_formaciones(practica):
             fecha_inicio_dt = datetime.fromisoformat(practica.get('fecha_inicio'))
             fecha_fin_dt = datetime.fromisoformat(practica.get('fecha_fin'))
             asignarFechasFormsFeedback(int(practica.get('id')), fecha_inicio_dt, alumno.get('email_alumno'), fecha_fin_dt)
+            invalidate_runtime_caches()
             st.toast("Generando formularios de feedback.")
             st.caption("Actualice la formación para ver los hitos")
         else:
@@ -944,8 +1057,8 @@ def feedback_formaciones(practica):
 def seccion_feedback_candidato(p, practicaId, forms):
     feedback_formaciones(p)
     st.subheader("¿Cómo se siente el candidato?")
-    feedbacks_db = getEquals(feedbackResponseTabla, {"practica_id": practicaId})
-    feedbacksEnviados_db = getEquals(feedbackFormsTabla, {"practica_id": practicaId}, not_equals={"estado": "pendiente"})
+    st.session_state.feedback_response = feedbacks_db = get_feedback_responses_cached(practicaId)
+    feedbacksEnviados_db = get_feedback_forms_sent_cached(practicaId)
     st.write(f"**Número de feedbacks enviados:** {len(feedbacksEnviados_db)}")
     progreso_feedback = {
         forms[0]: None,
@@ -971,41 +1084,70 @@ def seccion_feedback_candidato(p, practicaId, forms):
     with col_cie:
         render_feedback_card(respuestasCierre, "Cierre")
     pass
-    st.subheader(f"Resultado de la formación en empresa")
-    respuestasCierreFormacion = p.get("datos_cierre") or {}
+    st.subheader(f"Resultado de la formación en Empresa")
+    tabResultado, tabFeedback = st.tabs(["Resultado Formación", "Formulario Cierre Tutor Empresa"])
+    with tabResultado:
+        respuestasCierreFormacion = p.get("datos_cierre") or {}
+        if respuestasCierre:
+            # ¿Te contrata la empresa?
+            contratado = respuestasCierreFormacion.get("contratado", False)
+            st.markdown(f"{'✅' if contratado else '❌'} **¿Lo contrata la empresa?**")
 
-    if respuestasCierre:
-        # ¿Te contrata la empresa?
-        contratado = respuestasCierreFormacion.get("contratado", False)
-        st.markdown(f"{'✅' if contratado else '❌'} **¿Lo contrata la empresa?**")
+            # ¿Sigue estudiando?
+            sigue = respuestasCierreFormacion.get("sigueEstudiando", False)
+            st.markdown(f"{'✅' if sigue else '❌'} **¿Sigue estudiando?**")
+            if sigue:
+                estudios = respuestasCierreFormacion.get("estudios") or "—"
+                lugar = respuestasCierreFormacion.get("lugarEstudios") or "—"
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📚 **Qué:** {estudios}")
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📍 **Dónde:** {lugar}")
 
-        # ¿Sigue estudiando?
-        sigue = respuestasCierreFormacion.get("sigueEstudiando", False)
-        st.markdown(f"{'✅' if sigue else '❌'} **¿Sigue estudiando?**")
-        if sigue:
-            estudios = respuestasCierreFormacion.get("estudios") or "—"
-            lugar = respuestasCierreFormacion.get("lugarEstudios") or "—"
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📚 **Qué:** {estudios}")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;📍 **Dónde:** {lugar}")
+            # ¿Contratado por otra empresa?
+            otra = respuestasCierreFormacion.get("contratadoOtraEmpresa", False)
+            st.markdown(f"{'✅' if otra else '❌'} **¿Contratado por otra empresa?**")
+            if otra:
+                empresa = respuestasCierreFormacion.get("nombreEmpresa") or "—"
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;🏢 **Empresa:** {empresa}")
+        else:
+            st.info("Aún no se ha completado el formulario de cierre.") 
+    with tabFeedback:
+            feedback_responses = st.session_state.get("feedback_response") or []
+            feedback_tutor_empresa = [
+                response
+                for response in feedback_responses
+                if (response.get("respuestas_json") or {}).get("tipo")
+                == formsFeedback[3]
+            ]
 
-        # ¿Contratado por otra empresa?
-        otra = respuestasCierreFormacion.get("contratadoOtraEmpresa", False)
-        st.markdown(f"{'✅' if otra else '❌'} **¿Contratado por otra empresa?**")
-        if otra:
-            empresa = respuestasCierreFormacion.get("nombreEmpresa") or "—"
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;🏢 **Empresa:** {empresa}")
-    else:
-        st.info("Aún no se ha completado el formulario de cierre.") 
+            if feedback_tutor_empresa:
+                for feedback in feedback_tutor_empresa:
+                    respuestas = feedback.get("respuestas_json") or {}
 
+                    st.subheader("Formulario de cierre del tutor de empresa")
+
+                    for seccion, respuestas_seccion in respuestas.items():
+                        if seccion == "tipo":
+                            continue
+
+                        titulo = seccion.replace("_", " ").capitalize()
+                        st.markdown(f"### {titulo}")
+
+                        if isinstance(respuestas_seccion, dict):
+                            for pregunta, respuesta in respuestas_seccion.items():
+                                pregunta_titulo = pregunta.replace("_", " ").capitalize()
+                                st.write(f"**{pregunta_titulo}:** {respuesta}")
+                        else:
+                            st.write(respuestas_seccion)
+            else:
+                st.info("Aún no se ha completado el formulario de cierre del tutor de empresa.")
 def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
     st.subheader("Seguimiento del Tutor Empresa")
     nombre_tutor = tutor_actual or "Sin Asignar"
+
     with st.expander(f"Tutor en Empresa: {nombre_tutor}", expanded=True):
         historial_feedback = p.get("feedback_tutor")
         if not isinstance(historial_feedback, list):
             historial_feedback = []
-
-        # 2. ESPACIO PARA NUEVO FEEDBACK (Solo para Tutores)
         if rol_usuario == 'tutor':
             with st.container(border=True):
                 st.markdown("##### Añadir nueva observación")
@@ -1032,6 +1174,7 @@ def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
                                 "id": int(practicaId),
                                 "feedback_tutor": historial_feedback
                             }, keys=["id"])
+                            invalidate_runtime_caches()
                             
                             st.toast("✅ Comentario guardado")
                             # Actualizar el objeto p para mostrarlo sin esperar recarga manual
@@ -1100,6 +1243,7 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
                     "id": int(practicaId),
                     "feedback_tutor_centro": nuevo_registro
                 }, keys=["id"])
+                invalidate_runtime_caches()
 
                 st.toast("✅ Seguimiento guardado")
                 p["feedback_tutor_centro"] = nuevo_registro
@@ -1117,13 +1261,14 @@ def actualizar_fecha(key_nombre, id_registro, tipo):
                         }
     res = upsert(practicaTabla, payload_practica, keys=["id"])
     if res and getattr(res, 'data', None):
+        invalidate_runtime_caches()
         st.toast("✅ Fecha actualizada")
 
 def seccion_planificacion(alumno, empresa, practica):
     with st.expander("🗓️ Calendario de Formación"):
         practicaId = practica.get("id")
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
-        files = list_drive_files(folder_name)
+        files = list_drive_files_cached(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
 
         if rol_usuario == 'admin'and st.session_state["edit_disabled"]==False:   
@@ -1183,6 +1328,7 @@ def seccion_planificacion(alumno, empresa, practica):
                             with open(temp_path, "wb") as f:
                                 f.write(uploaded_cal.getbuffer())
                             upload_to_drive(str(temp_path), carpetaPractica, folder_name, original_name)
+                            invalidate_runtime_caches()
                             st.success("Imagen guardada.")
                             st.rerun()
 
@@ -1246,7 +1392,7 @@ def seccion_documentos(alumno, empresa, practicaId):
     st.subheader("📎 Documentos")
 
     folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
-    files, folderId = list_drive_files(folder_name)
+    files, folderId = list_drive_files_cached(folder_name)
     if rol_usuario != 'tutor':
         if folderId:
             st.link_button("Abrir carpeta", f"https://drive.google.com/drive/folders/{folderId}")
@@ -1315,6 +1461,7 @@ def seccion_documentos(alumno, empresa, practicaId):
                                 f.write(file.getbuffer())
                             upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
                             st.success(f"Subido: {nuevo_nombre}")
+                        invalidate_runtime_caches()
 
 
         
@@ -1376,7 +1523,7 @@ def seccion_planificacion_cancelado(alumno, empresa, p):
     
     archivo_calendario = None
     try:
-        files = list_drive_files(folder_name)
+        files = list_drive_files_cached(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
     except Exception:
         pass
@@ -1393,7 +1540,7 @@ def seccion_documentacion_cancelado(alumno,empresa):
     st.subheader("📎 Documentos Adjuntos")
 
     folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
-    files, folderId = list_drive_files(folder_name)
+    files, folderId = list_drive_files_cached(folder_name)
 
     if files:
         for f in files:
@@ -1424,30 +1571,13 @@ def mostrar_detalle():
         st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
         st.session_state["edit_disabled"] = p.get("status") == estados[2]
 
-        comentario = None
-        if p.get("status") == estados[2]:
-            comentarios_raw = p.get("datos_cierre")
-            if isinstance(comentarios_raw, dict):
-                comentarios = comentarios_raw
-            elif isinstance(comentarios_raw, str) and comentarios_raw:
-                try:
-                    comentarios = json.loads(comentarios_raw)
-                except json.JSONDecodeError:
-                    comentarios = {}
-            else:
-                comentarios = {}
-            comentario = comentarios.get("comentario")
 
-        if comentario:
-            st.info(f"✅ **Estado:** {p.get('status')} — **Comentarios:** {comentario}", icon="🚀")
-        else:
-            st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
+        st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
         planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento y Feedback", "Documentación"])
         if rol_usuario == 'tutor':
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
                 seccion_planificacion(alumno,empresa, p)
-                seccion_gestion(p)
             with seguimientoTab:
                 seccion_feedback_tutor(practicaId, p, tutor_actual, True)
             with documentacionTab:
@@ -1485,4 +1615,3 @@ if st.session_state.page == "lista":
     mostrar_lista()
 else:
     mostrar_detalle()
-

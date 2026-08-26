@@ -977,7 +977,6 @@ def finalizarPractica(practica, comentario):
                 "comentario": comentario
             }
     payload_practica = {"id": int(practicaId),"status":estados[2],
-                        "datos_cierre": datos_cierre,
                          "fecha_fin_real": datetime.now().isoformat()
                         }
     upsert(practicaTabla, payload_practica, keys=["id"])
@@ -1092,6 +1091,30 @@ def logError(error_msg, pagina):
 def actualizarFeedbackRecordatorio(email, tipo_form, id_practica):
     data_feedback = {"recordatorio": datetime.now().date().isoformat()}
     update(feedbackFormsTabla, data_feedback, {"email_destino": email, "tipo_form": tipo_form, "practica_id": id_practica})
+
+def generarFormularioCierre(practica_id, email_destino):
+        formCierre =forms[3]
+        base_url = st.secrets["urls"]["URL"] 
+        try:
+            registro_existente = getEquals(feedbackFormsTabla, {"practica_id": int(practica_id), "tipo_form":formCierre})
+            token = uuid.uuid4().hex
+            data_feedback = {
+                "practica_id": int(practica_id),
+                "fecha_envio": datetime.now().isoformat(),
+                "email_destino": email_destino,
+                "tipo_form": formCierre,
+                "token": token,
+                "estado": "pendiente",
+            }
+            if registro_existente:
+                id_registro = registro_existente[0]['id']
+                update(feedbackFormsTabla, data_feedback, {"id": id_registro})
+            else:
+                add(feedbackFormsTabla, data_feedback)
+
+            return f"{base_url.rstrip('/')}/{formCierre}?token={token}&tipo={formCierre}"
+        except Exception as e:
+            st.error(f"Error procesando feedback para {formCierre}: {e}")
 
 def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_fin):
     for i, tipo in enumerate(forms):

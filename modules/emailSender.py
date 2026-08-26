@@ -1,5 +1,6 @@
 import streamlit as st
 import smtplib
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -30,7 +31,15 @@ from modules.data_base import logError,actualizarFeedbackRecordatorio
 #         # Re-lanzamos para que Streamlit capture el error como vimos antes
 #         raise e
     
-def send_email(sender: str, password: str, recipients: list, subject: str, body: str, attachments=None) -> bool:
+def send_email(
+    sender: str,
+    password: str,
+    recipients: list,
+    subject: str,
+    body: str,
+    attachments=None,
+    html: bool = False,
+) -> bool:
     """
     Envía un email con adjuntos usando SMTP de Gmail con los destinatarios en BCC.
     """
@@ -45,7 +54,7 @@ def send_email(sender: str, password: str, recipients: list, subject: str, body:
         msg['Subject'] = subject
 
         # 2. Adjuntamos el cuerpo del mensaje
-        msg.attach(MIMEText(body, "plain", "utf-8"))
+        msg.attach(MIMEText(body, "html" if html else "plain", "utf-8"))
 
         # 3. Lógica para los archivos adjuntos
         if attachments:
@@ -95,6 +104,46 @@ def send_welcome_email(email: str, dni: str) -> bool:
     body = f"Bienvenido a FP Cámara, tu usuario es '{dni}' y tu contraseña es '{dni}'. Accede en: {url}"
 
     return send_email(email_sender, email_password, [email], subject, body, [])
+
+
+def send_feedback_tutor_email(
+    email: str,
+    alumno: str,
+    fecha_fin_real: str,
+    link: str,
+) -> bool:
+    """Envía al tutor el formulario de cierre de la formación en empresa."""
+    email_sender = st.secrets['email']['gmail']
+    email_password = st.secrets['email']['password']
+
+    subject = "Formulario de cierre de la formación en empresa"
+    logo_url = "https://github.com/user-attachments/assets/e8f8238a-65f8-4132-9d9f-efe8c0effbc7"
+    alumno_html = escape(alumno)
+    fecha_fin_html = escape(fecha_fin_real)
+    link_html = escape(link, quote=True)
+    body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto;">
+          <img src="{logo_url}" alt="Cámara FP Valencia"
+               style="display: block; width: 320px; max-width: 100%; margin: 0 auto 30px;">
+          <p>La formación en empresa de <strong>{alumno_html}</strong>,
+             ha finalizado el <strong>{fecha_fin_html}</strong>.</p>
+          <p>
+            Aquí te enviamos el
+            <a href="{link_html}" target="_blank" rel="noopener noreferrer">
+              formulario de cierre
+            </a>.
+            Por favor, rellénalo.
+          </p>
+          <p>Gracias</p>
+          <p><strong>Cámara FP Valencia</strong></p>
+        </div>
+      </body>
+    </html>
+    """
+
+    return send_email(email_sender, email_password, [email], subject, body, [], html=True)
 
 
 def enviarRecordatoriosMasivos(listado_morosos):

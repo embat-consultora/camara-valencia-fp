@@ -125,7 +125,7 @@ with tabOferta:
         else:
                 anioFiltroLink = anioFiltro
         url_form_empresas = f"{st.secrets["urls"]["FORM_EMPRESA"]}?curso_academico={anioFiltroLink}"
-        st.caption(f"Agregar nueva (seleccione el curso académico): {url_form_empresas}")
+        st.caption(f"Agregar nueva (seleccione el curso académico en el menu de la izquierda): {url_form_empresas}")
         if fps:
             for i, fp in enumerate(fps, start=1):
                 estado_actual = fp.get("estado") or estados[4]
@@ -220,7 +220,7 @@ with tabTutores:
                                 st.error(f"Email inválido para {nombre}, , corrobore que no tiene filas vacias, si las tiene eliminelas"); st.stop()
                         
                         res = updateTutores(cambios, df_tutores, cif=cif)
-                        st.toast("✅ Guardado",duration='short', icon="✅"); 
+                        st.toast("Guardado",duration='short', icon="✅"); 
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -351,9 +351,9 @@ def seccion_detalle(alumno, empresa, p, oferta):
             tutor_actual = p.get("tutor") 
             indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
             clave_tutor = f"tutor_{alumno['id']}"
-            if p.get("status") == estadosPractica[3]:
+            if p.get("status") in [ estadosPractica[3] , estadosPractica[2], estadosPractica[1]]:
                 st.write(f"**Tutor Empresa:** {tutor_actual or 'No asignado'}")
-            elif p.get("status") in [estadosPractica[5]]:
+            else:
                 st.selectbox(
                     "**Tutor Empresa**",
                     options=lista_nombres_tutores,
@@ -371,12 +371,12 @@ def seccion_detalle(alumno, empresa, p, oferta):
 def seccion_planificacion(alumno, empresa, practica):
         st.subheader("📅 Planificación de Formaciones")
         practicaId = practica.get("id")
-        cancelada = practica.get("status") == estadosPractica[3]
+        cancelada_finalizada = practica.get("status") == estadosPractica[3] or practica.get("status") == estadosPractica[2]
         folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
 
-        if cancelada:
+        if cancelada_finalizada:
             if archivo_calendario and archivo_calendario.get('id'):
                 preview_url = f"https://drive.google.com/file/d/{archivo_calendario.get('id')}/preview"
                 st.markdown(

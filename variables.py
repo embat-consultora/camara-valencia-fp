@@ -11,7 +11,7 @@ tipoCampo=["Texto", "Si/No", "Opciones", "Cantidad","OpcionesConCantidad"]
 categoria=["Empresa", "FP", "Alumno"]
 estados=["Documentación lista", "Iniciada", "Finalizada", "Cancelada", "Falta Documentación","Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado"]
-forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre"]
+forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre", "formulario_cierre_tutor_empresa"]
 #fases
 fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Formación en progreso", "Finalizada", "Evaluación Enviada"] 
 fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Formación en progreso", "Finalizada", "Evaluación Enviada"] 
