@@ -12,6 +12,7 @@ from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email,s
 from pathlib import Path
 from modules.feedback_helper import render_feedback_card
 import uuid
+import random
 from variables import (forms as formsFeedback, 
     practicaTabla, tutoresTabla, practicaEstadosTabla,
     max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
@@ -480,13 +481,14 @@ def mostrar_carga_rapida():
                             "telefono": new_emp_tel,
                             "email_empresa": new_emp_email
                         }, keys=["CIF"])
+                        new_pass = f"{new_emp_cif}{random.randint(10, 99)}"
                         usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                     "email": new_emp_cif,
-                                    "password": new_emp_cif,
+                                    "password": new_pass,
                                     "rol": "empresa",
                                 }, keys=["email"], return_created=True)
                         if usuario_creado and new_emp_cif:
-                                send_welcome_email(new_emp_email, new_emp_cif)
+                                send_welcome_email(new_emp_email, new_emp_cif,new_pass, new_emp_nombre)
                         # B. Alta Alumno
                         upsert(alumnosTabla, {
                             "dni": new_alu_dni,
@@ -500,13 +502,14 @@ def mostrar_carga_rapida():
                             "curso": curso,
                             "estado": estadosAlumno[1]
                         }, keys=["dni"])
+                        new_passA = f"{new_alu_dni}{random.randint(10, 99)}"
                         usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                     "email": new_alu_dni,
-                                    "password": new_alu_dni,
+                                    "password": new_passA,
                                     "rol": "alumno",
                                 }, keys=["email"], return_created=True)
                         if usuario_creado and new_alu_dni:
-                            send_welcome_email(new_alu_email, new_alu_dni)
+                            send_welcome_email(new_alu_email, new_alu_dni,new_passA, new_alu_nombre)
 
                         # C. Crear la formación (Vincular)
                         # Usamos los parámetros que requiere tu función crearPractica

@@ -118,21 +118,54 @@ if "data_loaded" not in st.session_state:
     st.session_state["data_loaded"] = False
 if "force_reload" not in st.session_state:
     st.session_state["force_reload"] = False
+if "practicas_data_filter" not in st.session_state:
+    st.session_state["practicas_data_filter"] = None
 if "grid_version" not in st.session_state:
     st.session_state.grid_version = 0
 
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 
-#@st.cache_data(show_spinner="Cargando datos. Por favor espere..")
-def get_data_cached():
+@st.cache_data(ttl=120)
+def get_data_cached(anio, curso):
     print("Cargando datos desde la base de datos...")
-    return get_alumnos_con_practicas_consolidado(anioFiltro, cursoFiltro)
+    return get_alumnos_con_practicas_consolidado(anio, curso)
+
+@st.cache_data(ttl=120)
+def get_gestores_cached():
+    return getGestores()
+
+@st.cache_data(ttl=120)
+def get_tutores_cached():
+    return getTutores()
+
+@st.cache_data(ttl=120)
+def get_empresas_ofertas_cached():
+    return getEmpresasYOfertas()
+
+@st.cache_data(ttl=120)
+def get_gestores_ofertas_cached():
+    return getGestore()
+
+@st.cache_data(ttl=120)
+def get_ofertas_cached(anio=None):
+    return getOfertasTabla(anio) if anio is not None else getOfertasTabla()
+
+@st.cache_data(ttl=300)
+def get_ciclos_areas_cached():
+    return getCiclosYAreas()
 
 def load_data():
-    if st.session_state["data_loaded"] or not st.session_state["force_reload"] or st.session_state.practicas_data is not None:
+    current_filter = (anioFiltro, cursoFiltro)
+    if (
+        not st.session_state["data_loaded"]
+        or st.session_state["force_reload"]
+        or st.session_state.practicas_data is None
+        or st.session_state["practicas_data_filter"] != current_filter
+    ):
         with st.spinner("Cargando datos desde la base..."):
-            st.session_state["practicas_data"] = get_data_cached()
+            st.session_state["practicas_data"] = get_data_cached(anioFiltro, cursoFiltro)
+            st.session_state["practicas_data_filter"] = current_filter
             st.session_state["data_loaded"] = True
             st.session_state["force_reload"] = False
 
@@ -159,6 +192,7 @@ with tab_alumnos:
     if df_raw is None or df_raw.empty:
         st.info("No hay alumnos para el filtro. Por favor, seleccione otro Curso Académico")
     else:
+        df_raw = df_raw.copy()
         if anioFiltro != aniosList[0]: 
             df_raw = df_raw[df_raw["anio_alumno"] == anioFiltro]
         if cursoFiltro != cursoList[0]:
@@ -182,17 +216,17 @@ with tab_alumnos:
         df_raw['puesto'] = df_raw['puesto'].fillna("")
         df_raw['tutor_centro'] = df_raw['tutor_centro'].fillna("")
         try:
-            df_gestores_lista = getGestores()
+            df_gestores_lista = get_gestores_cached()
             nombres_gestores = df_gestores_lista['nombre'].tolist()
         except:
             nombres_gestores = []
 
         try:
-            df_tutores_lista = getTutores() # Esta es la función que ya tienes
+            df_tutores_lista = get_tutores_cached()
             nombres_tutores_centro = sorted(df_tutores_lista['nombre'].unique().tolist())
         except:
             nombres_tutores_centro = []
-        df_empresas = getEmpresasYOfertas()
+        df_empresas = get_empresas_ofertas_cached()
         df_empresas_filtrado =df_empresas
         if df_empresas is None or len(df_empresas) == 0:
             st.info("No hay empresas cargadas aun.")
@@ -214,6 +248,7 @@ with tab_alumnos:
                 json_mapeo = json.dumps(dict_mapeo)
 
                 mapeo_ciclo_empresas = {}
+                mapeo_ciclo_empresas_idx = {}
 
                 for row in df_empresas_filtrado:
                     nombre_empresa = row['nombre']
@@ -232,11 +267,9 @@ with tab_alumnos:
                             
                             if ciclo not in mapeo_ciclo_empresas:
                                 mapeo_ciclo_empresas[ciclo] = []
-                            
-                            entrada_existente = next(
-                                (e for e in mapeo_ciclo_empresas[ciclo] if e["nombre"] == nombre_empresa),
-                                None
-                            )
+                                mapeo_ciclo_empresas_idx[ciclo] = {}
+
+                            entrada_existente = mapeo_ciclo_empresas_idx[ciclo].get(nombre_empresa)
 
                             if entrada_existente:
                                 # Acumular cupos si hay varias ofertas del mismo ciclo
@@ -250,6 +283,9 @@ with tab_alumnos:
                                     "direccion_empresa": direccion_empresa,
                                     "localidad_empresa": localidad_empresa
                                 })
+                                mapeo_ciclo_empresas_idx[ciclo][nombre_empresa] = (
+                                    mapeo_ciclo_empresas[ciclo][-1]
+                                )
 
 
                 json_ciclo_empresas = json.dumps(mapeo_ciclo_empresas)
@@ -268,27 +304,18 @@ with tab_alumnos:
                     if "localidad_empresa" not in df_display.columns:
                         df_display["localidad_empresa"] = None
                     
-                    def calcular_cupo_actual(row, dict_mapeo):
-                        empresa = row.get('nombre_empresa')
-                        ciclo = row.get('ciclo_formativo')
-                        
-                        # Si no tiene empresa o es la marca de "Sin asignar"
-                        if not empresa or empresa == "⚠️ SIN ASIGNAR":
-                            return None
-                    
-                        try:
-                            if empresa in dict_mapeo and ciclo in dict_mapeo[empresa]:
-                                # Accedemos al primer puesto o sumamos disponibles si hay varios
-                                puestos = dict_mapeo[empresa][ciclo]
-                                if isinstance(puestos, list) and len(puestos) > 0:
-                                    # Si tu dict_mapeo tiene la estructura de puestos:
-                                    return puestos[0].get('disponibles', 0) 
-                        except Exception as e:
-                            return None
-                        return None
-
-                    # Creamos la columna físicamente en el DataFrame
-                    df_display['cupos_disponibles'] = df_display.apply(lambda x: calcular_cupo_actual(x, dict_mapeo), axis=1)
+                    cupos_por_empresa_ciclo = {
+                        (empresa, ciclo): puestos[0].get("disponibles", 0)
+                        for empresa, ciclos in dict_mapeo.items()
+                        for ciclo, puestos in ciclos.items()
+                        if isinstance(puestos, list) and puestos
+                    }
+                    df_display["cupos_disponibles"] = [
+                        cupos_por_empresa_ciclo.get(
+                            (row["nombre_empresa"], row["ciclo_formativo"])
+                        )
+                        for _, row in df_display.iterrows()
+                    ]
                     # Ahora sí, asegúrate de incluirla en la lista de columnas visibles
                     if "cupos_disponibles" not in cols_visibles:
                         cols_visibles.append("cupos_disponibles")
@@ -299,7 +326,29 @@ with tab_alumnos:
                     # Inyectamos las traducciones en las opciones principales del grid
                     gb.configure_grid_options(localeText=locale_tabla_principal)
                     gb.configure_grid_options(stopEditingWhenCellsLoseFocus=True)
-                    gb.configure_default_column(editable=True, filter=True, resizable=True)
+                    gb.configure_grid_options(suppressSizeToFit=True)
+                    gb.configure_side_bar(
+                        filters_panel=False,
+                        columns_panel=True,
+                        defaultToolPanel="",
+                    )
+                    gb.configure_grid_options(
+                        getMainMenuItems=JsCode("""
+                            function(params) {
+                                const opcionesExcluidas = [
+                                    'sortAscending',
+                                    'sortDescending',
+                                    'autoSizeThis',
+                                    'autoSizeAll'
+                                ];
+                                return params.defaultItems.filter(
+                                    item => !opcionesExcluidas.includes(item)
+                                );
+                            }
+                        """)
+                    )
+                    # Los anchos son parte del contrato visual de esta tabla.
+                    gb.configure_default_column(editable=True, filter=True, resizable=False)
 
                     gb.configure_column("ciclo_acronimo", headerName="Ciclo", pinned='left', width=100, editable=False)
                     gb.configure_column("apellido", headerName="Apellidos", width=200)
@@ -518,17 +567,49 @@ with tab_alumnos:
 
                     for col in cols_tecnicas:
                         if col in df_display.columns:
-                            gb.configure_column(col, hide=True)
+                            gb.configure_column(
+                                col,
+                                hide=True,
+                                suppressColumnsToolPanel=False,
+                            )
 
                     gridOptions = gb.build()
+                    # GridOptionsBuilder activa fitGridWidth por defecto; eso
+                    # modifica los anchos y elimina el scroll horizontal.
+                    gridOptions.pop("autoSizeStrategy", None)
+                    gridOptions["rowHeight"] = 42
+                    grid_height = min(600, max(120, 52 + len(df_display) * 42 + 18))
+                    grid_columns_state = {
+                        "state": [
+                            {"colId": "ciclo_acronimo", "width": 150},
+                            {"colId": "apellido", "width": 200},
+                            {"colId": "nombre", "width": 200},
+                            {"colId": "telefono", "width": 150},
+                            {"colId": "email_empresa", "width": 200},
+                            {"colId": "comentarios_centro", "width": 200},
+                            {"colId": "vehiculo", "width": 100},
+                            {"colId": "localidad", "width": 150},
+                            {"colId": "gestor", "width": 120},
+                            {"colId": "horas_totales", "width": 100},
+                            {"colId": "nombre_empresa", "width": 200},
+                            {"colId": "asignado", "width": 120},
+                            {"colId": "tutor_centro", "width": 200},
+                            {"colId": "area", "width": 250},
+                            {"colId": "puesto", "width": 250},
+                            {"colId": "cupos_disponibles", "width": 130},
+                        ]
+                    }
                     grid_response = AgGrid(
                         df_display,
                         gridOptions=gridOptions,
+                        columns_state=grid_columns_state,
                         allow_unsafe_jscode=True,
-                        update_on=[],
+                        enable_enterprise_modules=True,
+                        update_on=["cellValueChanged"],
                         theme='alpine',
-                        height=600,
-                        key=f"grid_alumnos_v_{st.session_state.grid_version}"
+                        height=grid_height,
+                        key=f"grid_alumnos_v_{st.session_state.grid_version}",
+                        resizable=False
                         
                     )
 
@@ -541,6 +622,7 @@ with tab_alumnos:
                                 st.toast("✅ ¡Cambios guardados correctamente!")
                                 st.session_state["data_loaded"] = False 
                                 st.session_state["practicas_data"] = None
+                                st.session_state["practicas_data_filter"] = None
                                 st.session_state.grid_version += 1
                                 st.rerun()
                             except Exception as e:
@@ -550,7 +632,7 @@ with tab_alumnos:
 # --- TAB OFERTAS (Todo el código igual, visible para ambos) ---
 with tab_ofertas:
     try:
-        df_gestores_all = getGestore()
+        df_gestores_all = get_gestores_ofertas_cached()
         gestores_activos_df = pd.DataFrame(columns=['nombre', 'ciclo', 'activo'])
         
         if df_gestores_all.empty:
@@ -561,7 +643,7 @@ with tab_ofertas:
         st.error("No se pudo cargar la lista de gestores.")
         gestores_activos_df = []
         
-    df_raw_ofertas = getOfertasTabla(anioFiltro)
+    df_raw_ofertas = get_ofertas_cached(anioFiltro)
 
     if df_raw_ofertas.empty:
         st.info("No hay ofertas registradas.")
@@ -706,11 +788,13 @@ with tab_ofertas:
                                     st.success(f"Actualizada correctamente")
                                 except Exception as e:
                                     st.error(f"Error: {e}")
+                            get_ofertas_cached.clear()
+                            get_empresas_ofertas_cached.clear()
                             st.rerun()
 
 # --- TAB CONFIGURACIÓN (Solo Admin) ----
 
-CICLOS,AREAS_MAP = getCiclosYAreas()
+CICLOS,AREAS_MAP = get_ciclos_areas_cached()
 @st.fragment
 def fragment_gestion_gestores():
     if "gestores_guardados" not in st.session_state:
@@ -755,6 +839,8 @@ def fragment_gestion_gestores():
                     row["password_temp"] = password_auto
                 
                 updateGestores(cambios, st.session_state.df_gestores)
+                get_gestores_cached.clear()
+                get_gestores_ofertas_cached.clear()
                 st.session_state.df_gestores = None
                 st.session_state.gestores_guardados = True
                 st.rerun(scope="fragment")
@@ -762,7 +848,7 @@ def fragment_gestion_gestores():
             except Exception as e:
                 st.error(f"Error: {e}")
     if st.session_state.gestores_guardados:
-        st.success("✅ Datos guardados en la base de datos.")   
+        st.success("✅ Datos guardados exitosamente")   
         cambios_last = st.session_state.get("editor_gestores", {})
         if cambios_last.get("added_rows"):
             st.warning("⚠️ Copia las credenciales antes de finalizar:")
@@ -805,6 +891,7 @@ def fragment_gestion_tutores():
                     row["password_temp"] = password_auto
                 
                 updateTutoresCentro(cambios, st.session_state.df_tutores)
+                get_tutores_cached.clear()
                 st.session_state.df_tutores = None
                 st.session_state.tutores_guardados = True
                 st.rerun(scope="fragment")
@@ -813,7 +900,7 @@ def fragment_gestion_tutores():
                 st.error(f"Error: {e}")
 
     if st.session_state.tutores_guardados:
-        st.success("✅ Datos guardados en la base de datos.")   
+        st.success("✅ Datos guardados exitosamente.")   
         cambios_last = st.session_state.get("editor_tutores", {})
         if cambios_last.get("added_rows"):
             st.warning("⚠️ Copia las credenciales antes de finalizar:")
@@ -833,5 +920,3 @@ if rol_usuario == "admin":
          
         with tabs_config_inner[1]:
             fragment_gestion_tutores()
-
-

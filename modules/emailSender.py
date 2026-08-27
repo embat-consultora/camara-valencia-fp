@@ -1,11 +1,11 @@
 import streamlit as st
 import smtplib
-from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from modules.data_base import logError,actualizarFeedbackRecordatorio
+from modules.email_templates import render_feedback_tutor_email, render_welcome_email
 
 # def send_email_outlook( recipients: list, subject: str, body: str):
 #     sender = st.secrets["emailOutlook"]["EMAIL_USER"]
@@ -94,16 +94,15 @@ def send_email(
         raise e
 
 
-def send_welcome_email(email: str, dni: str) -> bool:
+def send_welcome_email(email: str, usuario: str, password:str,  nombre:str) -> bool:
     """Envía el email de bienvenida al alumno con su usuario/contraseña (el DNI)."""
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
     url = st.secrets['urls']['URL']
 
-    subject = "Bienvenido a FP Cámara"
-    body = f"Bienvenido a FP Cámara, tu usuario es '{dni}' y tu contraseña es '{dni}'. Accede en: {url}"
-
-    return send_email(email_sender, email_password, [email], subject, body, [])
+    subject = "Bienvenido a la plataforma Cámara FP Valencia - Ciclos Formativos"
+    body = render_welcome_email(nombre, usuario, password, url)
+    return send_email(email_sender, email_password, [email], subject, body, [], html=True)
 
 
 def send_feedback_tutor_email(
@@ -115,33 +114,8 @@ def send_feedback_tutor_email(
     """Envía al tutor el formulario de cierre de la formación en empresa."""
     email_sender = st.secrets['email']['gmail']
     email_password = st.secrets['email']['password']
-
     subject = "Formulario de cierre de la formación en empresa"
-    logo_url = "https://github.com/user-attachments/assets/e8f8238a-65f8-4132-9d9f-efe8c0effbc7"
-    alumno_html = escape(alumno)
-    fecha_fin_html = escape(fecha_fin_real)
-    link_html = escape(link, quote=True)
-    body = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-        <div style="max-width: 600px; margin: 0 auto;">
-          <img src="{logo_url}" alt="Cámara FP Valencia"
-               style="display: block; width: 320px; max-width: 100%; margin: 0 auto 30px;">
-          <p>La formación en empresa de <strong>{alumno_html}</strong>,
-             ha finalizado el <strong>{fecha_fin_html}</strong>.</p>
-          <p>
-            Aquí te enviamos el
-            <a href="{link_html}" target="_blank" rel="noopener noreferrer">
-              formulario de cierre
-            </a>.
-            Por favor, rellénalo.
-          </p>
-          <p>Gracias</p>
-          <p><strong>Cámara FP Valencia</strong></p>
-        </div>
-      </body>
-    </html>
-    """
+    body = render_feedback_tutor_email(alumno, fecha_fin_real, link)
 
     return send_email(email_sender, email_password, [email], subject, body, [], html=True)
 

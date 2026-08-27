@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
 import uuid
 from pathlib import Path
 from modules.data_base import get, update, upsert,getEqual,logError,getCiclosYAreas,upsertCustome
@@ -12,6 +11,7 @@ from modules.emailSender import send_email, send_welcome_email
 from modules.drive_helper import list_drive_files,upload_to_drive
 from modules.forms_helper import  file_size_bytes
 import re
+import random
 apply_page_config()
 make_sidebar()
 
@@ -218,17 +218,18 @@ with tab1:
                         )
                         if res_al and res_al.data:
                             try:
+                                new_pass = f"{new_dni}{random.randint(10, 99)}"
                                 usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                             "email": new_dni,
-                                            "password": new_dni,
+                                            "password": new_pass,
                                             "rol": "alumno",
                                         }, keys=["email"], return_created=True)
                                 if usuario_creado and new_dni:
-                                    send_welcome_email(new_email, new_dni)
+                                    send_welcome_email(new_email, new_dni, new_pass, new_nombre)
                             except Exception as e:
                                 st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
 
-                        st.toast("Alumno actualizado correctamente")
+                        st.toast("Alumno actualizado correctamente", icon="✅")
                         st.rerun()
 
 
@@ -373,12 +374,14 @@ with tab2:
                     st.success("✅ Nuevo alumno agregado correctamente")
                     if res_al and res_al.data:
                         try:
-                            usuario = upsertCustome(usuariosTabla, {
+                            new_pass = f"{new_dni}{random.randint(10, 99)}"
+                            usuario, usuario_creado  = upsertCustome(usuariosTabla, {
                                         "email": new_dni,
-                                        "password": new_dni,
+                                        "password": new_pass,
                                         "rol": "alumno",
-                                    }, keys=["email"])
-                            send_welcome_email(new_email, new_dni)
+                                    }, keys=["email"], return_created=True)
+                            if usuario_creado and new_dni:
+                                send_welcome_email(new_email, new_dni,new_pass, new_nombre)
                         except Exception as e:
                             st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
 
@@ -491,13 +494,14 @@ with tab2:
                                 res_al = upsert(alumnosTabla, data, keys=["dni"])
                                 if res_al and res_al.data:
                                     try:
+                                        new_pass = f"{dni}{random.randint(10, 99)}"
                                         usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                                     "email": dni,
-                                                    "password": dni,
+                                                    "password": new_pass,
                                                     "rol": "alumno",
                                                 }, keys=["email"], return_created=True)
                                         if usuario_creado and data["email_alumno"]:
-                                            send_welcome_email(data["email_alumno"], dni)
+                                            send_welcome_email(data["email_alumno"], dni,new_pass, data["nombre"])
                                     except Exception as e:
                                         st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
             
@@ -667,4 +671,3 @@ with tab3:
             error_msg = f"{type(e).__name__}: {str(e)}"
             logError(error_msg,"Alumnos - Envío de Emails")
             st.error(f"Falló el envío de email: {e}. Por favor contacte a antopiscio@gmail.com (soporte técnico).")
-

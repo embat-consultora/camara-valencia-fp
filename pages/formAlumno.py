@@ -7,7 +7,7 @@ from modules.drive_helper import upload_to_drive
 from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
 from modules.forms_helper import required_ok, file_size_bytes, slug
 from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
-
+import random
 # ---------------------------------
 # Config
 # ---------------------------------
@@ -225,12 +225,14 @@ if submit:
 
         if res_al and res_al.data:
             try:
-                usuario = upsertCustome(usuariosTabla, {
+                new_pass = f"{payload["dni"]}{random.randint(10, 99)}"
+                usuario, usuario_creado  = upsertCustome(usuariosTabla, {
                             "email": payload["dni"],
-                            "password": payload["dni"],
+                            "password": new_pass,
                             "rol": "alumno",
-                        }, keys=["email"])
-                send_welcome_email(email.strip().lower(), payload["dni"])
+                        }, keys=["email"], return_created=True)
+                if usuario_creado and payload["dni"]:
+                    send_welcome_email(email.strip().lower(), payload["dni"],new_pass, payload["nombre"])
             except Exception as e:
                 st.warning(f"No se pudo enviar el email de bienvenida: {e}. Contacta con el administrador para obtener tu usuario y contraseña.")
 
