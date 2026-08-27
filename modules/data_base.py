@@ -3,6 +3,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import pandas as pd
 import uuid
+import random
 from datetime import datetime, timedelta
 from variables import (
     practicaTabla,
@@ -84,7 +85,7 @@ def get_alumnos_con_practicas_consolidado(anio, curso):
                 localidad,
                 empresas(CIF, nombre, telefono, email_empresa)
             )
-        """).eq("estado", "Sin Empresa").eq("anio", anio)
+        """).eq("estado", estadosAlumno[0]).eq("anio", anio)
 
     if curso and curso.strip().lower() != "seleccionar":
         q = q.eq("curso", curso)
@@ -169,15 +170,13 @@ def getGestore():
 
 def getGestores():
     gestores = supabase.table(gestoresTabla).select("id, email, nombre, ciclo").order("nombre").execute()
-    usuarios = supabase.table(usuariosTabla).select("email, password").execute()
 
     df_gestores = pd.DataFrame(gestores.data)
-    df_usuarios = pd.DataFrame(usuarios.data)
     
     if df_gestores.empty:
         return pd.DataFrame(columns=["id","nombre","email","ciclo"])
     else:
-        df_final = pd.merge(df_gestores, df_usuarios, on="email", how="left")
+        df_final = pd.DataFrame(df_gestores)
         return df_final
 
 def getTutoresEmpresa():
@@ -185,14 +184,12 @@ def getTutoresEmpresa():
     return tutores
 def getTutores():
     tutores = supabase.table(tutoresCentroTabla).select("id, email, nombre,telefono").order("nombre").execute()
-    usuarios = supabase.table(usuariosTabla).select("email, password").execute()
     
     df_tutores = pd.DataFrame(tutores.data)
-    df_usuarios = pd.DataFrame(usuarios.data)
     if df_tutores.empty:
         return pd.DataFrame(columns=["id","nombre","email","telefono"])
     else:
-        df_final = pd.merge(df_tutores, df_usuarios, on="email", how="left")
+        df_final = pd.DataFrame(df_tutores)
         return df_final
 def getEmpresasYOfertas():
     res = (
@@ -212,7 +209,6 @@ def getEmpresasYOfertas():
 
 def updateTutores(cambios, df_original, cif=None):
     from modules.emailSender import send_welcome_email
-
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         telefono = new_row.get("telefono", "").strip()
@@ -228,13 +224,14 @@ def updateTutores(cambios, df_original, cif=None):
                     "cif_empresa":cif_final,
                     "telefono":telefono
                 })
-                usuario, usuario_creado = upsertCustome("usuarios", {
-                    "email": nif,
-                    "password": nif,
+                new_pass = f"{nif}{random.randint(10, 99)}"
+                usuario, usuario_creado = upsertCustome(usuariosTabla, {
+                    "email": email,
+                    "password": new_pass,
                     "rol": "tutor"
                 }, keys=["email"], return_created=True)
                 if usuario_creado:
-                    send_welcome_email(email, nif)
+                    send_welcome_email(email, nif,new_pass, nombre)
             except Exception as e:
                 raise Exception(f"Error al crear el usuario {email}: {e}")
 
@@ -250,7 +247,7 @@ def updateTutores(cambios, df_original, cif=None):
             if cambios_tutor:
                 update(tutoresTabla, mods, {"id": id_tutores})
             if cambios_usuario:
-                update("usuarios", cambios_usuario, {"email": email_orig})
+                update(usuariosTabla, cambios_usuario, {"email": email_orig})
                 
         except Exception as e:
             raise Exception(f"Error al actualizar el gestor {id_tutores}: {e}")
@@ -263,13 +260,14 @@ def updateTutores(cambios, df_original, cif=None):
       
         try:
             delete(tutoresTabla, "id", id_tutor)
-            delete("usuarios", "email", nif_tutor)
+            delete(usuariosTabla, "email", nif_tutor)
         except Exception as e:
             st.error(f"Error al eliminar {nif_tutor}: {e}")
         
 
 
 def updateTutoresCentro(cambios, df_original):
+    from modules.emailSender import send_welcome_email
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         telefono = new_row.get("telefono", "").strip()
@@ -282,11 +280,13 @@ def updateTutoresCentro(cambios, df_original):
                     "email": email,
                     "telefono":telefono
                 })
-                add("usuarios", {
+                usuario, usuario_creado = upsertCustome(usuariosTabla, {
                     "email": email,
                     "password": password,
                     "rol": "tutorCentro"
-                })
+                }, keys=["email"], return_created=True)
+                if usuario_creado:
+                    send_welcome_email(email, email, password, nombre)
             except Exception as e:
                 raise Exception(f"Error al crear el usuario {email}: {e}")
 
@@ -302,7 +302,7 @@ def updateTutoresCentro(cambios, df_original):
             if cambios_tutor:
                 update(tutoresCentroTabla, mods, {"id": id_tutores})
             if cambios_usuario:
-                update("usuarios", cambios_usuario, {"email": email_orig})
+                update(usuariosTabla, cambios_usuario, {"email": email_orig})
                 
         except Exception as e:
             raise Exception(f"Error al actualizar el gestor {id_tutores}: {e}")
@@ -315,17 +315,20 @@ def updateTutoresCentro(cambios, df_original):
         
         try:
             delete(tutoresCentroTabla, "id", id_tutor)
-            delete("usuarios", "email", email_tutor)
+            delete(usuariosTabla, "email", email_tutor)
         except Exception as e:
             st.error(f"Error al eliminar {email_tutor}: {e}")
         
 
 def updateGestores(cambios, df_original):
+    from modules.emailSender import send_welcome_email
     for new_row in cambios["added_rows"]:
         nombre = new_row.get("nombre", "").strip()
         email = new_row.get("email", "").strip().lower()
         password = new_row.get("password_temp") 
-        ciclo = new_row.get("ciclo", "").strip()
+        ciclo = new_row.get("ciclo", [])
+        if isinstance(ciclo, str):
+            ciclo = [ciclo.strip()] if ciclo.strip() else []
         if email and nombre:
             try:
                 add(gestoresTabla, {
@@ -334,13 +337,13 @@ def updateGestores(cambios, df_original):
                     "ciclo":ciclo,
                     "activo": new_row.get("activo", True)
                 })
-
-                # Insertamos en la tabla de USUARIOS
-                add("usuarios", {
+                usuario, usuario_creado = upsertCustome(usuariosTabla, {
                     "email": email,
                     "password": password,
                     "rol": "gestor"
-                })
+                }, keys=["email"], return_created=True)
+                if usuario_creado:
+                    send_welcome_email(email,email,  password, nombre)
             except Exception as e:
                 raise Exception(f"Error al crear el usuario {email}: {e}")
 
@@ -358,7 +361,7 @@ def updateGestores(cambios, df_original):
             # Si el email cambió, actualizamos también la tabla de usuarios
             if "email" in mods:
                 nuevo_email = mods["email"].strip().lower()
-                update("usuarios", {"email": nuevo_email}, {"email": email_orig})
+                update(usuariosTabla, {"email": nuevo_email}, {"email": email_orig})
                 
             # Si se modificó el estado 'activo', podrías sincronizarlo con usuarios si fuera necesario
         except Exception as e:

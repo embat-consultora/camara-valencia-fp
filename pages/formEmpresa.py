@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-import json
+import random
 from modules.forms_helper import required_ok, slug
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
 from modules.emailSender import send_welcome_email
@@ -283,19 +283,21 @@ with st.spinner("⏳ Enviando formulario, por favor espera..."):
             }, keys=["nif"])
             ofertaPayload["tutor"] = tutor.data[0]["id"] if tutor and tutor.data else None
             oferta = add(necesidadFP, ofertaPayload | {"empresa": res_emp.data[0]["CIF"]})
+            new_pass = f"{res_emp.data[0]["CIF"]}{random.randint(10, 99)}"
             usuario, usuario_creado = upsertCustome(usuariosTabla, {
                 "email": res_emp.data[0]["CIF"],
-                "password": res_emp.data[0]["CIF"],
+                "password": new_pass,
                 "rol": "empresa",
             }, keys=["email"], return_created=True)
             if usuario_creado and email_contacto.strip():
-                send_welcome_email(email_contacto.strip().lower(), res_emp.data[0]["CIF"])
+                send_welcome_email(email_contacto.strip().lower(), res_emp.data[0]["CIF"], new_pass,nombre_empresa.strip())
+            new_passT = f"{nif_tutor}{random.randint(10, 99)}"
             usuarioT, usuario_creadoT = upsertCustome(usuariosTabla, {
                 "email": nif_tutor,
-                "password": nif_tutor,
+                "password": new_passT,
                 "rol": "tutor",
             }, keys=["email"], return_created=True)
             if usuario_creadoT and email_tutor.strip():
-                send_welcome_email(email_tutor.strip().lower(), nif_tutor)
+                send_welcome_email(email_tutor.strip().lower(), nif_tutor,new_passT,nombre_tutor.strip())
 
-        st.success("✅ ¡Formulario de empresa enviado correctamente!")
+        st.success("✅ ¡Formulario de empresa enviado correctamente! Ya puede cerrar la ventana")

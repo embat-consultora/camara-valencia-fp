@@ -10,6 +10,7 @@ from datetime import datetime
 from modules.emailSender import send_email,send_welcome_email
 import re
 import tempfile
+import random
 
 apply_page_config()
 make_sidebar()
@@ -137,7 +138,15 @@ with tab1:
                     }
 
                 )
-                st.success("Empresa actualizada correctamente")
+                new_pass = f"{new_cif}{random.randint(10, 99)}"
+                usuario, usuario_creado  = upsertCustome(usuariosTabla, {
+                    "email": new_cif.strip(),
+                    "password": new_pass,
+                    "rol": "empresa",
+                }, keys=["email"], return_created=True)
+                if usuario_creado and new_cif:
+                    send_welcome_email(new_email, new_cif.strip(),new_pass, new_nombre)
+                st.toast("Empresa actualizado correctamente", icon="✅")             
                 st.rerun()
 
         # --- Mostrar FP asociadas ---
@@ -254,12 +263,14 @@ with tab2:
                             },
                             keys=["CIF"],
                         )
-                        usuario = upsertCustome(usuariosTabla, {
+                        new_pass = f"{cif}{random.randint(10, 99)}"
+                        usuario, usuario_creado  = upsertCustome(usuariosTabla, {
                             "email": cif.strip(),
-                            "password": cif.strip(),
+                            "password": new_pass,
                             "rol": "empresa",
-                        }, keys=["email"])
-                        send_welcome_email(email_contacto, cif.strip())
+                        }, keys=["email"], return_created=True)
+                        if usuario_creado and cif:
+                            send_welcome_email(email_contacto, cif.strip(),new_pass, nombre_empresa)
                         st.success("✅ Se ha enviado un correo a la empresa con las credenciales")
                         st.success("✅ Empresa creada correctamente")
                         st.session_state.form_registro_key += 1
@@ -394,21 +405,23 @@ with tab2:
                             # 4️⃣ Insert/update
                             try:
                                 upsert(empresasTabla, data, keys=["CIF"])
+                                new_pass = f"{data.get("CIF")}{random.randint(10, 99)}"
                                 usuario, usuario_creado = upsertCustome(usuariosTabla, {
                                             "email": data.get("CIF"),
-                                            "password": data.get("CIF"),
+                                            "password": new_pass,
                                             "rol": "empresa",
                                         }, keys=["email"], return_created=True)
                                 if usuario_creado and data.get("CIF"):
-                                    send_welcome_email(data.get("email_empresa"), data.get("CIF"))
+                                    send_welcome_email(data.get("email_empresa"), data.get("CIF"),new_pass, data.get("nombre"))
                                 if data_tutor.get("nombre") and data_tutor.get("email"):
                                     upsertCustome(tutoresTabla, data_tutor, keys=["email"])
+                                    new_passT = f"{data_tutor.get("nif")}{random.randint(10, 99)}"
                                     usuarioT, usuario_creadoT =  upsertCustome(usuariosTabla, {
                                     "email": data_tutor.get("email"),
-                                    "password": data_tutor.get("nif") if data_tutor.get("nif") else "123456",
+                                    "password": new_passT if data_tutor.get("nif") else "123456",
                                     "rol": "tutor",}, keys=["email"], return_created=True)
                                     if usuario_creadoT and data_tutor.get("nif"):
-                                        send_welcome_email(data_tutor.get("email"), data_tutor.get("nif"))
+                                        send_welcome_email(data_tutor.get("email"), data_tutor.get("nif"), new_passT, data_tutor.get("nombre"))
                                 creados += 1
                             except Exception as e:
                                 errores.append(f"CIF {cif}: {e}")
