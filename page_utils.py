@@ -24,3 +24,21 @@ def apply_page_config():
 
     st.logo(companyIcon,size="large")
 
+    hide_streamlit_style = """
+    <style>
+    /* Ocultar elementos dentro del iframe */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stHeader"] {display: none;}
+    [data-testid="stFooter"] {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    
+    /* Ajustar padding superior para que no quede hueco vacio */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+    </style>
+"""
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
