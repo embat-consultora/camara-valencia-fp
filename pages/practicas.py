@@ -6,7 +6,7 @@ from modules.data_base import (
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from datetime import datetime, timedelta
-from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica
+from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica,archivoNombre
 from modules.forms_helper import file_size_bytes
 from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email,send_feedback_tutor_email
 from pathlib import Path
@@ -1437,7 +1437,7 @@ def seccion_planificacion(folder_name, practica):
                 st.write("No han subido calendario aun")
         pass
 
-def seccion_documentos(folder_name, practicaId):
+def seccion_documentos(folder_name, alumno, practicaId):
     st.subheader("📎 Documentos")
     files, folderId = list_drive_files_cached(folder_name)
     if files:
@@ -1500,7 +1500,7 @@ def seccion_documentos(folder_name, practicaId):
                         total = len(uploaded_files)
                         st.info(f"Subiendo {total} archivo(s), por favor espera...")
                         for file in uploaded_files:
-                                nuevo_nombre = f"{nombre_limpio}_{apellido_limpio}_{file.name}"
+                                nuevo_nombre = archivoNombre(alumno['nombre'],alumno['apellido'],file.name)
                                 temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                                 with open(temp, "wb") as f:
                                     f.write(file.getbuffer())
@@ -1630,7 +1630,7 @@ def mostrar_detalle():
             with seguimientoTab:
                 seccion_feedback_tutor(practicaId, p, tutor_actual, True)
             with documentacionTab:
-                seccion_documentos(folder_name, practicaId)
+                seccion_documentos(folder_name,alumno, practicaId)
         else:
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
@@ -1645,7 +1645,7 @@ def mostrar_detalle():
                 st.divider()
                 seccion_feedback_candidato(p, practicaId, forms)
             with documentacionTab:
-                seccion_documentos(folder_name, practicaId)
+                seccion_documentos(folder_name,alumno, practicaId)
 
    
 # ------------------------------------------
