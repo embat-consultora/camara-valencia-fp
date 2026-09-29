@@ -4,7 +4,7 @@ from modules.data_base import updateCiclosFormativos, get,getEqual,upsert
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import ciclosFormativosTablas,emailImportantesTabla,formTabla,aniosList
-import os
+
 # Configuración inicial
 apply_page_config()
 make_sidebar()
