@@ -34,6 +34,7 @@ def apply_page_config():
     [data-testid="stFooter"] {display: none;}
     [data-testid="stToolbar"] {display: none;}
     [data-testid="appCreatorAvatar"] {display: none;}
+    [data-testid="appCreatorAvatar"] {display: none;}
     /* Ajustar padding superior para que no quede hueco vacio */
     .block-container {
         padding-top: 1rem !important;
