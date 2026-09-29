@@ -52,5 +52,5 @@ with col2:
         st.write("---")
         st.write(" 🛠️ Página en desarrollo")
         st.write("Contáctanos para recuperar tu contraseña, escribenos a 'antopiscio@gmail.com' con tu email o nombre de usuario")
-        if st.button("Volver al Login", use_container_width=True):
+        if st.button("Volver al Inicio de Sesión", use_container_width=True):
             st.switch_page("streamlit_app.py") # Cambia por la ruta exacta de tu Login principal

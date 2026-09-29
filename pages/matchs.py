@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-from modules.data_base import getMatches, upsert, getOfertaEmpresas,getEquals,crearPractica
+from modules.data_base import getMatches, upsert, getOfertaEmpresas,getEquals,crearPractica,getAlumnosSinPracticas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados,aniosList
@@ -52,7 +52,7 @@ anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 # ---------------------------------
 with st.spinner("Cargando datos..."):
     ofertas = getOfertaEmpresas(necesidadFP, {"anio": anioFiltro})
-    alumnosList = getEquals(alumnosTabla, {"estado": "Sin Empresa", "anio": anioFiltro})
+    alumnosList = getAlumnosSinPracticas(alumnosTabla,  anioFiltro)
     ofertas_con_cupo = [
         oferta for oferta in ofertas
         if any(
@@ -60,9 +60,9 @@ with st.spinner("Cargando datos..."):
             for ciclo_data in (oferta.get("ciclos_formativos") or {}).values()
         )
     ]
-    if not ofertas_con_cupo:
-        st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
-        st.stop()
+if not ofertas_con_cupo:
+    st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
+    st.stop()
 base_url = st.secrets["urls"]["URL"] 
 
 empresas_disponibles = []

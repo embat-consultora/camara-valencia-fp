@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    generarFormularioCierre,finalizarPractica,getEquals, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
+    generarFormularioCierre,finalizarPractica,getEquals,logError, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from datetime import datetime, timedelta
-from modules.drive_helper import list_drive_files, upload_to_drive
+from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica
 from modules.forms_helper import file_size_bytes
 from modules.emailSender import enviarRecordatoriosMasivos, send_welcome_email,send_feedback_tutor_email
 from pathlib import Path
@@ -26,7 +26,6 @@ apply_page_config()
 
 make_sidebar()
 now = datetime.now().isoformat()
-
 # ----------------------------------------------
 # BOTÓN REFRESCAR
 # ----------------------------------------------
@@ -206,7 +205,7 @@ def load_data():
     st.session_state["data_loaded"] = True
     st.session_state["force_reload"] = False
 if st.session_state.get("force_reload") or not st.session_state.get("data_loaded") or not st.session_state.get("practicas"):
-    with st.spinner("Cargando datos de formaciones..."):
+    with st.spinner("Cargando datos de formaciones...la primera vez puede tardar unos minutos"):
         load_data()
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
@@ -1128,19 +1127,68 @@ def seccion_feedback_candidato(p, practicaId, forms):
 
                     st.subheader("Formulario de cierre del tutor de empresa")
 
-                    for seccion, respuestas_seccion in respuestas.items():
-                        if seccion == "tipo":
+                    orden_secciones = [
+                        "valoracion_tutor_empresa",
+                        "insercion_laboral",
+                    ]
+                    etiquetas = {
+                        "actitud_alumnado": "Actitud del alumnado",
+                        "seguimiento_tutor_centro": "Seguimiento del tutor del centro",
+                        "valoracion_general_formacion": "Valoración general de la formación",
+                        "aspectos_positivos": "Aspectos positivos",
+                        "propuestas_mejora": "Propuestas de mejora",
+                        "oferta_relacion_laboral": "Oferta de relación laboral",
+                        "alumno_acepto_oferta": "Aceptación del alumno",
+                        "tipo_contrato": "Tipo de contrato",
+                        "motivo_no_oferta": "Motivo de no ofrecer contrato",
+                        "motivo_no_aceptacion": "Motivo de no aceptación",
+                        "detalle_otros_motivo": "Detalle de otros motivos",
+                        "recomendaria_contratacion": "Recomendaría la contratación",
+                        "motivo_no_recomendacion": "Motivo de no recomendación",
+                    }
+
+                    for seccion in orden_secciones:
+                        respuestas_seccion = respuestas.get(seccion)
+                        if not isinstance(respuestas_seccion, dict):
                             continue
 
                         titulo = seccion.replace("_", " ").capitalize()
                         st.markdown(f"### {titulo}")
 
-                        if isinstance(respuestas_seccion, dict):
-                            for pregunta, respuesta in respuestas_seccion.items():
-                                pregunta_titulo = pregunta.replace("_", " ").capitalize()
-                                st.write(f"**{pregunta_titulo}:** {respuesta}")
+                        if seccion == "valoracion_tutor_empresa":
+                            orden_preguntas = [
+                                "actitud_alumnado",
+                                "seguimiento_tutor_centro",
+                                "valoracion_general_formacion",
+                                "aspectos_positivos",
+                                "propuestas_mejora",
+                            ]
                         else:
-                            st.write(respuestas_seccion)
+                            oferta = respuestas_seccion.get("oferta_relacion_laboral")
+                            aceptacion = respuestas_seccion.get("alumno_acepto_oferta")
+                            orden_preguntas = ["oferta_relacion_laboral"]
+
+                            if oferta == "No":
+                                orden_preguntas.append("motivo_no_oferta")
+                            elif oferta == "Sí":
+                                orden_preguntas.append("alumno_acepto_oferta")
+                                if aceptacion == "Sí":
+                                    orden_preguntas.append("tipo_contrato")
+                                elif aceptacion == "No":
+                                    orden_preguntas.append("motivo_no_aceptacion")
+                                    if respuestas_seccion.get("motivo_no_aceptacion") == "c) Otros":
+                                        orden_preguntas.append("detalle_otros_motivo")
+
+                            orden_preguntas.append("recomendaria_contratacion")
+                            if respuestas_seccion.get("recomendaria_contratacion") == "No":
+                                orden_preguntas.append("motivo_no_recomendacion")
+
+                        for pregunta in orden_preguntas:
+                            if pregunta in respuestas_seccion:
+                                pregunta_titulo = etiquetas.get(
+                                    pregunta, pregunta.replace("_", " ").capitalize()
+                                )
+                                st.write(f"**{pregunta_titulo}:** {respuestas_seccion[pregunta]}")
             else:
                 st.info("Aún no se ha completado el formulario de cierre del tutor de empresa.")
 def seccion_feedback_tutor(practicaId, p, tutor_actual, abierto:None):
@@ -1210,9 +1258,6 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
         if "fp_contacto" not in st.session_state:
             st.session_state.fp_contacto = ultimo_feedback.get("programaFP", False)
 
-        if "fp_pyme_contacto" not in st.session_state:
-            st.session_state.fp_pyme_contacto = ultimo_feedback.get("FPPYME", "No")
-
         with st.form("form_feedback_tutor_centro"):
             comentarios_contacto1 = st.text_area("Comentarios",
                 value=ultimo_feedback.get("primerContacto", ""),
@@ -1220,16 +1265,16 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
 
             fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
                 disabled=not puede_editar, key="fp_contacto")
-
             ha_acogido = st.radio(
                 label="**¿Alguna vez has acogido a algún estudiante de FP dual?**",
-                options=["Sí", "No"],
-                index=0 if st.session_state.fp_pyme_contacto == "Sí" else 1,
+                options=[True, False],
+                index=0 if ultimo_feedback.get("FPPYME") == True else 1,
                 horizontal=True,
                 key="ha_acogido_fp_dual",
+                format_func=lambda x: "Sí" if x else "No",
                 disabled=not puede_editar
             )
-
+            
             submit = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True, disabled= not puede_editar)
 
         if submit:
@@ -1244,7 +1289,8 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
             try:
                 upsert(practicaTabla, {
                     "id": int(practicaId),
-                    "feedback_tutor_centro": nuevo_registro
+                    "feedback_tutor_centro": nuevo_registro,
+                    "fp_dual_cogido":ha_acogido
                 }, keys=["id"])
                 invalidate_runtime_caches()
 
@@ -1267,10 +1313,10 @@ def actualizar_fecha(key_nombre, id_registro, tipo):
         invalidate_runtime_caches()
         st.toast("✅ Fecha actualizada")
 
-def seccion_planificacion(alumno, empresa, practica):
+def seccion_planificacion(folder_name, practica):
     with st.expander("🗓️ Calendario de Formación"):
         practicaId = practica.get("id")
-        folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
+
         files = list_drive_files_cached(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
 
@@ -1391,15 +1437,9 @@ def seccion_planificacion(alumno, empresa, practica):
                 st.write("No han subido calendario aun")
         pass
 
-def seccion_documentos(alumno, empresa, practicaId):
+def seccion_documentos(folder_name, practicaId):
     st.subheader("📎 Documentos")
-
-    folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
     files, folderId = list_drive_files_cached(folder_name)
-    if rol_usuario != 'tutor':
-        if folderId:
-            st.link_button("Abrir carpeta", f"https://drive.google.com/drive/folders/{folderId}")
-
     if files:
         for f in files:
             fecha = f.get("modifiedTime", "")[:10]
@@ -1407,11 +1447,13 @@ def seccion_documentos(alumno, empresa, practicaId):
     else:
         st.warning("No hay documentación subida.")
     if rol_usuario != 'tutor':
+        uploader_version = st.session_state.get(f"uploader_version_{practicaId}",0)
+
         uploaded_files = st.file_uploader(
             "Subir archivos",
             type=["pdf", "doc", "docx", "odt", "jpg", "jpeg", "png"],
             accept_multiple_files=True,
-            key=f"up_{practicaId}"
+            key=f"up_{practicaId}_{uploader_version}"
         )
         st.html(
                     """
@@ -1454,18 +1496,23 @@ def seccion_documentos(alumno, empresa, practicaId):
                 st.error("Archivos demasiado grandes: " + ", ".join(too_big))
             else:
                 if st.button("Subir Archivos", key=f"subir_{practicaId}"):
-                    with st.spinner("Subiendo archivos..."):
+                    try:
+                        total = len(uploaded_files)
+                        st.info(f"Subiendo {total} archivo(s), por favor espera...")
                         for file in uploaded_files:
-                            extension = Path(file.name).suffix
-                            nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
-                            nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
-                            temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
-                            with open(temp, "wb") as f:
-                                f.write(file.getbuffer())
-                            upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
-                            st.success(f"Subido: {nuevo_nombre}")
+                                nuevo_nombre = f"{nombre_limpio}_{apellido_limpio}_{file.name}"
+                                temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
+                                with open(temp, "wb") as f:
+                                    f.write(file.getbuffer())
+                                upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
+                        st.session_state[f"uploader_version_{practicaId}"] = (uploader_version + 1)
+                        list_drive_files_cached.clear()
+                        st.success(f"Subido: {nuevo_nombre}")
+                        st.rerun()
                         invalidate_runtime_caches()
-
+                    except Exception as e:
+                            logError(f"{type(e).__name__}: {str(e)}", "Practica - Subida de Archivos")
+                            st.error(f"❌ Error al subir los archivos: {e}")
 
         
         pass
@@ -1479,7 +1526,7 @@ def mostrar_detalle_cancelada(p):
     oferta = p.get("oferta_fp", {}) or {}
     empresa = p.get("empresas", {}) or {}
     alumno = p.get("alumnos", {}) or {}
-    
+    folder_name= folderNamePractica(alumno['nombre'],alumno['apellido'], alumno['dni'], empresa['nombre'])
     st.title(f"{alumno.get('nombre', '')} {alumno.get('apellido', '')} – {empresa.get('nombre', '')}")
     
     # Detalle expandido en modo estricto de lectura
@@ -1493,9 +1540,9 @@ def mostrar_detalle_cancelada(p):
     st.divider( )
 
 
-    seccion_planificacion_cancelado(alumno, empresa, p)
+    seccion_planificacion_cancelado(folder_name, p)
     st.divider( )
-    seccion_documentacion_cancelado(alumno, empresa)
+    seccion_documentacion_cancelado(folder_name)
 
 def seccion_detalle_cancelado(alumno, empresa, p, oferta):
     st.error(f"ℹ️ **Estado:** {p.get('status')} — **Motivo:** {p.get('motivo') or 'No especificado'}", icon="🚀")
@@ -1520,10 +1567,9 @@ def seccion_detalle_cancelado(alumno, empresa, p, oferta):
         st.write(f"**Tutor Centro:** {p.get('tutor_centro', 'Sin asignar')}")
         st.write(f"**Gestor:** {alumno.get('gestor', 'Sin asignar')}")
 
-def seccion_planificacion_cancelado(alumno, empresa, p):
+def seccion_planificacion_cancelado(folder_name, p):
     st.subheader("📅 Planificación de Formaciones")
-    folder_name = f"{alumno.get('apellido', '')}_{alumno.get('nombre', '')}_{alumno.get('dni', '')}_practica_{empresa.get('nombre', '')}".strip()
-    
+
     archivo_calendario = None
     try:
         files = list_drive_files_cached(folder_name)
@@ -1539,10 +1585,9 @@ def seccion_planificacion_cancelado(alumno, empresa, p):
         else:
             st.markdown('<div style="border: 2px dashed #ccc; border-radius: 10px; height: 350px; display: flex; align-items: center; justify-content: center; color: #aaa; text-align: center; padding: 10px;">No hay archivos de calendario subidos en la carpeta de Drive de esta pasantía.</div>', unsafe_allow_html=True)
 
-def seccion_documentacion_cancelado(alumno,empresa):
+def seccion_documentacion_cancelado(folder_name):
     st.subheader("📎 Documentos Adjuntos")
 
-    folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
     files, folderId = list_drive_files_cached(folder_name)
 
     if files:
@@ -1569,6 +1614,7 @@ def mostrar_detalle():
         oferta = p["oferta_fp"]
         empresa = p["empresas"]
         alumno = p["alumnos"]
+        folder_name= folderNamePractica(alumno['nombre'],alumno['apellido'], alumno['dni'], empresa['nombre'])
         tutor_actual = p.get("tutor") 
         tutorCentro_actual = p.get("tutor_centro") 
         st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
@@ -1580,17 +1626,17 @@ def mostrar_detalle():
         if rol_usuario == 'tutor':
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
-                seccion_planificacion(alumno,empresa, p)
+                seccion_planificacion(folder_name, p)
             with seguimientoTab:
                 seccion_feedback_tutor(practicaId, p, tutor_actual, True)
             with documentacionTab:
-                seccion_documentos(alumno, empresa, practicaId)
+                seccion_documentos(folder_name, practicaId)
         else:
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
                 mostrar_anexos_practica(p)
                 seccion_programar(p)
-                seccion_planificacion(alumno,empresa, p)
+                seccion_planificacion(folder_name, p)
                 seccion_gestion(p)
             with seguimientoTab:
                 seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
@@ -1599,7 +1645,7 @@ def mostrar_detalle():
                 st.divider()
                 seccion_feedback_candidato(p, practicaId, forms)
             with documentacionTab:
-                seccion_documentos(alumno, empresa, practicaId)
+                seccion_documentos(folder_name, practicaId)
 
    
 # ------------------------------------------
@@ -1614,6 +1660,7 @@ def mostrar_detalle():
 # ----------------------------------------------
 # RENDER SEGÚN PÁGINA
 # ----------------------------------------------
+
 if st.session_state.page == "lista":
     mostrar_lista()
 else:

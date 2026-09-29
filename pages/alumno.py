@@ -1,12 +1,10 @@
 import streamlit as st
-import pandas as pd
-import re
 from modules.data_base import getEquals, getPracticas,getFormsLinks
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import alumnosTabla, practicaTabla,estados,max_file_size,carpetaPractica
 from pathlib import Path
-from modules.drive_helper import list_drive_files, upload_to_drive
+from modules.drive_helper import list_drive_files, upload_to_drive, folderNamePractica,archivoNombre
 from modules.forms_helper import file_size_bytes
 import uuid
 
@@ -116,7 +114,8 @@ if (practica.get('status') is not None and practica.get('status') == estados[1])
 st.subheader("📅 Planificación y Calendario de Formación")
 
 # Buscar archivos en Drive dinámicamente
-folder_name = f"{alumno_detalles.get('apellido', '')}_{alumno_detalles.get('nombre', '')}_{alumno_detalles.get('dni', '')}_practica_{empresa.get('nombre', '')}".strip()
+
+folder_name= folderNamePractica(alumno_detalles.get('nombre', ''),alumno_detalles.get('apellido', ''), alumno_detalles.get('dni', ''), empresa.get('nombre', ''))
 
 archivo_calendario = None
 try:
@@ -159,7 +158,6 @@ else:
 
 st.subheader("📎 Adjuntar documentos")
 
-folder_name = f"{alumno_detalles['apellido']}_{alumno_detalles['nombre']}_{alumno_detalles['dni']}_practica_{empresa['nombre']}".strip()
 files, folderId = list_drive_files(folder_name)
 
 if files:
@@ -220,8 +218,7 @@ if uploaded_files:
             with st.spinner("Subiendo archivos..."):
                 for file in uploaded_files:
                     extension = Path(file.name).suffix
-                    nombre_alumno_limpio = f"{alumno_detalles['nombre']}_{alumno_detalles['apellido']}".replace(" ", "_")
-                    nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                    nuevo_nombre = archivoNombre(alumno_detalles['nombre'],alumno_detalles['apellido'],file.name)
                     temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                     with open(temp, "wb") as f:
                         f.write(file.getbuffer())

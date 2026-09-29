@@ -8,7 +8,7 @@ from navigation import make_sidebar
 from variables import usuariosTabla,alumnosTabla, aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,alumnoEstadosTabla,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla
 from datetime import datetime
 from modules.emailSender import send_email, send_welcome_email
-from modules.drive_helper import list_drive_files,upload_to_drive
+from modules.drive_helper import list_drive_files,upload_to_drive,folderNombreAlumno,archivoNombre
 from modules.forms_helper import  file_size_bytes
 import re
 import random
@@ -32,11 +32,16 @@ base_url =  st.secrets["urls"]["URL"]
 alumnos = get(alumnosTabla)
 ciclos, areas = getCiclosYAreas()
 
-if not alumnos:
-    st.warning("No hay alumnos registrados")
-    st.stop()
+# 1. Definir explícitamente las columnas que esperas recibir
+COLUMNAS = [
+    "ciclo_formativo", "anio", "curso",
+    "dni", "nombre", "apellido", "direccion", 
+    "localidad", "telefono", "email_alumno", 
+    "vehiculo", "tipoPractica"
+]
 
-df_alumnos = pd.DataFrame(alumnos)
+df_alumnos = pd.DataFrame(alumnos) if alumnos else pd.DataFrame(columns=COLUMNAS)
+
 
 
 # --- Tabs principales ---
@@ -234,7 +239,7 @@ with tab1:
 
 
             with subtab3:
-                folder_name = f"{alumno['nombre']}_{alumno['apellido']}_{alumno['dni']}".strip()
+                folder_name = folderNombreAlumno(alumno['nombre'], alumno['apellido'], alumno['dni'])
                 files, folderId = list_drive_files(folder_name)
 
                 if not files:
@@ -273,8 +278,7 @@ with tab1:
 
                                 for i, file in enumerate(uploaded_files, start=1):
                                     extension = Path(file.name).suffix
-                                    nombre_alumno_limpio = f"{alumno['nombre']}_{alumno['apellido']}".replace(" ", "_")
-                                    nuevo_nombre = f"{nombre_alumno_limpio}_{file.name}"
+                                    nuevo_nombre = archivoNombre(alumno['nombre'],alumno['apellido'],file.name)
                                     tmp_path = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
                                     with open(tmp_path, "wb") as f:
                                         f.write(file.getbuffer())
@@ -534,11 +538,6 @@ with tab3:
         st.session_state.emailsList = []
     st.write("🎓 Contactar Alumnos")
     
-    if not alumnos:
-        st.warning("No hay alumnos registrados")
-        st.stop()
-
-    df_alumnos = pd.DataFrame(alumnos)
     df_clean_al = df_alumnos.dropna(subset=["email_alumno", "nombre"]).copy()
 
     # Opcional: Eliminar también si el email es un string vacío "" (no solo nulo)

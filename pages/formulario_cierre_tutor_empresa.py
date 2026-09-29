@@ -136,25 +136,39 @@ with st.form("feedback_form"):
 # --- PROCESAMIENTO POST-ENVÍO ---
 if submit_button:
     with st.spinner("Guardando tu respuesta..."):
+        valoracion_tutor_empresa = {
+            "actitud_alumnado": actitud,
+            "seguimiento_tutor_centro": seguimiento_tutor_centro,
+            "valoracion_general_formacion": valoracion_general,
+            "aspectos_positivos": aspectos_positivos,
+            "propuestas_mejora": propuestas_mejora,
+        }
+
+        insercion_laboral = {
+            "oferta_relacion_laboral": oferta_relacion_laboral,
+        }
+
+        if oferta_relacion_laboral == "No":
+            insercion_laboral["motivo_no_oferta"] = motivo_no_oferta
+        else:
+            insercion_laboral["alumno_acepto_oferta"] = alumno_acepto_oferta
+
+            if alumno_acepto_oferta == "Sí":
+                insercion_laboral["tipo_contrato"] = tipo_contrato
+            else:
+                insercion_laboral["motivo_no_aceptacion"] = motivo_no_aceptacion
+
+                if motivo_no_aceptacion == "c) Otros":
+                    insercion_laboral["detalle_otros_motivo"] = detalle_otros_motivo
+
+        insercion_laboral["recomendaria_contratacion"] = recomendaria_contratacion
+        if recomendaria_contratacion == "No":
+            insercion_laboral["motivo_no_recomendacion"] = motivo_no_recomendacion
+
         respuestas_json = {
             "tipo": tipo_form,
-            "valoracion_tutor_empresa": {
-                "actitud_alumnado": actitud,
-                "seguimiento_tutor_centro": seguimiento_tutor_centro,
-                "valoracion_general_formacion": valoracion_general,
-                "aspectos_positivos": aspectos_positivos,
-                "propuestas_mejora": propuestas_mejora,
-            },
-            "insercion_laboral": {
-                "oferta_relacion_laboral": oferta_relacion_laboral,
-                "motivo_no_oferta": motivo_no_oferta,
-                "tipo_contrato": tipo_contrato,
-                "alumno_acepto_oferta": alumno_acepto_oferta,
-                "motivo_no_aceptacion": motivo_no_aceptacion,
-                "detalle_otros_motivo": detalle_otros_motivo,
-                "recomendaria_contratacion": recomendaria_contratacion,
-                "motivo_no_recomendacion": motivo_no_recomendacion,
-            },
+            "valoracion_tutor_empresa": valoracion_tutor_empresa,
+            "insercion_laboral": insercion_laboral,
         }
 
         payload = {

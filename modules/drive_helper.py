@@ -104,9 +104,11 @@ def create_drive_folder_practica(dni, nombre, apellido, empresa, folder_id):
 
     # --- 1. Definir nombres de carpetas ---
     # Carpeta Destino: Practica
-    nombre_folder_practica = f"{apellido}_{nombre}_{dni}_practica_{empresa['nombre']}".strip()
+    nombre_limpio = "-".join(nombre.strip().split())
+    apellido_limpio = "-".join(apellido.strip().split())
+    nombre_folder_practica = f"{apellido_limpio}_{nombre_limpio}_{dni}_practica_{empresa['nombre']}".strip()
     # Carpeta Origen: Legajo Alumno (Asegúrate que coincida con cómo guardaste el CV antes)
-    nombre_folder_alumno = f"Alumno - {nombre}_{apellido}_{dni}".strip()
+    nombre_folder_alumno = f"Alumno - {nombre_limpio}_{apellido_limpio}_{dni}".strip()
     st.write(nombre_folder_practica)
     try:
         # --- 2. Obtener o Crear Carpeta de la formación ---
@@ -178,3 +180,25 @@ def delete_drive_file(file_id: str, file_name: str):
 
     except Exception as e:
         st.error(f"❌ No se pudo eliminar el archivo '{file_name}': {e}")
+
+
+def folderNamePractica(nombre, apellido, dni, empresa):
+    apellido_limpio = "_".join(apellido.split())
+    nombre_limpio = "_".join(nombre.split())
+    empresa_limpio = "_".join(empresa.split())
+    folder_name = f"{nombre_limpio}_{apellido_limpio}_{dni}_practica_{empresa_limpio}".strip()
+    return folder_name
+
+
+def folderNombreAlumno(nombre, apellido, dni):
+    apellido_limpio = "_".join(apellido.split())
+    nombre_limpio = "_".join(nombre.split())
+    folder_name = f"{nombre_limpio}_{apellido_limpio}_{dni}".strip()
+    return folder_name
+
+def archivoNombre(nombre, apellido, archivo):
+    apellido_limpio = "_".join(apellido.split())
+    nombre_limpio = "_".join(nombre.split())
+    archivo_limpio = "_".join(archivo.split())
+    archivo_nombre = f"{nombre_limpio}_{apellido_limpio}_{archivo_limpio}".strip()
+    return archivo_nombre

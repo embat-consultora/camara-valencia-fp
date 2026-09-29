@@ -2,8 +2,8 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime
 import  uuid
-from modules.emailSender import send_email, send_welcome_email
-from modules.drive_helper import upload_to_drive
+from modules.emailSender import send_welcome_email
+from modules.drive_helper import upload_to_drive,folderNombreAlumno
 from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
 from modules.forms_helper import required_ok, file_size_bytes, slug
 from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
@@ -250,8 +250,8 @@ if submit:
                     f.write(cv_file.getbuffer())
                 
                 # upload_to_drive(path, folder_id, dni) -> ajusta si tu helper usa otro tercer parámetro
-                folderName= payload["nombre"]+"_"+payload["apellido"]+"_"+payload["dni"]
-                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName,cv_file.name )
+                folderName =folderNombreAlumno(payload["nombre"],payload["apellido"],payload["dni"])
+                res = upload_to_drive(str(tmp_path), carpetaAlumnos, folderName, cv_file.name )
                 if isinstance(res, dict):
                     file_id = res.get("id")
                     link = res.get("webViewLink") or res.get("webContentLink")

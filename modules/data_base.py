@@ -408,6 +408,10 @@ def get(tableName):
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
+
+def getAlumnosSinPracticas(tableAlumno, filtroAnio):
+    response = supabase.table(tableAlumno).select("*, practicas_fp(*)").eq("estado", "Sin Empresa").eq("anio",filtroAnio).is_("practicas_fp.id", "null").execute()
+    return response
 def getEquals(tableName, conditions: dict, in_filters: dict = None, not_equals: dict = None):
     query = supabase.table(tableName).select("*")
     if conditions:
@@ -904,6 +908,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         if cambio_logistica:
                 if nueva_empresa == "⚠️ SIN ASIGNAR":
                     newCif = None
+                    print(f"entro a crear - nuevo empresa {newCif}")
                 if nueva_empresa != "⚠️ SIN ASIGNAR":
                     newCif = mapa_nombres_id.get(nueva_empresa)                
                 practica_res = crearDraftPractica(
@@ -915,7 +920,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                     tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
                     oferta_id=nueva_oferta if nueva_oferta else antigua_oferta,
                     status=estados[5],
-                    practicaId=row.get('practica_id'),
+                    practicaId=None if pd.isna(row.get('practica_id')) else row.get('practica_id') ,
                     gestor=curr_gestor if curr_gestor else orig_gestor,
                     direccion=nueva_direccion if nueva_direccion else antigua_direccion,
                     localidad=nueva_localidad if nueva_localidad else antigua_localidad,
@@ -961,7 +966,7 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
             "curso": curso
         }
 
-        print(f"entro a crear practica {payload_practica}")
+        print(f"entro a crear/update practica {payload_practica}")
         if practicaId:
             payload_practica["id"] = int(practicaId)
             print(f"entro a actualizar")
@@ -974,11 +979,8 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
         
         #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
-def finalizarPractica(practica, comentario):
+def finalizarPractica(practica):
     practicaId = practica.get("id")
-    datos_cierre = {
-                "comentario": comentario
-            }
     payload_practica = {"id": int(practicaId),"status":estados[2],
                          "fecha_fin_real": datetime.now().isoformat()
                         }

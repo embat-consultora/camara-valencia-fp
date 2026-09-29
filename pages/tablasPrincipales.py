@@ -397,44 +397,61 @@ with tab_alumnos:
                             }
                         """),
                         onCellValueChanged=JsCode(f"""
-                                function(params) {{
-                                    // Usamos el JSON de ciclos que tiene los disponibles
-                                    const mapeoCiclos = {json_ciclo_empresas}; 
-                                    const nuevaEmpresa = params.data.nombre_empresa;
-                                    const ciclo = params.data.ciclo_formativo;
-                                    
-                                    let totalCupos = 0;
-                                    let ofertaId = null;
-                                    let email_empresa = null;
-                                    let direccion_empresa = null;
-                                    let localidad_empresa = null;
+                            function(params) {{
+                                const mapeoCiclos = {json_ciclo_empresas};
+                                const nuevaEmpresa = params.data.nombre_empresa;
+                                const ciclo = params.data.ciclo_formativo;
+
+                                let totalCupos = 0;
+                                let ofertaId = null;
+                                let email_empresa = null;
+                                let direccion_empresa = null;
+                                let localidad_empresa = null;
+
+                                if (nuevaEmpresa === '⚠️ SIN ASIGNAR') {{
+                                    params.data.email_empresa = '';
+                                    params.data.area = '';
+                                    params.data.oferta = '';
+                                    params.data.cupos_disponibles = null;
+                                    params.data.puesto = null;
+                                    params.data.direccion_empresa = '';
+                                    params.data.localidad_empresa = '';
+                                }} else {{
                                     if (mapeoCiclos[ciclo]) {{
-                                        const empData = mapeoCiclos[ciclo].find(e => e.nombre === nuevaEmpresa);
-                                        if (empData) 
-                                        totalCupos = empData.disponibles;
-                                        ofertaId = empData.oferta; 
-                                        email_empresa = empData.email_empresa;
-                                        direccion_empresa = empData.direccion_empresa;
-                                        localidad_empresa = empData.localidad_empresa;
+                                        const empData = mapeoCiclos[ciclo]
+                                            .find(e => e.nombre === nuevaEmpresa);
+
+                                        if (empData) {{
+                                            totalCupos = empData.disponibles;
+                                            ofertaId = empData.oferta;
+                                            email_empresa = empData.email_empresa;
+                                            direccion_empresa = empData.direccion_empresa;
+                                            localidad_empresa = empData.localidad_empresa;
+                                        }}
                                     }}
 
-                                    // Actualizamos el valor en la fila (esto dispara el cellRenderer de la otra columna)
                                     params.data.cupos_disponibles = totalCupos;
-                                    params.data.puesto = null; 
+                                    params.data.puesto = null;
                                     params.data.oferta = ofertaId;
                                     params.data.email_empresa = email_empresa;
                                     params.data.direccion_empresa = direccion_empresa;
                                     params.data.localidad_empresa = localidad_empresa;
-
-                                    // Refrescamos ambas celdas para que el usuario vea el cambio visual
-                                    params.api.refreshCells({{
-                                        rowNodes: [params.node], 
-                                        columns: ['cupos_disponibles', 'puesto','area',"oferta","email_empresa","direccion_empresa","localidad_empresa"]
-                                    }});
                                 }}
-                            """),
-                        editable=True,
-                        width=200
+
+                                params.api.refreshCells({{
+                                    rowNodes: [params.node],
+                                    columns: [
+                                        'cupos_disponibles',
+                                        'puesto',
+                                        'area',
+                                        'oferta',
+                                        'email_empresa',
+                                        'direccion_empresa',
+                                        'localidad_empresa'
+                                    ]
+                                }});
+                            }}
+                        """),
                     )
 
                     gb.configure_column("asignado", 
@@ -578,7 +595,7 @@ with tab_alumnos:
                     # modifica los anchos y elimina el scroll horizontal.
                     gridOptions.pop("autoSizeStrategy", None)
                     gridOptions["rowHeight"] = 42
-                    grid_height = min(600, max(120, 52 + len(df_display) * 42 + 18))
+                    grid_height = min(700, max(120, 52 + len(df_display) * 42 + 18))
                     grid_columns_state = {
                         "state": [
                             {"colId": "ciclo_acronimo", "width": 150},
@@ -615,6 +632,9 @@ with tab_alumnos:
 
                     if st.button("💾 Guardar Cambios Alumnos", type="primary",width='stretch'):
                         df_grid = grid_response['data']
+                        print(df_display)
+
+                        print(df_grid)
                         with st.spinner("Guardando datos"):
                             try:
                                 guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)

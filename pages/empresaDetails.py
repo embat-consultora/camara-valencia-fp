@@ -5,7 +5,7 @@ from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPra
 from navigation import make_sidebar
 from variables import empresasTabla, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
-from modules.drive_helper import list_drive_files, upload_to_drive
+from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica
 from pathlib import Path
 import uuid
 apply_page_config()
@@ -372,7 +372,7 @@ def seccion_planificacion(alumno, empresa, practica):
         st.subheader("📅 Planificación de Formaciones")
         practicaId = practica.get("id")
         cancelada_finalizada = practica.get("status") == estadosPractica[3] or practica.get("status") == estadosPractica[2]
-        folder_name = f"{alumno['apellido']}_{alumno['nombre']}_{alumno['dni']}_practica_{empresa['nombre']}".strip()
+        folder_name= folderNamePractica(alumno['nombre'],alumno['apellido'], alumno['dni'], empresa['nombre'])
         files = list_drive_files(folder_name)
         archivo_calendario = next((f for f in files[0] if "calendario" in f['name']), None)
 
@@ -442,10 +442,13 @@ def seccion_planificacion(alumno, empresa, practica):
                 if uploaded_cal:
                     if st.button("Guardar", key=f"btn_save_cal_{practicaId}"):
                         with st.spinner("Subiendo imagen..."):
-                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{uploaded_cal.name}"
+                            original_name = uploaded_cal.name
+                            if not original_name.lower().startswith("calendario"):
+                                original_name = f"calendario_{original_name}"
+                            temp_path = Path("/tmp") / f"CAL_{uuid.uuid4()}_{original_name}"
                             with open(temp_path, "wb") as f:
                                 f.write(uploaded_cal.getbuffer())
-                            upload_to_drive(str(temp_path), carpetaPractica, folder_name, uploaded_cal.name)
+                            upload_to_drive(str(temp_path), carpetaPractica, folder_name,original_name)
                             st.success("Imagen guardada.")
                             st.rerun()
 

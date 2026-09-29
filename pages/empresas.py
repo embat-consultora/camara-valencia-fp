@@ -26,11 +26,12 @@ if "form_registro_key" not in st.session_state:
     st.session_state.form_registro_key = 0
 # --- Traer todas las empresas ---
 empresas = get(empresasTabla)
-if not empresas:
-    st.warning("No hay empresas registradas")
-    st.stop()
 
-df_empresas = pd.DataFrame(empresas)
+COLUMNAS = [
+    "CIF","created_at",'nombre', 'direccion', 'localidad', 'telefono', 'email_empresa'
+]
+df_empresas = pd.DataFrame(empresas) if empresas else pd.DataFrame(columns=COLUMNAS)
+
 df_empresas = df_empresas[df_empresas["CIF"] != "00000000"]
 # --- Tabs principales ---
 tab1, tab2, tab3 = st.tabs(["🏢 Buscar/Visualizar", "➕ Nueva Empresa", "📨 Formularios & Contacto"])
@@ -421,7 +422,7 @@ with tab2:
                                     "password": new_passT if data_tutor.get("nif") else "123456",
                                     "rol": "tutor",}, keys=["email"], return_created=True)
                                     if usuario_creadoT and data_tutor.get("nif"):
-                                        send_welcome_email(data_tutor.get("email"), data_tutor.get("nif"), new_passT, data_tutor.get("nombre"))
+                                        send_welcome_email(data_tutor.get("email"), data_tutor.get("email"), new_passT, data_tutor.get("nombre"))
                                 creados += 1
                             except Exception as e:
                                 errores.append(f"CIF {cif}: {e}")
@@ -449,11 +450,6 @@ with tab3:
         st.session_state.emailsList = []
     st.write("🎓 Contactar Empresas")
     
-    if not empresas:
-        st.warning("No hay empresas registrados")
-        st.stop()
-
-    df_empresas = pd.DataFrame(empresas)[["CIF", "nombre", "email_empresa"]]
     df_clean = df_empresas.dropna(subset=["nombre", "email_empresa"]).drop_duplicates()
     emailsEmpresasClean =df_clean["email_empresa"].dropna().unique().tolist()
     nombreEmpresasClean =df_clean["nombre"].dropna().unique().tolist()
