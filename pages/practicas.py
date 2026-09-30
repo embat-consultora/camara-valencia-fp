@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    generarFormularioCierre,finalizarPractica,getEquals,logError, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
+    generarFormularioCierre,finalizarPractica,getEquals,logError,update, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -390,6 +390,7 @@ def dialog_finalizar(practica):
         )
     if st.button("Confirmar", type="primary"):
         finalizarPractica(practica)
+        update(alumnosTabla, {"estado": estadosAlumno[0]}, {"dni": practica.get("alumno")})
         link_cierre = generarFormularioCierre(practica.get("id"), tutor_email)
         alumno = practica.get("alumnos") or {}
         nombre_alumno = f"{alumno.get('nombre', '')} {alumno.get('apellido', '')}".strip()

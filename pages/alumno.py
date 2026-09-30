@@ -30,7 +30,7 @@ def fetch_practicas_alumno():
     todas_las_practicas = getPracticas(practicaTabla, {"alumno": dniAlumno})
     practica_res = [
     p for p in todas_las_practicas 
-    if p.get("status") not in [estados[3], estados[2],estados[5]]  # Excluir prácticas con estado "Canceladas" o "Finalizada" o "Borrador"
+    if p.get("status") not in [estados[5]]  # Excluir prácticas con estado "Canceladas" o "Finalizada" o "Borrador"
 ]
     st.session_state["practicas"] = practica_res
     return practica_res

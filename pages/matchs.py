@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import json
-from modules.data_base import getMatches, upsert, getOfertaEmpresas,getEquals,crearPractica,getAlumnosSinPracticas
+from modules.data_base import getMatches,actualizar_cupo, upsert, getOfertaEmpresas,getEquals,crearPractica,getAlumnosSinPracticas
 from page_utils import apply_page_config
 from navigation import make_sidebar
 from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados,aniosList
 from datetime import datetime
 from modules.text_helper import st_custom_message
-import os
 now = datetime.now().isoformat()
 
 def checkEstadoOferta(ofertaId):
@@ -160,11 +159,13 @@ for oferta_data in ofertas:
                 )
                 area = (
                     oferta_data.get("puestos", {})
-                    .get('area', [{}])[0]
-                    .get("proyecto")
+                    .get(ciclo, [{}])[0]
+                    .get("area")
                     or "No completado"
                 )
+                st.write(f"**Area:**",area  )
                 st.write(f"**Proyectos:**",proyecto  )
+                
                 st.write(f"📦 Plazas disponibles: {cupos_disp}/{cupos_total}")
 
                 if cupos_disp <= 0:
@@ -202,12 +203,17 @@ for oferta_data in ofertas:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
                                                 curso =  row['curso']
-                                                st.write(f"Curso del alumno: {curso}")
                                                 crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4], anio=anioFiltro, curso=curso)
+                                                print('practica creada')
+                                                checkEstadoOferta(oferta_id)
+                                                print('oferta actualizada')
+                                                actualizar_cupo(empresa.get("CIF"), ciclos_info, -1)
+                                                print('cupo actualizado')
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
                                             except Exception as e:
                                                 st.error(f"❌ Error al crear el match: {e}")
+                                                
                                     else:
                                         st.info("Plazas completos para este ciclo.")
                                 
@@ -227,11 +233,11 @@ for oferta_data in ofertas:
                             # Buscar información del alumno
                             alumno_info = next((a for a in alumnosList if a["dni"] == dni_alumno), None)
                             if alumno_info:
-                                st.write(f"**Ciclo formativo:** {', '.join(alumno_info.get('ciclo_formativo', [])) if isinstance(alumno_info.get('ciclo_formativo'), list) else alumno_info.get('ciclo_formativo', 'No especificado')}")
-                                st.write(f"**Preferencias FP:** {', '.join(alumno_info.get('preferencias_fp', [])) if isinstance(alumno_info.get('preferencias_fp'), list) else alumno_info.get('preferencias_fp', 'No especificado')}")
-                                st.write(f"**Vehículo:** {alumno_info.get('vehiculo', 'No especificado')}")
-                                st.write(f"**Localidad:** {alumno_info.get('localidad', 'No especificado')}")
-                                st.write(f"**Requisitos:** {alumno_info.get('requisitos', 'No especificado')}")
+                                st.write(f"**Ciclo formativo:** {(', '.join(alumno_info.get('ciclo_formativo', [])) if isinstance(alumno_info.get('ciclo_formativo'), list) else alumno_info.get('ciclo_formativo')) or 'No especificado'}")
+                                st.write(f"**Preferencias FP:** {(', '.join(alumno_info.get('preferencias_fp', [])) if isinstance(alumno_info.get('preferencias_fp'), list) else alumno_info.get('preferencias_fp')) or 'No especificado'}")
+                                st.write(f"**Vehículo:** {alumno_info.get('vehiculo') or 'No especificado'}")
+                                st.write(f"**Localidad:** {alumno_info.get('localidad') or 'No especificado'}")
+                                st.write(f"**Requisitos:** {alumno_info.get('requisitos') or 'No especificado'}")
                                 
 
                     with colMatch:  
@@ -242,6 +248,7 @@ for oferta_data in ofertas:
                                 try:
                                     crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status=estados[4], anio=anioFiltro, curso=curso)
                                     checkEstadoOferta(oferta_id)
+                                    actualizar_cupo(empresa.get("CIF"), ciclos_info, -1)
                                     st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")
                                     st.rerun()
                                 except Exception as e:

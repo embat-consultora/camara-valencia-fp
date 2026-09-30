@@ -389,12 +389,17 @@ def getOfertasTabla(anio=None):
     if df.empty:
         return df
 
-    def tiene_disponibilidad(ciclos):
-        if not ciclos or not isinstance(ciclos, dict):
-            return False
-        return any((ciclo.get("disponibles") or 0) > 0 for ciclo in ciclos.values())
+    def ciclos_con_disponibilidad(ciclos):
+        if not isinstance(ciclos, dict):
+            return {}
+        return {
+            nombre: ciclo
+            for nombre, ciclo in ciclos.items()
+            if (ciclo.get("disponibles") or 0) > 0
+        }
 
-    df = df[df["ciclos_formativos"].apply(tiene_disponibilidad)]
+    df["ciclos_formativos"] = df["ciclos_formativos"].apply(ciclos_con_disponibilidad)
+    df = df[df["ciclos_formativos"].map(bool)]
     return df
 
 def updateOfertasTabla(update_payload, id_oferta):
@@ -411,7 +416,7 @@ def getEqual(tableName, variable, value):
 
 def getAlumnosSinPracticas(tableAlumno, filtroAnio):
     response = supabase.table(tableAlumno).select("*, practicas_fp(*)").eq("estado", "Sin Empresa").eq("anio",filtroAnio).is_("practicas_fp.id", "null").execute()
-    return response
+    return response.data
 def getEquals(tableName, conditions: dict, in_filters: dict = None, not_equals: dict = None):
     query = supabase.table(tableName).select("*")
     if conditions:
@@ -650,8 +655,7 @@ def getMatches(ciclo):
         of.*,
         of.ciclos_formativos::jsonb AS ciclos_js
       FROM oferta_fp of
-      WHERE LOWER(of.estado) = 'nuevo'
-        AND of.cupo_alumnos > 0
+      WHERE of.cupo_alumnos > 0
         AND of.anio = '{ciclo_safe}'
     ),
     alumnos_disponibles AS (
@@ -908,28 +912,34 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         if cambio_logistica:
                 if nueva_empresa == "⚠️ SIN ASIGNAR":
                     newCif = None
-                    print(f"entro a crear - nuevo empresa {newCif}")
+                    print(f"Entro a sin asignar")
+                    if practicaId is not None: 
+                        print(f"Elimino borrador - practica {practicaId}")
+                        delete(practicaTabla, "id", practicaId)
+                        upsert(alumnosTabla, {"dni": dni,"estado": estadosAlumno[0]}, keys=["dni"])
                 if nueva_empresa != "⚠️ SIN ASIGNAR":
-                    newCif = mapa_nombres_id.get(nueva_empresa)                
-                practica_res = crearDraftPractica(
-                    empresaCif=newCif,
-                    alumnoDni=dni,
-                    ciclo=row['ciclo_formativo'], 
-                    area= nuevo_area if nuevo_area else antiguo_area,
-                    proyecto=nuevo_puesto if nuevo_puesto else antiguo_puesto,
-                    tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
-                    oferta_id=nueva_oferta if nueva_oferta else antigua_oferta,
-                    status=estados[5],
-                    practicaId=None if pd.isna(row.get('practica_id')) else row.get('practica_id') ,
-                    gestor=curr_gestor if curr_gestor else orig_gestor,
-                    direccion=nueva_direccion if nueva_direccion else antigua_direccion,
-                    localidad=nueva_localidad if nueva_localidad else antigua_localidad,
-                    anio=curr_anio,
-                    curso=curr_curso
-                )
-                practicaId = practica_res[0].get("id")
-                print(f"Practica: {practicaId}")
-        
+                    newCif = mapa_nombres_id.get(nueva_empresa)        
+                    upsert(alumnosTabla, {"dni": dni,"estado":estadosAlumno[5]}, keys=["dni"])
+                    print(f"Entro a crear - nueva empresa {newCif}")
+                    practica_res = crearDraftPractica(
+                        empresaCif=newCif,
+                        alumnoDni=dni,
+                        ciclo=row['ciclo_formativo'], 
+                        area= nuevo_area if nuevo_area else antiguo_area,
+                        proyecto=nuevo_puesto if nuevo_puesto else antiguo_puesto,
+                        tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
+                        oferta_id=nueva_oferta if nueva_oferta else antigua_oferta,
+                        status=estados[5],
+                        practicaId=None if pd.isna(row.get('practica_id')) else row.get('practica_id') ,
+                        gestor=curr_gestor if curr_gestor else orig_gestor,
+                        direccion=nueva_direccion if nueva_direccion else antigua_direccion,
+                        localidad=nueva_localidad if nueva_localidad else antigua_localidad,
+                        anio=curr_anio,
+                        curso=curr_curso
+                    )
+                    practicaId = practica_res[0].get("id")
+                    print(f"Practica: {practicaId}")
+            
         if curr_asignado != orig_asignado:
             print(f"Cambio estado de practica {practicaId}")
             cif_nuevo = mapa_nombres_id.get(nueva_empresa)

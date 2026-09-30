@@ -108,8 +108,10 @@ def make_sidebar():
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "empresa":
                     st.page_link("pages/empresaDetails.py", label="Mi Empresa")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "alumno":
                     st.page_link("pages/alumno.py", label="Mi Formación en Empresa")
+                    st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if st.button(logoutButton):
                     logout()
 

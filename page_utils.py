@@ -19,27 +19,26 @@ def apply_page_config():
         page_title=title,
         page_icon=page_icon,  # You can use an emoji or a URL to an icon image
         layout="wide", # Optional: You can set the layout as "centered" or "wide"
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="expanded"
     )
 
     st.logo(companyIcon,size="large")
 
-    hide_streamlit_style = """
-    <style>
-    /* Ocultar elementos dentro del iframe */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    [data-testid="stHeader"] {display: none;}
-    [data-testid="stFooter"] {display: none;}
-    [data-testid="stToolbar"] {display: none;}
-    [data-testid="appCreatorAvatar"] {display: none;}
-    [data-testid="appCreatorAvatar"] {display: none;}
-    /* Ajustar padding superior para que no quede hueco vacio */
-    .block-container {
-        padding-top: 1rem !important;
-    }
-    </style>
-"""
-    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+#     hide_streamlit_style = """
+#     <style>
+#     /* Ocultar elementos dentro del iframe */
+#     #MainMenu {visibility: hidden;}
+#     header {visibility: hidden;}
+#     footer {visibility: hidden;}
 
+#     [data-testid="stFooter"] {display: none;}
+#     [data-testid="stToolbar"] {display: none;}
+#     [data-testid="appCreatorAvatar"] {display: none;}
+#     [data-testid="appCreatorAvatar"] {display: none;}
+#     /* Ajustar padding superior para que no quede hueco vacio */
+#     .block-container {
+#         padding-top: 1rem !important;
+#     }
+#     </style>
+# """
+#     st.markdown(hide_streamlit_style, unsafe_allow_html=True)

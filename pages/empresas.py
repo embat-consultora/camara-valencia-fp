@@ -5,7 +5,7 @@ from modules.data_base import get, getEquals, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, aniosList, empresaEstadosTabla,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
+from variables import empresasTabla, necesidadFP, estados, aniosList,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email,send_welcome_email
 import re
@@ -120,7 +120,7 @@ with tab1:
             except (ValueError, TypeError):
                 default_index_loc = 10
             new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc, key=f"localidad_emp_{empresa_id}")
-            new_cif = st.text_input("CIF", empresa.get("CIF", ""))
+            new_cif = st.text_input("CIF", empresa.get("CIF", ""), disabled=True)
             new_telefono = st.text_input("Teléfono", empresa.get("telefono", ""))
             new_email = st.text_input("Email", empresa.get("email_empresa", ""))
 
@@ -538,13 +538,6 @@ with tab3:
                 for email in final_list:
                     empresa = df_empresas[df_empresas["email_empresa"] == email]
 
-                    if not empresa.empty:
-                        cif = empresa["CIF"].values[0]
-                        upsert(
-                            empresaEstadosTabla,
-                            {"empresa": cif, "email_enviado": fecha_envio},
-                            keys=["empresa"]
-                        )
                 st.success("Emails enviados correctamente! 🚀")
         except Exception as e:
             st.error(f"Falló el envío de mail: {e}")

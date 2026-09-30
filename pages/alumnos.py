@@ -485,7 +485,6 @@ with tab2:
                                 "NIA": row.get("NIA", "").strip(),
                                 "telefono": row.get("telefono", "").strip(),
                                 "email_alumno": row.get("email_alumno", "").strip(),
-                                "estado": "Sin Empresa",
                                 "tipoPractica": row.get("tipoPractica", "").strip(),
                                 "anio": re.sub(r"['\"]", "", row.get("anio", "")).strip(),
                                 "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip(),

@@ -126,28 +126,28 @@ if "grid_version" not in st.session_state:
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 cursoFiltro = cursoList[st.session_state.get("index_curso", 0)]
 
-@st.cache_data(ttl=120)
+
 def get_data_cached(anio, curso):
     print("Cargando datos desde la base de datos...")
     return get_alumnos_con_practicas_consolidado(anio, curso)
 
-@st.cache_data(ttl=120)
+
 def get_gestores_cached():
     return getGestores()
 
-@st.cache_data(ttl=120)
+
 def get_tutores_cached():
     return getTutores()
 
-@st.cache_data(ttl=120)
+
 def get_empresas_ofertas_cached():
     return getEmpresasYOfertas()
 
-@st.cache_data(ttl=120)
+
 def get_gestores_ofertas_cached():
     return getGestore()
 
-@st.cache_data(ttl=120)
+
 def get_ofertas_cached(anio=None):
     return getOfertasTabla(anio) if anio is not None else getOfertasTabla()
 
@@ -428,14 +428,15 @@ with tab_alumnos:
                                             direccion_empresa = empData.direccion_empresa;
                                             localidad_empresa = empData.localidad_empresa;
                                         }}
+                                        params.data.cupos_disponibles = totalCupos;
+                                        params.data.puesto = null;
+                                        params.data.oferta = ofertaId;
+                                        params.data.email_empresa = email_empresa;
+                                        params.data.direccion_empresa = direccion_empresa;
+                                        params.data.localidad_empresa = localidad_empresa;
                                     }}
 
-                                    params.data.cupos_disponibles = totalCupos;
-                                    params.data.puesto = null;
-                                    params.data.oferta = ofertaId;
-                                    params.data.email_empresa = email_empresa;
-                                    params.data.direccion_empresa = direccion_empresa;
-                                    params.data.localidad_empresa = localidad_empresa;
+
                                 }}
 
                                 params.api.refreshCells({{
@@ -595,7 +596,7 @@ with tab_alumnos:
                     # modifica los anchos y elimina el scroll horizontal.
                     gridOptions.pop("autoSizeStrategy", None)
                     gridOptions["rowHeight"] = 42
-                    grid_height = min(700, max(120, 52 + len(df_display) * 42 + 18))
+                    grid_height = min(850, max(180, 52 + len(df_display) * 50 + 18))
                     grid_columns_state = {
                         "state": [
                             {"colId": "ciclo_acronimo", "width": 150},
@@ -664,7 +665,6 @@ with tab_ofertas:
         gestores_activos_df = []
         
     df_raw_ofertas = get_ofertas_cached(anioFiltro)
-
     if df_raw_ofertas.empty:
         st.info("No hay ofertas registradas.")
     else:
@@ -808,8 +808,8 @@ with tab_ofertas:
                                     st.success(f"Actualizada correctamente")
                                 except Exception as e:
                                     st.error(f"Error: {e}")
-                            get_ofertas_cached.clear()
-                            get_empresas_ofertas_cached.clear()
+                            get_ofertas_cached
+                            get_empresas_ofertas_cached
                             st.rerun()
 
 # --- TAB CONFIGURACIÓN (Solo Admin) ----

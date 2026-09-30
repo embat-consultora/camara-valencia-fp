@@ -1,7 +1,7 @@
 import streamlit as st
 from page_utils import apply_page_config
 from navigation import make_sidebar
-import pandas as pd
+from variables import nombres_roles
 # Configuración inicial de página
 apply_page_config()
 make_sidebar()
@@ -103,7 +103,7 @@ datos_roles = {
             }
         ],
     },
-    "Tutor (empresa)": {
+    "Tutor en Empresa": {
         "descripcion": "Realiza el seguimiento diario y evaluación práctica de los alumnos que tiene a su cargo.",
         "paginas_acceso": ["Formación en Empresa"],
         "recursos": [
@@ -134,9 +134,22 @@ datos_roles = {
 # ----------------------------------------------------
 # BLOQUE 1: SELECTOR DE ROL Y DESCRIPCIÓN
 # ----------------------------------------------------
+rol = st.session_state.get("rol", "admin")
+
+roles_disponibles = list(datos_roles.keys())
+rol_usuario = nombres_roles.get(rol, "")
+indice_rol = next(
+    (
+        indice
+        for indice, nombre_rol in enumerate(roles_disponibles)
+        if nombre_rol.casefold() == rol_usuario.casefold()
+    ),
+    0,
+)
 rol_seleccionado = st.selectbox(
     "🎯 Selecciona un Rol para consultar su documentación:",
-    list(datos_roles.keys()),
+    roles_disponibles,
+    index=indice_rol,
 )
 
 info_rol = datos_roles[rol_seleccionado]
