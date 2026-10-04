@@ -712,115 +712,218 @@ with tab_ofertas:
         )
 
 with tab_feedback:
-    st.subheader("Formaciones")
-    if df_feedback_base.empty:
-        st.info("Aún no hay datos de feedback para los filtros seleccionados.")
-    else:
-        recibidas = (
-            df_feedback_base["total_respuestas_recibidas"].sum()
-            if "total_respuestas_recibidas" in df_feedback_base.columns
-            else 0
-        )
-        enviadas = (
-            df_feedback_base["total_alumnos_asignados"].sum()
-            if "total_alumnos_asignados" in df_feedback_base.columns
-            else 0
-        )
-        tasa_respuesta = recibidas / enviadas * 100 if enviadas else 0
-        feedback_1, feedback_2, feedback_3 = st.columns(3)
-        feedback_1.metric("Tasa de respuesta", f"{tasa_respuesta:.1f}%")
-        feedback_2.metric("Respuestas recibidas", int(recibidas))
-        feedback_3.metric(
-            "Respuestas del mes",
-            int(df_feedback_base["respuestas_mes_actual"].sum())
-            if "respuestas_mes_actual" in df_feedback_base.columns
-            else 0,
-        )
+  st.subheader("Formaciones")
 
-
-    st.subheader("Resultados de prácticas y cierres")
-    cierres_alumno = datos_feedback_cierre_alumno(
-        df_feedback_respuestas, df_practicas_dashboard
+  if df_feedback_base.empty:
+    st.info("Aún no hay datos de feedback para los filtros seleccionados.")
+  else:
+    # 1. Cálculo de métricas
+    recibidas = (
+        df_feedback_base["total_respuestas_recibidas"].sum()
+        if "total_respuestas_recibidas" in df_feedback_base.columns
+        else 0
     )
+    enviadas = (
+        df_feedback_base["total_alumnos_asignados"].sum()
+        if "total_alumnos_asignados" in df_feedback_base.columns
+        else 0
+    )
+    tasa_respuesta = recibidas / enviadas * 100 if enviadas else 0
+    respuestas_mes = (
+        int(df_feedback_base["respuestas_mes_actual"].sum())
+        if "respuestas_mes_actual" in df_feedback_base.columns
+        else 0
+    )
+
+    # 2. Cards estilizadas con CSS
+    feedback_1, feedback_2, feedback_3 = st.columns(3)
+
+    with feedback_1:
+      st.markdown(
+          f"""
+            <div style="background-color: #f0f8ff; border-left: 5px solid #1E88E5; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin: 0; font-size: 13px; color: #555; font-weight: 600;">TASA DE RESPUESTA</p>
+                <h2 style="margin: 5px 0 0 0; color: #1E88E5; font-size: 26px;">{tasa_respuesta:.1f}%</h2>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+    with feedback_2:
+      st.markdown(
+          f"""
+            <div style="background-color: #f4fbf7; border-left: 5px solid #2ECC71; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin: 0; font-size: 13px; color: #555; font-weight: 600;">RESPUESTAS RECIBIDAS</p>
+                <h2 style="margin: 5px 0 0 0; color: #2ECC71; font-size: 26px;">{int(recibidas)}</h2>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+    with feedback_3:
+      st.markdown(
+          f"""
+            <div style="background-color: #fbf5fc; border-left: 5px solid #9B59B6; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin: 0; font-size: 13px; color: #555; font-weight: 600;">RESPUESTAS DEL MES</p>
+                <h2 style="margin: 5px 0 0 0; color: #9B59B6; font-size: 26px;">{respuestas_mes}</h2>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+  st.markdown("<br>", unsafe_allow_html=True)
+  st.subheader("Resultados de Formaciones")
+
+  # --- A. VALORACIONES POSITIVAS Y CIERRES DE ALUMNOS (PRIMERO) ---
+  cierres_alumno = datos_feedback_cierre_alumno(
+      df_feedback_respuestas, df_practicas_dashboard
+  )
+
+  if cierres_alumno.empty:
+    st.info(
+        "No hay valoraciones de cierre de alumnos para los filtros"
+        " seleccionados."
+    )
+  else:
+    felicidad = cierres_alumno["happy"].mean() * 100
+    feedback_cierre_1, feedback_cierre_2 = st.columns(2)
+    feedback_cierre_1.metric(
+        "% valoraciones positivas (4–5)", f"{felicidad:.1f}%"
+    )
+    feedback_cierre_2.metric(
+        "Total de cierres valorados", len(cierres_alumno)
+    )
+
+    promedio_por_curso = cierres_alumno.groupby("curso", as_index=False).agg(
+        cierres=("valoracion", "count"),
+        promedio=("valoracion", "mean"),
+        valoraciones_positivas=("happy", "mean"),
+    )
+    promedio_por_curso["% valoraciones positivas"] = (
+        promedio_por_curso["valoraciones_positivas"] * 100
+    )
+    promedio_por_curso = promedio_por_curso.drop(
+        columns="valoraciones_positivas"
+    )
+
+  st.markdown("<hr>", unsafe_allow_html=True)
+
+  # --- B. GRÁFICOS DE TORTA EN 2 COLUMNAS ---
+  graf_col1, graf_col2 = st.columns(2)
+
+  # 1. Gráfico de Contratación
+  with graf_col1:
     datos_cierre = []
     for practica in df_practicas_dashboard.to_dict("records"):
-        cierre = practica.get("datos_cierre")
-        if not isinstance(cierre, dict) or not cierre:
-            continue
-        contratado = es_verdadero(cierre.get("contratado", False))
-        otra_empresa = es_verdadero(cierre.get("contratadoOtraEmpresa", False))
-        datos_cierre.append(
-            {
-                "contratacion": (
-                    "Contratado por la empresa"
-                    if contratado
-                    else "Contratado por otra empresa"
-                    if otra_empresa
-                    else "No contratado"
-                ),
-            }
-        )
+      cierre = practica.get("datos_cierre")
+      if not isinstance(cierre, dict) or not cierre:
+        continue
+      contratado = es_verdadero(cierre.get("contratado", False))
+      otra_empresa = es_verdadero(cierre.get("contratadoOtraEmpresa", False))
+      datos_cierre.append({
+          "contratacion": (
+              "Contratado por la empresa"
+              if contratado
+              else (
+                  "Contratado por otra empresa"
+                  if otra_empresa
+                  else "No contratado"
+              )
+          ),
+      })
 
-    contratacion = pd.Series(
-        [item["contratacion"] for item in datos_cierre], dtype="object"
-    ).value_counts()
-    total_con_cierre = len(datos_cierre)
-    contratacion_1, contratacion_2, contratacion_3 = st.columns(3)
-    for columna, etiqueta in zip(
-        (contratacion_1, contratacion_2, contratacion_3),
-        (
-            "Contratados por la empresa",
-            "No contratados",
-            "Contratados por otra empresa",
-        ),
+    if datos_cierre:
+      df_cierre = pd.DataFrame(datos_cierre)
+      conteo_cierre = df_cierre["contratacion"].value_counts().reset_index()
+      conteo_cierre.columns = ["Estado", "Cantidad"]
+
+      fig_cierre = px.pie(
+          conteo_cierre,
+          names="Estado",
+          values="Cantidad",
+          title="Estado de Contratación al Cierre",
+          color="Estado",
+          color_discrete_map={
+              "Contratado por la empresa": "#2ecc71",  # Verde
+              "No contratado": "#e74c3c",  # Rojo
+              "Contratado por otra empresa": "#3498db",  # Azul
+          },
+          hole=0.35,
+      )
+      fig_cierre.update_traces(
+          textinfo="percent+label",
+          hovertemplate="%{label}: %{value} (%{percent})",
+      )
+      fig_cierre.update_layout(
+          legend=dict(
+              orientation="h",
+              yanchor="bottom",
+              y=-0.3,
+              xanchor="center",
+              x=0.5,
+          )
+      )
+
+      st.plotly_chart(fig_cierre, use_container_width=True)
+    else:
+      st.info("Sin datos de cierre disponibles.")
+
+  # 2. Gráfico de Participación FP Pyme
+  with graf_col2:
+
+    def mapear_estado(val):
+      if pd.isna(val) or val is None or str(val).strip() == "":
+        return "SIN DEFINIR"
+      if isinstance(val, bool):
+        return "SI" if val else "NO"
+      if str(val).lower() in ["true", "1", "1.0", "si", "sí"]:
+        return "SI"
+      if str(val).lower() in ["false", "0", "0.0", "no"]:
+        return "NO"
+      return "SIN DEFINIR"
+
+    if (
+        "fp_dual_cogido" in df_practicas_dashboard.columns
+        and not df_practicas_dashboard.empty
     ):
-        clave = {
-            "Contratados por la empresa": "Contratado por la empresa",
-            "No contratados": "No contratado",
-            "Contratados por otra empresa": "Contratado por otra empresa",
-        }[etiqueta]
-        cantidad = int(contratacion.get(clave, 0))
-        porcentaje = cantidad / total_con_cierre * 100 if total_con_cierre else 0
-        columna.metric(
-            etiqueta,
-            f"{cantidad} ({porcentaje:.1f}%)" if total_con_cierre else "Sin datos",
-        )
-    registros_fp_pyme = df_practicas_dashboard[
-        df_practicas_dashboard["fp_dual_cogido"].notna()
-    ] if "fp_dual_cogido" in df_practicas_dashboard.columns else pd.DataFrame()
-    if not registros_fp_pyme.empty:
-        participan_fp_pyme = registros_fp_pyme["fp_dual_cogido"].map(es_verdadero)
-        st.metric(
-            "Participación FP Pyme",
-            f"{int(participan_fp_pyme.sum())} de {len(registros_fp_pyme)} "
-            f"({participan_fp_pyme.mean() * 100:.1f}%)",
-        )
+      df_grafico = df_practicas_dashboard.copy()
+      df_grafico["estado_fp"] = df_grafico["fp_dual_cogido"].apply(
+          mapear_estado
+      )
+
+      conteo_fp = df_grafico["estado_fp"].value_counts().reset_index()
+      conteo_fp.columns = ["Estado", "Cantidad"]
+
+      fig_fp = px.pie(
+          conteo_fp,
+          names="Estado",
+          values="Cantidad",
+          title="Participación FP Pyme",
+          color="Estado",
+          color_discrete_map={
+              "SI": "#2ecc71",  # Verde
+              "NO": "#e74c3c",  # Rojo
+              "SIN DEFINIR": "#95a5a6",  # Gris
+          },
+          hole=0.35,
+      )
+      fig_fp.update_traces(
+          textinfo="percent+label",
+          hovertemplate="%{label}: %{value} (%{percent})",
+      )
+      fig_fp.update_layout(
+          legend=dict(
+              orientation="h",
+              yanchor="bottom",
+              y=-0.3,
+              xanchor="center",
+              x=0.5,
+          )
+      )
+
+      st.plotly_chart(fig_fp, use_container_width=True)
     else:
-        st.metric("Participación FP Pyme", "Sin datos")
-
-    if cierres_alumno.empty:
-        st.info("No hay valoraciones de cierre de alumnos para los filtros seleccionados.")
-    else:
-        felicidad = cierres_alumno["happy"].mean() * 100
-        feedback_cierre_1, feedback_cierre_2 = st.columns(2)
-        feedback_cierre_1.metric("% valoraciones positivas (4–5)", f"{felicidad:.1f}%")
-        feedback_cierre_2.metric("Total de cierres valorados", len(cierres_alumno))
-
-        promedio_por_curso = (
-            cierres_alumno.groupby("curso", as_index=False)
-            .agg(
-                cierres=("valoracion", "count"),
-                promedio=("valoracion", "mean"),
-                valoraciones_positivas=("happy", "mean"),
-            )
-        )
-        promedio_por_curso["% valoraciones positivas"] = (
-            promedio_por_curso["valoraciones_positivas"] * 100
-        )
-        promedio_por_curso = promedio_por_curso.drop(
-            columns="valoraciones_positivas"
-        )
-
+      st.info("Sin datos disponibles para la columna FP Dual.")
 st.divider()
 if not df_alumnos.empty:
     st.download_button(
