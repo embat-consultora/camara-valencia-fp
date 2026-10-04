@@ -13,6 +13,9 @@ from variables import (
     aniosList,
     cursoList,
     empresasTabla,
+    estadosAlumno,
+    feedbackResponseTabla,
+    necesidadFP,
     practicaEstadosTabla,
     practicaTabla,
     tutoresTabla,
@@ -67,10 +70,7 @@ def load_all_data():
     df_estados = pd.DataFrame(get(practicaEstadosTabla))
     df_practicas = pd.DataFrame(get(practicaTabla))
 
-    try:
-        df_ofertas = pd.DataFrame(get("vw_empresas_ofertas"))
-    except Exception:
-        df_ofertas = pd.DataFrame()
+    df_ofertas = pd.DataFrame(get(necesidadFP))
 
     if df_practicas.empty:
         df_master = pd.DataFrame()
@@ -84,27 +84,36 @@ def load_all_data():
             None,
         )
         if columna_alumno and "dni" in df_alumnos.columns:
+            columnas_alumno = [
+                columna
+                for columna in (
+                    "dni",
+                    "nombre",
+                    "apellido",
+                    "localidad",
+                    "sexo",
+                    "ciclo_formativo",
+                    "estado",
+                    "vehiculo",
+                )
+                if columna in df_alumnos.columns
+            ]
+            datos_alumnos = df_alumnos[columnas_alumno].rename(
+                columns={
+                    "localidad": "localidad_alumno",
+                    "ciclo_formativo": "ciclo_formativo_alumno",
+                }
+            )
             df_master = df_practicas.merge(
-                df_alumnos[
-                    [
-                        columna
-                        for columna in (
-                            "dni",
-                            "nombre",
-                            "apellido",
-                            "localidad",
-                            "sexo",
-                            "ciclo_formativo",
-                            "estado",
-                            "vehiculo",
-                        )
-                        if columna in df_alumnos.columns
-                    ]
-                ],
+                datos_alumnos,
                 left_on=columna_alumno,
                 right_on="dni",
                 how="left",
             )
+            if "localidad_alumno" in df_master.columns:
+                df_master["localidad"] = df_master["localidad_alumno"]
+            if "ciclo_formativo_alumno" in df_master.columns:
+                df_master["ciclo_formativo"] = df_master["ciclo_formativo_alumno"]
         else:
             df_master = df_practicas.copy()
 
@@ -127,6 +136,11 @@ def load_feedback_data():
         )
     except Exception:
         return pd.DataFrame(), pd.DataFrame()
+
+
+@st.cache_data
+def load_feedback_respuestas():
+    return pd.DataFrame(get(feedbackResponseTabla))
 
 
 def filtrar_por_curso(df, anio, curso):
@@ -200,33 +214,101 @@ def valores_filtro(df, columna, transformador=str):
     return sorted({valor for valor in valores if valor and valor != "No definido"})
 
 
-def empresas_de_practicas(df_empresas, df_practicas):
-    if df_empresas.empty or df_practicas.empty:
-        return df_empresas.iloc[0:0].copy()
+def ofertas_activas_por_ciclo(df_ofertas, df_empresas):
+    if df_ofertas.empty:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "empresa",
+                "nombre",
+                "ciclo_formativo",
+                "cupos_disponibles",
+                "localidad",
+                "created_at",
+                "anio",
+            ]
+        )
 
-    identificadores = set()
-    for columna in ("empresa", "cif_empresa", "empresa_id", "CIF", "cif"):
-        if columna in df_practicas.columns:
-            identificadores.update(
-                str(valor).strip()
-                for valor in df_practicas[columna].dropna()
-                if str(valor).strip()
+    empresas_por_cif = {}
+    if not df_empresas.empty and "CIF" in df_empresas.columns:
+        empresas_por_cif = {
+            str(empresa["CIF"]): empresa
+            for empresa in df_empresas.to_dict("records")
+        }
+
+    ofertas_ciclos = []
+    for oferta in df_ofertas.to_dict("records"):
+        ciclos_oferta = oferta.get("ciclos_formativos")
+        if not isinstance(ciclos_oferta, dict):
+            continue
+
+        empresa = empresas_por_cif.get(str(oferta.get("empresa")), {})
+        for ciclo, datos_ciclo in ciclos_oferta.items():
+            if not isinstance(datos_ciclo, dict):
+                continue
+            disponibles = pd.to_numeric(
+                datos_ciclo.get("disponibles"), errors="coerce"
+            )
+            if pd.isna(disponibles) or disponibles <= 0:
+                continue
+
+            ofertas_ciclos.append(
+                {
+                    "id": oferta.get("id"),
+                    "empresa": oferta.get("empresa"),
+                    "nombre": empresa.get("nombre", "Sin empresa"),
+                    "ciclo_formativo": ciclo,
+                    "cupos_disponibles": disponibles,
+                    "localidad": oferta.get("localidad_empresa")
+                    or empresa.get("localidad"),
+                    "created_at": oferta.get("created_at"),
+                    "anio": oferta.get("anio"),
+                }
             )
 
-    columna_empresa = next(
-        (
-            columna
-            for columna in ("CIF", "cif", "id")
-            if columna in df_empresas.columns
-        ),
-        None,
-    )
-    if not columna_empresa:
-        return df_empresas.iloc[0:0].copy()
+    return pd.DataFrame(ofertas_ciclos)
 
-    return df_empresas[
-        df_empresas[columna_empresa].astype(str).isin(identificadores)
-    ].copy()
+
+def es_verdadero(valor):
+    if isinstance(valor, bool):
+        return valor
+    return str(valor).strip().lower() in {"sí", "si", "true", "1"}
+
+
+def datos_feedback_cierre_alumno(df_respuestas, df_practicas):
+    columnas = ["curso", "valoracion", "happy"]
+    if df_respuestas.empty or df_practicas.empty or "id" not in df_practicas.columns:
+        return pd.DataFrame(columns=columnas)
+
+    practicas_por_id = {
+        str(practica["id"]): practica
+        for practica in df_practicas.to_dict("records")
+    }
+    resultados = []
+    for respuesta in df_respuestas.to_dict("records"):
+        respuestas_json = respuesta.get("respuestas_json")
+        if not isinstance(respuestas_json, dict):
+            continue
+        if respuestas_json.get("tipo") != "feedback_cierre":
+            continue
+
+        practica = practicas_por_id.get(str(respuesta.get("practica_id")))
+        evaluacion = respuestas_json.get("evaluacion_global") or {}
+        if practica is None or not isinstance(evaluacion, dict):
+            continue
+
+        valoracion = pd.to_numeric(evaluacion.get("positiva"), errors="coerce")
+        if pd.isna(valoracion):
+            continue
+        resultados.append(
+            {
+                "curso": practica.get("curso", "Sin definir"),
+                "valoracion": valoracion,
+                "happy": valoracion >= 4,
+            }
+        )
+
+    return pd.DataFrame(resultados, columns=columnas)
 
 
 def card(contenedor, icono, titulo, valor, color):
@@ -244,10 +326,12 @@ def card(contenedor, icono, titulo, valor, color):
 
 df_alumnos_raw, df_estados, df_empresas_raw, df_practicas_raw, df_ofertas_raw, df_master_raw = load_all_data()
 df_feedback_stats, df_feedback_detalle = load_feedback_data()
+df_feedback_respuestas = load_feedback_respuestas()
 
 anio_filtro = st.session_state.get("selector_curso_ac_global", aniosList[0])
 curso_filtro = st.session_state.get("selector_curso_global", cursoList[0])
 
+df_feedback_base = filtrar_por_curso(df_feedback_stats, anio_filtro, curso_filtro)
 df_alumnos_base = filtrar_por_curso(df_alumnos_raw, anio_filtro, curso_filtro)
 df_practicas_base = filtrar_por_curso(df_practicas_raw, anio_filtro, curso_filtro)
 df_master_base = filtrar_por_curso(df_master_raw, anio_filtro, curso_filtro)
@@ -323,7 +407,44 @@ df_master = aplicar_filtros(
     localidades_seleccionadas,
     estados_seleccionados,
 )
-df_empresas = empresas_de_practicas(df_empresas_raw, df_practicas)
+df_practicas_dashboard = df_master
+df_ofertas = filtrar_por_curso(
+    ofertas_activas_por_ciclo(df_ofertas_raw, df_empresas_raw),
+    anio_filtro,
+    curso_filtro,
+)
+if ciclos_seleccionados and "ciclo_formativo" in df_ofertas.columns:
+    df_ofertas = df_ofertas[
+        df_ofertas["ciclo_formativo"].astype(str).isin(ciclos_seleccionados)
+    ]
+if localidades_seleccionadas and "localidad" in df_ofertas.columns:
+    localidades_limpias = {
+        limpiar_localidad(localidad) for localidad in localidades_seleccionadas
+    }
+    df_ofertas = df_ofertas[
+        df_ofertas["localidad"].map(limpiar_localidad).isin(localidades_limpias)
+    ]
+if estados_seleccionados:
+    ciclos_alumnos_filtrados = set(
+        df_alumnos["ciclo_formativo"].dropna().astype(str)
+    ) if "ciclo_formativo" in df_alumnos.columns else set()
+    if "ciclo_formativo" in df_ofertas.columns:
+        df_ofertas = df_ofertas[
+            df_ofertas["ciclo_formativo"].astype(str).isin(ciclos_alumnos_filtrados)
+        ]
+
+if not df_ofertas.empty:
+    df_ofertas["cupos_disponibles"] = pd.to_numeric(
+        df_ofertas["cupos_disponibles"], errors="coerce"
+    ).fillna(0)
+    df_ofertas = df_ofertas[df_ofertas["cupos_disponibles"] > 0]
+
+if not df_ofertas.empty and "empresa" in df_ofertas.columns:
+    empresas_con_ofertas_activas = df_ofertas["empresa"].dropna().astype(str).nunique()
+else:
+    empresas_con_ofertas_activas = (
+        df_ofertas["nombre"].nunique() if "nombre" in df_ofertas.columns else 0
+    )
 
 if not df_alumnos.empty and "vehiculo" in df_alumnos.columns:
     vehiculos = df_alumnos["vehiculo"].astype(str).str.strip().str.lower()
@@ -334,13 +455,13 @@ else:
 st.subheader("Resumen")
 kpi_1, kpi_2, kpi_3, kpi_4 = st.columns(4)
 card(kpi_1, "🎓", "Alumnos totales", len(df_alumnos), AZUL_CAMARA)
-card(kpi_2, "🏢", "Empresas", len(df_empresas), CIAN_CAMARA)
-card(kpi_3, "🤝", "Matches realizados", len(df_practicas), "#003366")
+card(kpi_2, "🏢", "Empresas con ofertas activas", empresas_con_ofertas_activas, CIAN_CAMARA)
+card(kpi_3, "🤝", "Formaciones Iniciadas", len(df_practicas_dashboard), "#003366")
 card(kpi_4, "🚗", "Tasa de movilidad", f"{tasa_movilidad:.1f}%", "#5B8C5A")
 
 st.divider()
-tab_alumnos, tab_ofertas, tab_gestion, tab_empresas, tab_feedback = st.tabs(
-    ["🎓 Alumnos", "🏢 Ofertas", "⚙️ Gestión", "📍 Empresas", "📩 Feedback"]
+tab_alumnos, tab_ofertas, tab_feedback = st.tabs(
+    ["🎓 Alumnos", "🏢 Ofertas", "📩 Formaciones"]
 )
 
 with tab_alumnos:
@@ -350,65 +471,211 @@ with tab_alumnos:
     else:
         col_1, col_2 = st.columns(2)
         with col_1:
-            if "ciclo_formativo" in df_alumnos.columns:
-                datos_ciclo = df_alumnos["ciclo_formativo"].fillna("Sin definir").value_counts().reset_index()
-                datos_ciclo.columns = ["Ciclo", "Alumnos"]
-                st.plotly_chart(
-                    px.bar(
-                        datos_ciclo,
-                        x="Alumnos",
-                        y="Ciclo",
-                        orientation="h",
-                        text_auto=True,
-                        color_discrete_sequence=[AZUL_CAMARA],
-                    ),
-                    use_container_width=True,
-                )
-        with col_2:
-            if "estado" in df_alumnos.columns:
-                datos_estado = df_alumnos["estado"].fillna("Sin definir").value_counts().reset_index()
-                datos_estado.columns = ["Estado", "Alumnos"]
+            if "sexo" in df_alumnos.columns:
+                datos_sexo = df_alumnos["sexo"].fillna("Sin definir").value_counts().reset_index()
+                datos_sexo.columns = ["Sexo", "Alumnos"]
                 st.plotly_chart(
                     px.pie(
-                        datos_estado,
-                        names="Estado",
+                        datos_sexo,
+                        names="Sexo",
                         values="Alumnos",
                         hole=0.5,
+                        title="Alumnos por sexo",
                         color_discrete_sequence=PALETA_GRAFICOS,
                     ),
                     use_container_width=True,
                 )
-        columnas_alumnos = [
-            columna
-            for columna in (
-                "dni",
-                "nombre",
-                "apellido",
-                "localidad",
-                "ciclo_formativo",
-                "estado",
-                "vehiculo",
-            )
-            if columna in df_alumnos.columns
-        ]
-        st.dataframe(df_alumnos[columnas_alumnos], hide_index=True, use_container_width=True)
+            if "vehiculo" in df_alumnos.columns:
+                def movilidad_label(valor):
+                    if pd.isna(valor):
+                        return "Sin definir"
+                    return "Sí" if es_verdadero(valor) else "No"
+
+                datos_movilidad = (
+                    df_alumnos["vehiculo"]
+                    .map(movilidad_label)
+                    .value_counts()
+                    .rename_axis("Movilidad")
+                    .reset_index(name="Alumnos")
+                )
+                st.plotly_chart(
+                    px.pie(
+                        datos_movilidad,
+                        names="Movilidad",
+                        values="Alumnos",
+                        hole=0.5,
+                        title="Alumnos con movilidad",
+                        color_discrete_sequence=[CIAN_CAMARA, AZUL_CAMARA],
+                    ),
+                    use_container_width=True,
+                )
+        with col_2:
+            if "tipoPractica" in df_alumnos.columns:
+                datos_tipo_formacion = (
+                    df_alumnos["tipoPractica"]
+                    .fillna("Sin definir")
+                    .value_counts()
+                    .rename_axis("Tipo de formación")
+                    .reset_index(name="Alumnos")
+                )
+                st.plotly_chart(
+                    px.pie(
+                        datos_tipo_formacion,
+                        names="Tipo de formación",
+                        values="Alumnos",
+                        hole=0.5,
+                        title="Alumnos por tipo de formación",
+                        color_discrete_sequence=PALETA_GRAFICOS,
+                    ),
+                    use_container_width=True,
+                )
+            if "localidad" in df_alumnos.columns:
+                datos_localidad = (
+                    df_alumnos["localidad"]
+                    .map(limpiar_localidad)
+                    .value_counts()
+                    .rename_axis("Localidad")
+                    .reset_index(name="Alumnos")
+                    .sort_values("Alumnos", ascending=True)
+                )
+                st.plotly_chart(
+                    px.bar(
+                        datos_localidad,
+                        x="Localidad",
+                        y="Alumnos",
+                        text_auto=True,
+                        title="Alumnos por localidad",
+                        color_discrete_sequence=[AZUL_CAMARA],
+                    ),
+                    use_container_width=True,
+                )
 
 with tab_ofertas:
-    st.subheader("Detalle de ofertas y plazas")
-    df_ofertas = filtrar_por_curso(df_ofertas_raw, anio_filtro, curso_filtro)
-    if ciclos_seleccionados and "ciclo_formativo" in df_ofertas.columns:
-        df_ofertas = df_ofertas[
-            df_ofertas["ciclo_formativo"].astype(str).isin(ciclos_seleccionados)
-        ]
-    if localidades_seleccionadas and "localidad" in df_ofertas.columns:
-        localidades_limpias = {limpiar_localidad(valor) for valor in localidades_seleccionadas}
-        df_ofertas = df_ofertas[
-            df_ofertas["localidad"].map(limpiar_localidad).isin(localidades_limpias)
-        ]
+    st.subheader("Ofertas disponibles por ciclo")
+    columnas_match = {"oferta", "created_at"}
+    if (
+        columnas_match.issubset(df_practicas_dashboard.columns)
+        and {"id", "created_at"}.issubset(df_ofertas_raw.columns)
+    ):
+        practicas_match = df_practicas_dashboard[
+            ["oferta", "created_at"]
+        ].copy()
+        ofertas_match = df_ofertas_raw[["id", "created_at"]].copy()
+
+        practicas_match["oferta_id_match"] = pd.to_numeric(
+            practicas_match["oferta"], errors="coerce"
+        ).astype("Int64")
+        ofertas_match["oferta_id_match"] = pd.to_numeric(
+            ofertas_match["id"], errors="coerce"
+        ).astype("Int64")
+        practicas_match["fecha_practica"] = pd.to_datetime(
+            practicas_match["created_at"], errors="coerce", utc=True
+        )
+        ofertas_match["fecha_oferta"] = pd.to_datetime(
+            ofertas_match["created_at"], errors="coerce", utc=True
+        )
+
+        tiempos_match_df = practicas_match.dropna(
+            subset=["oferta_id_match", "fecha_practica"]
+        ).merge(
+            ofertas_match.dropna(subset=["oferta_id_match", "fecha_oferta"])[
+                ["oferta_id_match", "fecha_oferta"]
+            ],
+            on="oferta_id_match",
+            how="inner",
+            validate="many_to_one",
+        )
+        tiempos_match_df["dias_match"] = (
+            tiempos_match_df["fecha_practica"]
+            - tiempos_match_df["fecha_oferta"]
+        ).dt.total_seconds() / 86400
+    else:
+        tiempos_match_df = pd.DataFrame(columns=["dias_match"])
+
     if df_ofertas.empty:
         st.info("No hay ofertas para los filtros seleccionados.")
     else:
-        if "nombre" in df_ofertas.columns and "cupos_disponibles" in df_ofertas.columns:
+        ofertas_disponibles = (
+            df_ofertas["id"].nunique() if "id" in df_ofertas.columns else len(df_ofertas)
+        )
+        plazas_disponibles = int(df_ofertas["cupos_disponibles"].sum())
+        df_alumnos_disponibles = df_alumnos
+        if "estado" in df_alumnos_disponibles.columns:
+            df_alumnos_disponibles = df_alumnos_disponibles[
+                df_alumnos_disponibles["estado"].astype(str).str.casefold()
+                == estadosAlumno[0].casefold()
+            ]
+
+        oferta_1, oferta_2 = st.columns(2)
+        oferta_1.metric("Ofertas disponibles", ofertas_disponibles)
+        oferta_2.metric("Plazas disponibles", plazas_disponibles)
+
+        ofertas_por_ciclo = (
+            df_ofertas.groupby("ciclo_formativo")
+            .agg({"id": "nunique", "cupos_disponibles": "sum"})
+            .rename(
+                columns={
+                    "id": "Ofertas disponibles",
+                    "cupos_disponibles": "Plazas disponibles",
+                }
+            )
+            .reset_index()
+        )
+        alumnos_por_ciclo = (
+            df_alumnos_disponibles.groupby("ciclo_formativo")["dni"]
+            .nunique()
+            .rename("Alumnos disponibles")
+            if "ciclo_formativo" in df_alumnos_disponibles.columns
+            and "dni" in df_alumnos_disponibles.columns
+            else pd.Series(dtype="int64", name="Alumnos disponibles")
+        )
+        datos_ciclo = ofertas_por_ciclo[["ciclo_formativo", "Ofertas disponibles"]].merge(
+            alumnos_por_ciclo,
+            left_on="ciclo_formativo",
+            right_index=True,
+            how="outer",
+        )
+        for columna in ("Ofertas disponibles", "Alumnos disponibles"):
+            if columna in datos_ciclo.columns:
+                datos_ciclo[columna] = datos_ciclo[columna].fillna(0)
+        datos_ciclo["ciclo_formativo"] = datos_ciclo["ciclo_formativo"].fillna(
+            "Sin definir"
+        )
+        grafico_ofertas, grafico_alumnos = st.columns(2)
+        with grafico_ofertas:
+            st.plotly_chart(
+                px.bar(
+                    datos_ciclo.sort_values("Ofertas disponibles"),
+                    x="ciclo_formativo",
+                    y="Ofertas disponibles",
+                    text_auto=True,
+                    title="Ofertas disponibles por ciclo",
+                    color_discrete_sequence=[CIAN_CAMARA],
+                    labels={
+                        "Ofertas disponibles": "Cantidad de ofertas",
+                        "ciclo_formativo": "Ciclo formativo",
+                    },
+                ),
+                use_container_width=True,
+            )
+        with grafico_alumnos:
+            st.plotly_chart(
+                px.bar(
+                    datos_ciclo.sort_values("Alumnos disponibles"),
+                    x="ciclo_formativo",
+                    y="Alumnos disponibles",
+                    text_auto=True,
+                    title="Alumnos disponibles por ciclo",
+                    color_discrete_sequence=[AZUL_CAMARA],
+                    labels={
+                        "Alumnos disponibles": "Cantidad de alumnos",
+                        "ciclo_formativo": "Ciclo formativo",
+                    },
+                ),
+                use_container_width=True,
+            )
+
+        if "nombre" in df_ofertas.columns:
             datos_ofertas = (
                 df_ofertas.groupby("nombre", as_index=False)["cupos_disponibles"]
                 .sum()
@@ -417,101 +684,46 @@ with tab_ofertas:
             st.plotly_chart(
                 px.bar(
                     datos_ofertas,
-                    x="cupos_disponibles",
-                    y="nombre",
-                    orientation="h",
+                    x="nombre",
+                    y="cupos_disponibles",
                     text_auto=True,
                     color_discrete_sequence=[CIAN_CAMARA],
                     labels={"cupos_disponibles": "Plazas disponibles", "nombre": ""},
+                    title="Plazas disponibles por empresa",
                 ),
                 use_container_width=True,
             )
-        st.dataframe(df_ofertas, hide_index=True, use_container_width=True)
 
-with tab_gestion:
-    st.subheader("Gestión y documentación pendiente")
-    df_gestion = df_master if not df_master.empty else df_practicas
-    if df_gestion.empty:
-        st.info("No hay formaciones para los filtros seleccionados.")
-    else:
-        anexos_pendientes = (
-            int((df_gestion["anexos_firmados"] != True).sum())
-            if "anexos_firmados" in df_gestion.columns
-            else 0
+    if not tiempos_match_df.empty:
+        match_tiempo, match_total = st.columns(2)
+        match_tiempo.metric(
+            "Tiempo medio entre creación de oferta y práctica",
+            f"{tiempos_match_df['dias_match'].mean():.1f} días",
         )
-        sao_pendiente = (
-            int((df_gestion["doc_sao_entregada"] != True).sum())
-            if "doc_sao_entregada" in df_gestion.columns
-            else 0
+        match_total.metric(
+            "Prácticas enlazadas con fechas válidas",
+            len(tiempos_match_df),
+            help="Emparejadas con oferta.id por el campo práctica.oferta.",
         )
-        gestion_1, gestion_2, gestion_3 = st.columns(3)
-        gestion_1.metric("Anexos sin firmar", anexos_pendientes)
-        gestion_2.metric("Documentación SAO pendiente", sao_pendiente)
-        gestion_3.metric("Formaciones", len(df_gestion))
-        columnas_gestion = [
-            columna
-            for columna in (
-                "nombre",
-                "apellido",
-                "empresa",
-                "gestor",
-                "anexos_firmados",
-                "doc_sao_entregada",
-            )
-            if columna in df_gestion.columns
-        ]
-        st.dataframe(df_gestion[columnas_gestion], hide_index=True, use_container_width=True)
-
-with tab_empresas:
-    st.subheader("Empresas relacionadas")
-    if df_empresas.empty:
-        st.info("No hay empresas relacionadas con los filtros seleccionados.")
     else:
-        empresas_1, empresas_2 = st.columns(2)
-        with empresas_1:
-            if "localidad" in df_empresas.columns:
-                datos_localidad = df_empresas["localidad"].map(limpiar_localidad).value_counts().reset_index()
-                datos_localidad.columns = ["Localidad", "Empresas"]
-                st.plotly_chart(
-                    px.bar(
-                        datos_localidad,
-                        x="Empresas",
-                        y="Localidad",
-                        orientation="h",
-                        text_auto=True,
-                        color_discrete_sequence=[CIAN_CAMARA],
-                    ),
-                    use_container_width=True,
-                )
-        with empresas_2:
-            st.metric("Empresas relacionadas", len(df_empresas))
-        columnas_empresas = [
-            columna
-            for columna in (
-                "CIF",
-                "nombre",
-                "direccion",
-                "localidad",
-                "telefono",
-                "email_empresa",
-            )
-            if columna in df_empresas.columns
-        ]
-        st.dataframe(df_empresas[columnas_empresas], hide_index=True, use_container_width=True)
+        st.info(
+            "No hay prácticas enlazadas por ID de oferta con fechas de creación "
+            "válidas para calcular el tiempo medio."
+        )
 
 with tab_feedback:
-    st.subheader("Feedback")
-    if df_feedback_stats.empty:
+    st.subheader("Formaciones")
+    if df_feedback_base.empty:
         st.info("Aún no hay datos de feedback para los filtros seleccionados.")
     else:
         recibidas = (
-            df_feedback_stats["total_respuestas_recibidas"].sum()
-            if "total_respuestas_recibidas" in df_feedback_stats.columns
+            df_feedback_base["total_respuestas_recibidas"].sum()
+            if "total_respuestas_recibidas" in df_feedback_base.columns
             else 0
         )
         enviadas = (
-            df_feedback_stats["total_alumnos_asignados"].sum()
-            if "total_alumnos_asignados" in df_feedback_stats.columns
+            df_feedback_base["total_alumnos_asignados"].sum()
+            if "total_alumnos_asignados" in df_feedback_base.columns
             else 0
         )
         tasa_respuesta = recibidas / enviadas * 100 if enviadas else 0
@@ -520,14 +732,93 @@ with tab_feedback:
         feedback_2.metric("Respuestas recibidas", int(recibidas))
         feedback_3.metric(
             "Respuestas del mes",
-            int(df_feedback_stats["respuestas_mes_actual"].sum())
-            if "respuestas_mes_actual" in df_feedback_stats.columns
+            int(df_feedback_base["respuestas_mes_actual"].sum())
+            if "respuestas_mes_actual" in df_feedback_base.columns
             else 0,
         )
-        st.dataframe(
-            df_feedback_stats,
-            hide_index=True,
-            use_container_width=True,
+
+
+    st.subheader("Resultados de prácticas y cierres")
+    cierres_alumno = datos_feedback_cierre_alumno(
+        df_feedback_respuestas, df_practicas_dashboard
+    )
+    datos_cierre = []
+    for practica in df_practicas_dashboard.to_dict("records"):
+        cierre = practica.get("datos_cierre")
+        if not isinstance(cierre, dict) or not cierre:
+            continue
+        contratado = es_verdadero(cierre.get("contratado", False))
+        otra_empresa = es_verdadero(cierre.get("contratadoOtraEmpresa", False))
+        datos_cierre.append(
+            {
+                "contratacion": (
+                    "Contratado por la empresa"
+                    if contratado
+                    else "Contratado por otra empresa"
+                    if otra_empresa
+                    else "No contratado"
+                ),
+            }
+        )
+
+    contratacion = pd.Series(
+        [item["contratacion"] for item in datos_cierre], dtype="object"
+    ).value_counts()
+    total_con_cierre = len(datos_cierre)
+    contratacion_1, contratacion_2, contratacion_3 = st.columns(3)
+    for columna, etiqueta in zip(
+        (contratacion_1, contratacion_2, contratacion_3),
+        (
+            "Contratados por la empresa",
+            "No contratados",
+            "Contratados por otra empresa",
+        ),
+    ):
+        clave = {
+            "Contratados por la empresa": "Contratado por la empresa",
+            "No contratados": "No contratado",
+            "Contratados por otra empresa": "Contratado por otra empresa",
+        }[etiqueta]
+        cantidad = int(contratacion.get(clave, 0))
+        porcentaje = cantidad / total_con_cierre * 100 if total_con_cierre else 0
+        columna.metric(
+            etiqueta,
+            f"{cantidad} ({porcentaje:.1f}%)" if total_con_cierre else "Sin datos",
+        )
+    registros_fp_pyme = df_practicas_dashboard[
+        df_practicas_dashboard["fp_dual_cogido"].notna()
+    ] if "fp_dual_cogido" in df_practicas_dashboard.columns else pd.DataFrame()
+    if not registros_fp_pyme.empty:
+        participan_fp_pyme = registros_fp_pyme["fp_dual_cogido"].map(es_verdadero)
+        st.metric(
+            "Participación FP Pyme",
+            f"{int(participan_fp_pyme.sum())} de {len(registros_fp_pyme)} "
+            f"({participan_fp_pyme.mean() * 100:.1f}%)",
+        )
+    else:
+        st.metric("Participación FP Pyme", "Sin datos")
+
+    if cierres_alumno.empty:
+        st.info("No hay valoraciones de cierre de alumnos para los filtros seleccionados.")
+    else:
+        felicidad = cierres_alumno["happy"].mean() * 100
+        feedback_cierre_1, feedback_cierre_2 = st.columns(2)
+        feedback_cierre_1.metric("% valoraciones positivas (4–5)", f"{felicidad:.1f}%")
+        feedback_cierre_2.metric("Total de cierres valorados", len(cierres_alumno))
+
+        promedio_por_curso = (
+            cierres_alumno.groupby("curso", as_index=False)
+            .agg(
+                cierres=("valoracion", "count"),
+                promedio=("valoracion", "mean"),
+                valoraciones_positivas=("happy", "mean"),
+            )
+        )
+        promedio_por_curso["% valoraciones positivas"] = (
+            promedio_por_curso["valoraciones_positivas"] * 100
+        )
+        promedio_por_curso = promedio_por_curso.drop(
+            columns="valoraciones_positivas"
         )
 
 st.divider()
