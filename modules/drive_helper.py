@@ -14,18 +14,20 @@ def upload_to_drive(file_name, folder_id, folderName, nombre_archivo_drive=None)
     meta = service.files().get(fileId=folder_id, fields="id,mimeType", supportsAllDrives=True).execute()
     if meta.get("mimeType") != "application/vnd.google-apps.folder":
         raise RuntimeError("El ID provisto no es una carpeta.")
-
+    if folderName:
     # --- Buscar/Crear subcarpeta (folderName) ---
-    query_folder = f"'{folder_id}' in parents and name = '{folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    results_folder = service.files().list(q=query_folder, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+        query_folder = f"'{folder_id}' in parents and name = '{folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        results_folder = service.files().list(q=query_folder, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
 
-    if results_folder.get("files"):
-        email_folder_id = results_folder["files"][0]["id"]
+        if results_folder.get("files"):
+            email_folder_id = results_folder["files"][0]["id"]
+        else:
+            folder_metadata = {"name": folderName, "mimeType": "application/vnd.google-apps.folder", "parents": [folder_id]}
+            folder = service.files().create(body=folder_metadata, fields="id", supportsAllDrives=True).execute()
+            email_folder_id = folder["id"]
     else:
-        folder_metadata = {"name": folderName, "mimeType": "application/vnd.google-apps.folder", "parents": [folder_id]}
-        folder = service.files().create(body=folder_metadata, fields="id", supportsAllDrives=True).execute()
-        email_folder_id = folder["id"]
-
+            # Si no hay folderName, guardar directamente en la carpeta principal
+            email_folder_id = folder_id
     # --- Lógica de Sobrescritura ---
     nombre_final = nombre_archivo_drive or file_name.split("/")[-1]
     

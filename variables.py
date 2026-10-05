@@ -77,6 +77,8 @@ max_file_size = 20 * 1024 * 1024  # 20MB
 carpetaAlumnos="1Ow8FQ7GGTwQXWpUBWjoyFSIKKpE9q-d_"
 carpetaEmpresas="1rqVE9qm3FiVZ9mSbC-kBGT1vTxqbU8zF"
 carpetaPractica="1L0pgScXKi3KlqYXxnT73vFbdLFTNUb8h"
+carpetaDocumentacion='17HEOEEBiAfaQMvOwvFewZz3uuICyz8kn'
+carpetaManuales='manuales'
 #emails
 bodyEmailsEmpresa= f"""Hola,
 
