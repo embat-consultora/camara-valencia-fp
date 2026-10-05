@@ -317,7 +317,7 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
-st.subheader("🔗 Enlaces a documentación")              
+st.subheader("🔗 Enlaces a documentación")            
 files, folderId = list_drive_files(carpetaManuales)
 
 if files:

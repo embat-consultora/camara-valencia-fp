@@ -74,11 +74,11 @@ emailImportantesTabla = "email_importantes"
 max_file_size = 20 * 1024 * 1024  # 20MB
 
 #drive
-carpetaAlumnos="1Ow8FQ7GGTwQXWpUBWjoyFSIKKpE9q-d_"
-carpetaEmpresas="1rqVE9qm3FiVZ9mSbC-kBGT1vTxqbU8zF"
-carpetaPractica="1L0pgScXKi3KlqYXxnT73vFbdLFTNUb8h"
-carpetaDocumentacion='17HEOEEBiAfaQMvOwvFewZz3uuICyz8kn'
-carpetaManuales='manuales'
+carpetaAlumnos="1Q6YVWNLi2Jm5V7E9dnT454Me_INBvU3Z"
+carpetaEmpresas="1S4WOBuY_Yn_7eiFqJ3BJrRSWu_QLhg4_"
+carpetaPractica="1a-s8ycno4rXBnennRUdodvJbrt-KgRHT"
+carpetaDocumentacion='1S4WOBuY_Yn_7eiFqJ3BJrRSWu_QLhg4_'
+carpetaManuales='Empresas'
 #emails
 bodyEmailsEmpresa= f"""Hola,
 
