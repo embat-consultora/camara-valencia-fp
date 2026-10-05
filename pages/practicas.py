@@ -1260,10 +1260,10 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
             st.session_state.fp_contacto = ultimo_feedback.get("programaFP", False)
 
         with st.form("form_feedback_tutor_centro"):
+            st.info("Aquí puede añadir comentarios sobre el seguimiento de la formación del alumno, así como cualquier observación relevante para la empresa o el alumno.")
             comentarios_contacto1 = st.text_area("Comentarios",
                 value=ultimo_feedback.get("primerContacto", ""),
                 disabled=not puede_editar)
-
             fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
                 disabled=not puede_editar, key="fp_contacto")
             ha_acogido = st.radio(

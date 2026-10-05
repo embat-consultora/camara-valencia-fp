@@ -27,12 +27,10 @@ def apply_page_config():
     hide_streamlit_style = """
     <style>
     /* Ocultar elementos dentro del iframe */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
     footer {visibility: hidden;}
 
     [data-testid="stFooter"] {display: none;}
-    [data-testid="stToolbar"] {display: none;}
+
     [data-testid="appCreatorAvatar"] {display: none;}
     [data-testid="appCreatorAvatar"] {display: none;}
     /* Ajustar padding superior para que no quede hueco vacio */
