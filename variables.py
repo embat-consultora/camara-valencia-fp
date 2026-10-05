@@ -2,7 +2,7 @@ title="Cámara Valencia - FP"
 logoutButton="Desloguearse"
 page_icon="./images/cv-fp.ico"
 companyIcon="./images/cv-fp.png"
-
+camaraLogo="./images/camara-logo.png"
 azul="#013d5f"
 celeste="2AD2C9"
 amarillo=""
@@ -82,7 +82,7 @@ carpetaManuales="Empresas"
 #emails
 bodyEmailsEmpresa= f"""Hola,
 
-Nos ponemos en contacto desde la Cámara FP de Valencia en relación a la Formación Profesional.
+Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
 Llena esta formulario si tiene alguna formación u oferta: {"{{form_link}}"}
 
@@ -91,7 +91,7 @@ Andrea
 """
 bodyEmailsAlumno= f"""Hola,
 
-Nos ponemos en contacto desde la Cámara FP de Valencia en relación a la Formación Profesional.
+Nos ponemos en contacto desde la Cámara de Comercio de Valencia en relación a la Formación Profesional.
 Estamos próximos a lanzar los nuevos proyectos de FP y nos gustaría contar con tu colaboración. 
 Llena esta formulario si te interesaría participar en alguna Formación: {"{{form_link}}"}
 
@@ -415,7 +415,7 @@ locale_tabla_principal = {
                 "resetColumns": "Restablecer columnas",
                 "expandAll": "Expandir todo",
                 "collapseAll": "Contraer todo",
-                "columns": "Columnas",
+                                "columns": "Columnas",
                 "columnsToolPanel": "Columnas",
                 "hideColumn": "Ocultar columna",
                 "filters": "Filtros",
@@ -431,11 +431,11 @@ locale_tabla_principal = {
                 "pivotMode": "Modo pivote",
                 "groups": "Agrupaciones",
                 "values": "Valores",
+                
                 "pivots": "Pivotes",
                 "rowGroupColumnsEmptyMessage": "Arrastra aquí para agrupar filas",
                 "valueColumnsEmptyMessage": "Arrastra aquí para agregar valores",
                 "pivotColumnsEmptyMessage": "Arrastra aquí para agregar pivotes",
-
                 # Filtros estándar
                 "filterOoo": "Filtrar...",
                 "equals": "Igual a",
