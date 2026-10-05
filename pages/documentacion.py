@@ -56,12 +56,53 @@ datos_roles = {
         ],
         "recursos": [
             {
-                "titulo": "Manual de Administración Global y Configuración",
-                "duracion": "15 min lectura",
-                "descripcion": "Guía completa para la gestión de usuarios, alta de empresas, parametrización del sistema y paneles estratégicos.",
-                "pdf_path": "manual_administrador.pdf",
-                "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            }
+                "titulo": "Panel estratégico",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre el panel estratégico.",
+                "video_url": "https://www.youtube.com/watch?v=L7wDOM3ZQn0",
+            },
+            {
+                "titulo": "Formaciones en empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+            },
+            {
+                "titulo": "Configuraciones",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre las configuraciones de la plataforma.",
+                "video_url": "http://youtube.com/watch?v=tyjTdpAYzZs",
+            },
+            {
+                "titulo": "Carga rápida",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la carga rápida de asignaciones.",
+                "video_url": "https://www.youtube.com/watch?v=tiAQxS5HM0Y",
+            },
+            {
+                "titulo": "Asignar alumno a empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre cómo asignar un alumno a una empresa.",
+                "video_url": "https://www.youtube.com/watch?v=AuG9AWzRaXo",
+            },
+            {
+                "titulo": "Creación de gestores y tutores",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la creación de gestores y tutores.",
+                "video_url": "https://www.youtube.com/watch?v=e_RRmBjdqxQ",
+            },
+            {
+                "titulo": "Match de alumnos",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre el proceso de match de alumnos.",
+                "video_url": "https://www.youtube.com/watch?v=HmMRZ_EfIVo",
+            },
+            {
+                "titulo": "Gestión de alumnos",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de alumnos.",
+                "video_url": "http://youtube.com/watch?v=dqMvyF9QcOs",
+            },
         ],
     },
     "Gestor": {
@@ -73,12 +114,24 @@ datos_roles = {
         ],
         "recursos": [
             {
-                "titulo": "Guía de Gestión de Formaciones Asignadas",
-                "duracion": "10 min lectura",
-                "descripcion": "Procedimientos para el seguimiento estratégico, validación de asignaciones y gestión de FE.",
-                "pdf_path": "manual_gestor.pdf",
-                "video_url": None,
-            }
+                          "titulo": "Formaciones en empresa",
+                          "duracion": "Video tutorial",
+                          "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                          "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+                      },
+
+                      {
+                          "titulo": "Asignar alumno a empresa",
+                          "duracion": "Video tutorial",
+                          "descripcion": "Tutorial sobre cómo asignar un alumno a una empresa.",
+                          "video_url": "https://www.youtube.com/watch?v=AuG9AWzRaXo",
+                      },
+                      {
+                          "titulo": "Match de alumnos",
+                          "duracion": "Video tutorial",
+                          "descripcion": "Tutorial sobre el proceso de match de alumnos.",
+                          "video_url": "https://www.youtube.com/watch?v=HmMRZ_EfIVo",
+                      },
         ],
     },
     "Tutor de centro": {
@@ -86,12 +139,11 @@ datos_roles = {
         "paginas_acceso": ["Formación en Empresa"],
         "recursos": [
             {
-                "titulo": "Manual para Tutores de Centro Educativo",
-                "duracion": "8 min lectura",
-                "descripcion": "Cómo realizar la supervisión de alumnos, revisar progresos y comunicarse con los tutores de empresa.",
-                "pdf_path": "manual_tutor_centro.pdf",
-                "video_url": None,
-            }
+                          "titulo": "Formaciones en empresa",
+                          "duracion": "Video tutorial",
+                          "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                          "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+                      }
         ],
     },
     "Empresa": {
@@ -99,12 +151,11 @@ datos_roles = {
         "paginas_acceso": ["Formación en Empresa", "Mi Empresa"],
         "recursos": [
             {
-                "titulo": "Guía de Portal Empresa: Ofertas y Tutores",
-                "duracion": "12 min lectura",
-                "descripcion": "Instructivo para la gestión del perfil corporativo, publicación de ofertas y alta de tutores de empresa.",
-                "pdf_path": "manual_empresa.pdf",
-                "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            }
+                "titulo": "Formaciones en empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+            },
         ],
     },
     "Tutor en Empresa": {
@@ -115,21 +166,7 @@ datos_roles = {
                 "titulo": "Manual del Tutor de Empresa: Evaluación y Seguimiento",
                 "duracion": "7 min lectura",
                 "descripcion": "Paso a paso para registrar actividades, validar asistencias y calificar el desempeño del alumno.",
-                "pdf_path": "manual_tutor_empresa.pdf",
-                "video_url": None,
-            }
-        ],
-    },
-    "Alumno": {
-        "descripcion": "Consulta el estado de su formación en la empresa y adjunta la documentación requerida.",
-        "paginas_acceso": ["Mi Formación"],
-        "recursos": [
-            {
-                "titulo": "Manual del Alumno: Carga de Documentación y Seguimiento",
-                "duracion": "5 min lectura",
-                "descripcion": "Tutorial sobre cómo subir anexos, consultar la formación asignada y revisar observaciones.",
-                "pdf_path": "manual_alumno.pdf",
-                "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "video_url": "https://www.youtube.com/watch?v=XjC6Ceyis90",
             }
         ],
     },
@@ -138,23 +175,19 @@ datos_roles = {
 # ----------------------------------------------------
 # BLOQUE 1: SELECTOR DE ROL Y DESCRIPCIÓN
 # ----------------------------------------------------
-rol = st.session_state.get("rol", "admin")
-
-roles_disponibles = list(datos_roles.keys())
-rol_usuario = nombres_roles.get(rol, "")
-indice_rol = next(
+rol = st.session_state.get("rol")
+rol_usuario = nombres_roles.get(rol)
+rol_seleccionado = next(
     (
-        indice
-        for indice, nombre_rol in enumerate(roles_disponibles)
-        if nombre_rol.casefold() == rol_usuario.casefold()
+        nombre_rol
+        for nombre_rol in datos_roles
+        if nombre_rol.casefold() == (rol_usuario or "").casefold()
     ),
-    0,
+    None,
 )
-rol_seleccionado = st.selectbox(
-    "🎯 Selecciona un Rol para consultar su documentación:",
-    roles_disponibles,
-    index=indice_rol,
-)
+if rol_seleccionado is None:
+    st.error("No se pudo identificar el rol de usuario para mostrar sus recursos.")
+    st.stop()
 
 info_rol = datos_roles[rol_seleccionado]
 
@@ -319,37 +352,36 @@ if rol == "admin":
 
 st.subheader("🔗 Enlaces a documentación")            
 files, folderId = list_drive_files(carpetaManuales)
+archivos_pdf = [
+    archivo
+    for archivo in files or []
+    if archivo.get("name", "").lower().endswith(".pdf")
+]
 
-if files:
-    for f in files:
-        fecha = f.get("modifiedTime", "")[:10]
-        st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
+if archivos_pdf:
+    for archivo in archivos_pdf:
+        fecha = archivo.get("modifiedTime", "")[:10]
+        st.write(
+            f"- [{archivo['name']}]({archivo['webViewLink']}) "
+            f"_(última modificación: {fecha})_"
+        )
 else:
-    st.warning("No hay archivos.")
+    st.warning("No hay archivos PDF.")
 
-st.subheader(f"📖 Manuales y Videos para {rol_seleccionado}")
+st.subheader(f"🎬 Videos para {rol_seleccionado}")
 
-st.write('')
-for recurso in info_rol["recursos"]:
-    with st.expander(f"📌 {recurso['titulo']}", expanded=True):
-        col_desc, col_actions = st.columns([2, 1])
+recursos_video = [
+    (rol_seleccionado, recurso)
+    for recurso in info_rol["recursos"]
+    if recurso.get("video_url")
+]
 
-        with col_desc:
+if recursos_video:
+    for nombre_rol, recurso in recursos_video:
+        with st.expander(f"📌 {nombre_rol}: {recurso['titulo']}", expanded=False):
             st.write(f"**Descripción:** {recurso['descripcion']}")
-            st.caption(f"⏱️ Tiempo estimado: {recurso['duracion']}")
-
-            if recurso.get("video_url"):
-                st.markdown("#### 🎬 Video Tutorial")
-                st.video(recurso["video_url"])
-
-        with col_actions:
-            st.markdown("#### 📥 Documentación")
-            st.download_button(
-                label="Descargar Manual (PDF)",
-                data=b"Contenido de ejemplo del PDF",
-                file_name=recurso["pdf_path"],
-                mime="application/pdf",
-                use_container_width=True,
-            )
+            st.video(recurso["video_url"])
+else:
+    st.info("Aún no hay videos disponibles para este rol.")
 
 st.divider()
