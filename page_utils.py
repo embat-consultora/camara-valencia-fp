@@ -30,7 +30,7 @@ def apply_page_config():
     footer {visibility: hidden;}
 
     [data-testid="stFooter"] {display: none;}
-    [data-testid="stToolbar"] {display: none;}
+
     [data-testid="appCreatorAvatar"] {display: none;}
     [data-testid="appCreatorAvatar"] {display: none;}
     /* Ajustar padding superior para que no quede hueco vacio */
