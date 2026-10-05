@@ -859,8 +859,8 @@ def fragment_gestion_gestores():
                     row["password_temp"] = password_auto
                 
                 updateGestores(cambios, st.session_state.df_gestores)
-                get_gestores_cached.clear()
-                get_gestores_ofertas_cached.clear()
+                get_gestores_cached()
+                get_gestores_ofertas_cached()
                 st.session_state.df_gestores = None
                 st.session_state.gestores_guardados = True
                 st.rerun(scope="fragment")
@@ -911,7 +911,7 @@ def fragment_gestion_tutores():
                     row["password_temp"] = password_auto
                 
                 updateTutoresCentro(cambios, st.session_state.df_tutores)
-                get_tutores_cached.clear()
+                get_tutores_cached()
                 st.session_state.df_tutores = None
                 st.session_state.tutores_guardados = True
                 st.rerun(scope="fragment")

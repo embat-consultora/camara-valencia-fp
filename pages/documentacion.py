@@ -1,7 +1,11 @@
 import streamlit as st
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import nombres_roles
+from modules.drive_helper import upload_to_drive,list_drive_files
+from variables import nombres_roles,carpetaDocumentacion,max_file_size,carpetaManuales
+from modules.forms_helper import  file_size_bytes
+from pathlib import Path
+import uuid
 # Configuración inicial de página
 apply_page_config()
 make_sidebar()
@@ -180,6 +184,151 @@ st.divider()
 # ----------------------------------------------------
 st.subheader(f"📖 Manuales y Videos para {rol_seleccionado}")
 
+if rol == "admin":
+    with st.expander("Configuración documentación"):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Como administrador, puedes entrar a canva y cambiar los documentos")
+            st.info("Una vez actualices los documentos, descargalos y subelos en la sección de abajo con el mismo nombre")
+        with col2:
+            st.link_button('Ir a Canva', 'https://www.canva.com/design/DAHQCSbVGkk/D2kh6ss6dJavaLmAwpeyBw/edit')
+        st.divider()
+        st.write("📤 Actualizar Documentos Oficiales")
+
+        col_subir1, col_subir2 = st.columns(2)
+        with col_subir1:
+            st.markdown("**Manual de Seguimiento**") 
+            uploaded_files = st.file_uploader(
+                "Subir archivos",
+                type=["pdf", "doc", "docx"],
+                accept_multiple_files=True,
+                key=f"up_manual_seguimiento"
+            )
+            st.html(
+                """
+                <style>
+
+                [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                display: none;
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                content: 'Arrastre aquí los archivos';
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                text-indent: -9999px;
+                line-height: 0;
+                }
+                [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                line-height: initial;
+                content: "Buscar";
+                text-indent: 0;
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                text-indent: -9999px;
+                line-height: 0;
+                }
+                [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                line-height: initial;
+                content: "Límite 1MB por archivo";
+                text-indent: 0;
+                }
+
+                </style>
+                """
+            )
+
+            if uploaded_files:
+                too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+                if too_big:
+                    st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+                else:
+                    if st.button("Subir Archivos", key=f"subir_manual_seguimiento"):
+                        with st.spinner("Subiendo archivos..."):
+                            for file in uploaded_files:
+                                extension = Path(file.name).suffix
+                                nuevo_nombre = f"Manual_Seguimiento{extension}"
+                                temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
+                                with open(temp, "wb") as f:
+                                    f.write(file.getbuffer())
+                                upload_to_drive(str(temp), carpetaDocumentacion, None, nuevo_nombre)
+                                st.success(f"Subido: {nuevo_nombre}")
+
+        with col_subir2:
+                st.markdown("**Manual de Onboarding**")
+                uploaded_files = st.file_uploader(
+                    "Subir archivos",
+                    type=["pdf", "doc", "docx"],
+                    accept_multiple_files=True,
+                    key=f"up_manual_onboarding"
+                )
+                st.html(
+                    """
+                    <style>
+    
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                    display: none;
+                    }
+    
+                    [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                    content: 'Arrastre aquí los archivos';
+                    }
+    
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                    line-height: initial;
+                    content: "Buscar";
+                    text-indent: 0;
+                    }
+    
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                    text-indent: -9999px;
+                    line-height: 0;
+                    }
+                    [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                    line-height: initial;
+                    content: "Límite 1MB por archivo";
+                    text-indent: 0;
+                    }
+    
+                    </style>
+                    """
+                )
+    
+                if uploaded_files:
+                    too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+                    if too_big:
+                        st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+                    else:
+                        if st.button("Subir Archivos", key=f"subir_manual_onboarding"):
+                            with st.spinner("Subiendo archivos..."):
+                                for file in uploaded_files:
+                                    extension = Path(file.name).suffix
+                                    nuevo_nombre = f"Manual_Onboarding{extension}"
+                                    temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
+                                    with open(temp, "wb") as f:
+                                        f.write(file.getbuffer())
+                                    upload_to_drive(str(temp), carpetaDocumentacion, None, nuevo_nombre)
+                                    st.success(f"Subido: {nuevo_nombre}")
+    
+    # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
+st.subheader("🔗 Enlaces a documentación")              
+files, folderId = list_drive_files(carpetaManuales)
+
+if files:
+    for f in files:
+        fecha = f.get("modifiedTime", "")[:10]
+        st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
+else:
+    st.warning("No hay archivos.")
+
+
+st.write('')
 for recurso in info_rol["recursos"]:
     with st.expander(f"📌 {recurso['titulo']}", expanded=True):
         col_desc, col_actions = st.columns([2, 1])
