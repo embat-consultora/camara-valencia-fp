@@ -182,7 +182,6 @@ st.divider()
 # ----------------------------------------------------
 # BLOQUE 2: DOCUMENTACIÓN Y VIDEOS
 # ----------------------------------------------------
-st.subheader(f"📖 Manuales y Videos para {rol_seleccionado}")
 
 if rol == "admin":
     with st.expander("Configuración documentación"):
@@ -317,6 +316,7 @@ if rol == "admin":
                                     st.success(f"Subido: {nuevo_nombre}")
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
+
 st.subheader("🔗 Enlaces a documentación")              
 files, folderId = list_drive_files(carpetaManuales)
 
@@ -327,6 +327,7 @@ if files:
 else:
     st.warning("No hay archivos.")
 
+st.subheader(f"📖 Manuales y Videos para {rol_seleccionado}")
 
 st.write('')
 for recurso in info_rol["recursos"]:
