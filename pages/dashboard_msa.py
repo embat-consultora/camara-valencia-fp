@@ -17,8 +17,7 @@ from variables import (
     feedbackResponseTabla,
     necesidadFP,
     practicaEstadosTabla,
-    practicaTabla,
-    tutoresTabla,
+    practicaTabla
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -66,7 +65,6 @@ def exportar_excel(df):
 def load_all_data():
     df_alumnos = pd.DataFrame(get(alumnosTabla))
     df_empresas = pd.DataFrame(get(empresasTabla))
-    df_tutores = pd.DataFrame(get(tutoresTabla))
     df_estados = pd.DataFrame(get(practicaEstadosTabla))
     df_practicas = pd.DataFrame(get(practicaTabla))
 
@@ -472,7 +470,17 @@ with tab_alumnos:
         col_1, col_2 = st.columns(2)
         with col_1:
             if "sexo" in df_alumnos.columns:
-                datos_sexo = df_alumnos["sexo"].fillna("Sin definir").value_counts().reset_index()
+                sexo = df_alumnos["sexo"].astype("string").str.strip()
+                sin_especificar = (
+                    sexo.isna()
+                    | sexo.eq("")
+                    | sexo.str.casefold().isin(
+                        {"none", "null", "nan", "Prefiero No especificar"}
+                    )
+                )
+                sexo = sexo.mask(sin_especificar, "Prefiero No especificar")
+
+                datos_sexo = sexo.value_counts().rename_axis("Sexo").reset_index(name="Alumnos")
                 datos_sexo.columns = ["Sexo", "Alumnos"]
                 st.plotly_chart(
                     px.pie(
@@ -697,17 +705,16 @@ with tab_ofertas:
     if not tiempos_match_df.empty:
         match_tiempo, match_total = st.columns(2)
         match_tiempo.metric(
-            "Tiempo medio entre creación de oferta y práctica",
+            "Tiempo medio entre creación de oferta y formaciones",
             f"{tiempos_match_df['dias_match'].mean():.1f} días",
         )
         match_total.metric(
-            "Prácticas enlazadas con fechas válidas",
+            "Formaciones creadas desde ofertas",
             len(tiempos_match_df),
-            help="Emparejadas con oferta.id por el campo práctica.oferta.",
         )
     else:
         st.info(
-            "No hay prácticas enlazadas por ID de oferta con fechas de creación "
+            "No hay Formaciones enlazadas por ID de oferta con fechas de creación "
             "válidas para calcular el tiempo medio."
         )
 
@@ -924,11 +931,3 @@ with tab_feedback:
       st.plotly_chart(fig_fp, use_container_width=True)
     else:
       st.info("Sin datos disponibles para la columna FP Dual.")
-st.divider()
-if not df_alumnos.empty:
-    st.download_button(
-        "📥 Exportar alumnos filtrados",
-        data=exportar_excel(df_alumnos),
-        file_name=f"alumnos_fp_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )

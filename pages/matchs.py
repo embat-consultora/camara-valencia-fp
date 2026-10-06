@@ -60,7 +60,7 @@ with st.spinner("Cargando datos..."):
         )
     ]
 if not ofertas_con_cupo:
-    st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
+    st.info("No se encontraron ofertas registradas o alumnos para realizar el match. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
     st.stop()
 base_url = st.secrets["urls"]["URL"] 
 
@@ -125,7 +125,7 @@ for oferta_data in ofertas:
     with st.expander(f"🏢 {empresa.get("nombre", "Empresa sin nombre")} — CIF: {empresa.get("CIF", "Sin CIF")} — Oferta #{oferta_id} ({candidatos_count} candidatos)"):
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Requisitos:**", oferta_data.get("requisitos"), "Ninguno especificado")
+            st.write(f"**Requisitos:**", oferta_data.get("requisitos", "Ninguno especificado"))
             st.write(f"**Vehículo:**", oferta_data.get("vehiculo", "Ninguno especificado"))
             st.write(f"**Contrato:**", oferta_data.get("contrato", "Ninguno especificado"))
             st.write(f"**CP:**", oferta_data.get("cp_empresa", "Ninguno especificado"))
@@ -144,7 +144,6 @@ for oferta_data in ofertas:
             continue
 
         tab_objs = st.tabs(ciclos)
-
         for i, ciclo in enumerate(ciclos):
             with tab_objs[i]:
                 st.subheader(f"🎓 {ciclo}")
@@ -203,16 +202,17 @@ for oferta_data in ofertas:
                                         if st.button("Asignar", key=f"match_{oferta_id}_{row['alumno_id']}"):
                                             try:
                                                 curso =  row['curso']
+                                                print(ciclos_info)
                                                 crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4], anio=anioFiltro, curso=curso)
                                                 print('practica creada')
                                                 checkEstadoOferta(oferta_id)
                                                 print('oferta actualizada')
-                                                actualizar_cupo(empresa.get("CIF"), ciclos_info, -1)
+                                                actualizar_cupo(empresa.get("CIF"), ciclo, -1)
                                                 print('cupo actualizado')
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
                                             except Exception as e:
-                                                st.error(f"❌ Error al crear el match: {e}")
+                                                st.error(f"❌ Error al crear el match: {e}. Por favor intente nuevamente o envie un correo a soporte")
                                                 
                                     else:
                                         st.info("Plazas completos para este ciclo.")
