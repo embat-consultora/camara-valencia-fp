@@ -132,6 +132,12 @@ datos_roles = {
                           "descripcion": "Tutorial sobre el proceso de match de alumnos.",
                           "video_url": "https://www.youtube.com/watch?v=HmMRZ_EfIVo",
                       },
+                       {
+                                      "titulo": "Gestión de alumnos",
+                                      "duracion": "Video tutorial",
+                                      "descripcion": "Tutorial sobre la gestión de alumnos.",
+                                      "video_url": "http://youtube.com/watch?v=dqMvyF9QcOs",
+                                  },
         ],
     },
     "Tutor de centro": {
