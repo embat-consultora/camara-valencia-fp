@@ -125,13 +125,13 @@ for oferta_data in ofertas:
     with st.expander(f"🏢 {empresa.get("nombre", "Empresa sin nombre")} — CIF: {empresa.get("CIF", "Sin CIF")} — Oferta #{oferta_id} ({candidatos_count} candidatos)"):
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Requisitos:**", oferta_data.get("requisitos"), "Ninguno especificado")
-            st.write(f"**Vehículo:**", oferta_data.get("vehiculo", "Ninguno especificado"))
-            st.write(f"**Contrato:**", oferta_data.get("contrato", "Ninguno especificado"))
-            st.write(f"**CP:**", oferta_data.get("cp_empresa", "Ninguno especificado"))
+            st.write(f"**Requisitos:**", oferta_data.get("requisitos") or "Ninguno especificado")
+            st.write(f"**Vehículo:**", oferta_data.get("vehiculo") or "Ninguno especificado")
+            st.write(f"**Contrato:**", oferta_data.get("contrato") or "Ninguno especificado")
+            st.write(f"**CP:**", oferta_data.get("cp_empresa" or "Ninguno especificado"))
         with col2:
-            st.write(f"**Dirección:**", oferta_data.get("direccion_empresa", "Ninguno especificado"))
-            st.write(f"**Localidad:**", oferta_data.get("localidad_empresa", "Ninguno especificado"))
+            st.write(f"**Dirección:**", oferta_data.get("direccion_empresa") or "Ninguno especificado")
+            st.write(f"**Localidad:**", oferta_data.get("localidad_empresa") or  "Ninguno especificado")
             #tutores = oferta_data.get("tutores", [])
             if tutores:
                 st.write(f"**Tutor:**", tutores[0].get("nombre"))
