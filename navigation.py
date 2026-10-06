@@ -85,7 +85,7 @@ def make_sidebar():
             st.write("")
             if st.session_state.get("logged_in", False):
                 if rol == "admin":
-                    st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
+                    st.page_link("pages/dashboard_msa.py", label="Panel Estratégico")
                     st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/matchs.py", label="Panel de Matcheos")
@@ -96,8 +96,9 @@ def make_sidebar():
                     st.page_link("pages/configuracion.py", label="Configuraciones")
                     st.write("")
                 if rol == "gestor":
-                    st.page_link("pages/dashboard_msa.py", label="Panel Estatégico")
+                    st.page_link("pages/dashboard_msa.py", label="Panel Estratégico")
                     st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
+                    st.page_link("pages/matchs.py", label="Panel de Matcheos")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "tutor":
