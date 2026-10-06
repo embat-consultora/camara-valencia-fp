@@ -176,6 +176,18 @@ datos_roles = {
             }
         ],
     },
+    "Alumno": {
+        "descripcion": "Realiza el seguimiento diario y evaluación práctica de los alumnos que tiene a su cargo.",
+        "paginas_acceso": ["Formación en Empresa"],
+        "recursos": [
+            {
+                "titulo": "Formaciones en empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+            },
+        ],
+    },
 }
 
 # ----------------------------------------------------

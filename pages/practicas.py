@@ -170,9 +170,8 @@ def load_data():
             gestorNombre = gestorDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
-            if p.get("gestor") is not None and p.get("gestor") == gestorNombre
+            if p.get("gestor") == gestorNombre or p.get("gestor") is None
         ]
-            
         else:
             practicas = []
    
@@ -887,9 +886,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         colGestor, colTutor, colTCentro = st.columns(3)
         with colGestor:
             clave_gestor = f"gestor_{alumno['id']}"
-            if rol_usuario != 'admin':
-                st.write(f"**Gestor:** {gestor_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Gestor Asignado**",
                     options=lista_nombres_gestores,
@@ -900,6 +897,9 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "gestor", "id", clave_gestor, "Gestor"),
                     disabled=st.session_state["edit_disabled"]
                 )
+            else:
+                 st.write(f"**Gestor:** {gestor_actual or 'Sin asignar'}")
+   
         tutores_filtrados = [g for g in tutores if g["cif_empresa"] == empresa['CIF']]
         lista_nombres_tutores = [g["nombre"] for g in tutores_filtrados]
         if "No asignado" not in lista_nombres_tutores:
@@ -922,9 +922,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             )
 
             st.session_state[f"tutor_empresa_{p['id']}"] = tutor_empresa
-            if rol_usuario != 'admin':
-                st.write(f"**Tutor Empresa:** {tutor_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Tutor Empresa**",
                     options=lista_nombres_tutores,
@@ -934,6 +932,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor"),
                     disabled=st.session_state["edit_disabled"]
                     )
+            else:
+                st.write(f"**Tutor Empresa:** {tutor_actual  or 'Sin asignar'}")
                 
 
         lista_nombres_tutoresCentro = [g["nombre"] for g in tutoresCentro]
@@ -943,9 +943,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         indice_tutorc = lista_nombres_tutoresCentro.index(tutorc_actual) if tutorc_actual in lista_nombres_tutoresCentro else 0
         with colTCentro:
             clave_tutorc = f"tutor_centro_{alumno['id']}"
-            if rol_usuario != 'admin':
-                st.write(f"**Tutor Centro:** {tutorc_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Tutor Centro**",
                     options=lista_nombres_tutoresCentro,
@@ -955,6 +953,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutorc, "TutorCentro"),
                     disabled=st.session_state["edit_disabled"]
                 )
+            else:
+                st.write(f"**Tutor Centro:** {tutorc_actual or 'Sin asignar'}")
 
         pass
 
