@@ -808,9 +808,9 @@ with tab_ofertas:
                                     st.success(f"Actualizada correctamente")
                                 except Exception as e:
                                     st.error(f"Error: {e}")
-                            get_ofertas_cached
-                            get_empresas_ofertas_cached
-                            st.rerun()
+                            get_ofertas_cached()
+                            get_empresas_ofertas_cached()
+                 
 
 # --- TAB CONFIGURACIÓN (Solo Admin) ----
 
