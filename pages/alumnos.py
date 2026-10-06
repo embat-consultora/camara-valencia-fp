@@ -653,18 +653,19 @@ with tab3:
 )
     if st.button("📨 Enviar Correo a Alumnos", disabled=not can_send):
         try:
-            if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
-                fecha_envio = datetime.now().isoformat()
-                for email in final_list:
-                    alumno = df_alumnos[df_alumnos["email_alumno"] == email]
-                    if not alumno.empty:
-                        alumno_id = alumno["dni"].values[0]
-                        upsert(
-                            alumnoEstadosTabla,
-                            {"alumno": alumno_id, "email_enviado": fecha_envio},
-                            keys=["alumno"]
-                        )
-                st.success("Emails enviados correctamente! 🚀")
+            with st.spinner("Enviando correos, por favor espere..."):
+                if send_email(email_sender, email_password, final_list, subject_al, body_al,adjuntos):
+                    fecha_envio = datetime.now().isoformat()
+                    for email in final_list:
+                        alumno = df_alumnos[df_alumnos["email_alumno"] == email]
+                        if not alumno.empty:
+                            alumno_id = alumno["dni"].values[0]
+                            upsert(
+                                alumnoEstadosTabla,
+                                {"alumno": alumno_id, "email_enviado": fecha_envio},
+                                keys=["alumno"]
+                            )
+                    st.success("Emails enviados correctamente! 🚀")
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
             logError(error_msg,"Alumnos - Envío de Emails")
