@@ -351,7 +351,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
             tutor_actual = p.get("tutor") 
             indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
             clave_tutor = f"tutor_{alumno['id']}"
-            if p.get("status") in [ estadosPractica[3] , estadosPractica[2], estadosPractica[1]]:
+            if p.get("status") in [ estadosPractica[3] , estadosPractica[2]]:
                 st.write(f"**Tutor Empresa:** {tutor_actual or 'No asignado'}")
             else:
                 st.selectbox(
