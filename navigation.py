@@ -96,10 +96,11 @@ def make_sidebar():
                     st.page_link("pages/configuracion.py", label="Configuraciones")
                     st.write("")
                 if rol == "gestor":
-                    st.page_link("pages/dashboard_msa.py", label="Panel Estratégico")
                     st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
                     st.page_link("pages/matchs.py", label="Panel de Matcheos")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
+                    st.page_link("pages/empresas.py", label="Gestión de Empresas")
+                    st.page_link("pages/alumnos.py", label="Gestión de Alumnos")
                     st.page_link("pages/documentacion.py", label="Instructivos y Manuales de uso")
                 if rol == "tutor":
                     st.page_link("pages/practicas.py", label="Formación en Empresa")

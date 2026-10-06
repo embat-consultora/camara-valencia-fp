@@ -1139,7 +1139,7 @@ def generarFormularioCierre(practica_id, email_destino):
                 "email_destino": email_destino,
                 "tipo_form": formCierre,
                 "token": token,
-                "estado": "pendiente",
+                "estado": "enviado",
             }
             if registro_existente:
                 id_registro = registro_existente[0]['id']

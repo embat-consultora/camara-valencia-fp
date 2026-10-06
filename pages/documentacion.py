@@ -132,6 +132,12 @@ datos_roles = {
                           "descripcion": "Tutorial sobre el proceso de match de alumnos.",
                           "video_url": "https://www.youtube.com/watch?v=HmMRZ_EfIVo",
                       },
+                       {
+                                      "titulo": "Gestión de alumnos",
+                                      "duracion": "Video tutorial",
+                                      "descripcion": "Tutorial sobre la gestión de alumnos.",
+                                      "video_url": "http://youtube.com/watch?v=dqMvyF9QcOs",
+                                  },
         ],
     },
     "Tutor de centro": {
@@ -352,7 +358,6 @@ if rol == "admin":
 
 st.subheader("🔗 Enlaces a documentación")              
 
-st.subheader("🔗 Enlaces a documentación")
 with st.spinner("Cargando archivos ..."):     
     files, folderId = list_drive_files(carpetaManuales)
     archivos_pdf = [
