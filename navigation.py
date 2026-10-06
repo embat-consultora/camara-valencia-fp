@@ -96,7 +96,6 @@ def make_sidebar():
                     st.page_link("pages/configuracion.py", label="Configuraciones")
                     st.write("")
                 if rol == "gestor":
-                    st.page_link("pages/dashboard_msa.py", label="Panel Estratégico")
                     st.page_link("pages/tablasPrincipales.py", label="Panel de Gestión de FE")
                     st.page_link("pages/matchs.py", label="Panel de Matcheos")
                     st.page_link("pages/practicas.py", label="Formación en Empresa")
