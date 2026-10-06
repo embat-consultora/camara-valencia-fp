@@ -352,7 +352,6 @@ if rol == "admin":
 
 st.subheader("🔗 Enlaces a documentación")              
 
-st.subheader("🔗 Enlaces a documentación")
 with st.spinner("Cargando archivos ..."):     
     files, folderId = list_drive_files(carpetaManuales)
     archivos_pdf = [

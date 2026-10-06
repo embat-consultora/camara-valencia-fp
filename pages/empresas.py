@@ -365,7 +365,7 @@ with tab2:
                 if "CIF" not in df_csv.columns:
                     st.error("❌ El archivo debe incluir la columna 'CIF'.")
                     st.stop()
-                with st.spinner(f"Procesando alumos."):
+                with st.spinner(f"Procesando Empresas."):
                     if st.button("🚀 Subir empresas desde CSV"):
                         creados = 0
                         errores = []
