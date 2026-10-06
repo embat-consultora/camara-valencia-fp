@@ -917,6 +917,26 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                         print(f"Elimino borrador - practica {practicaId}")
                         delete(practicaTabla, "id", practicaId)
                         upsert(alumnosTabla, {"dni": dni,"estado": estadosAlumno[0]}, keys=["dni"])
+                    else:
+                        print(f"sin asignar y sin practica, entro a crear una borrador y sin cif")
+                        practica_res = crearDraftPractica(
+                                                empresaCif=newCif,
+                                                alumnoDni=dni,
+                                                ciclo=row['ciclo_formativo'], 
+                                                area= nuevo_area if nuevo_area else antiguo_area,
+                                                proyecto=nuevo_puesto if nuevo_puesto else antiguo_puesto,
+                                                tutorCentro= nuevo_tutorCentro if nuevo_tutorCentro else antiguo_tutorCentro,
+                                                oferta_id=nueva_oferta if nueva_oferta else antigua_oferta,
+                                                status=estados[5],
+                                                practicaId=None if pd.isna(row.get('practica_id')) else row.get('practica_id') ,
+                                                gestor=curr_gestor if curr_gestor else orig_gestor,
+                                                direccion=nueva_direccion if nueva_direccion else antigua_direccion,
+                                                localidad=nueva_localidad if nueva_localidad else antigua_localidad,
+                                                anio=curr_anio,
+                                                curso=curr_curso
+                                            )
+                        practicaId = practica_res[0].get("id")
+                        print(f"Practica creada borrador sin empresa: {practicaId}")               
                 if nueva_empresa != "⚠️ SIN ASIGNAR":
                     newCif = mapa_nombres_id.get(nueva_empresa)        
                     upsert(alumnosTabla, {"dni": dni,"estado":estadosAlumno[5]}, keys=["dni"])

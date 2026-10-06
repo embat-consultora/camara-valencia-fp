@@ -60,7 +60,7 @@ with st.spinner("Cargando datos..."):
         )
     ]
 if not ofertas_con_cupo:
-    st.info("No se encontraron ofertas registradas. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
+    st.info("No se encontraron ofertas registradas o alumnos para realizar el match. Use el filtro de curso académico para cambiar el año y ver otras ofertas.")
     st.stop()
 base_url = st.secrets["urls"]["URL"] 
 
@@ -207,7 +207,7 @@ for oferta_data in ofertas:
                                                 print('practica creada')
                                                 checkEstadoOferta(oferta_id)
                                                 print('oferta actualizada')
-                                                actualizar_cupo(empresa.get("CIF"), ciclos_info, -1)
+                                                actualizar_cupo(empresa.get("CIF"),ciclo, -1)
                                                 print('cupo actualizado')
                                                 st.success(f"✅ Match creado con {row['alumno_nombre']} ({row['alumno_dni']}) 🎉")                                               
                                                 st.rerun()
