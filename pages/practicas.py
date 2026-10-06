@@ -1565,8 +1565,8 @@ def seccion_detalle_cancelado(alumno, empresa, p, oferta):
         st.write(f"**Dirección formación:** {oferta.get('direccion_empresa') or empresa.get('direccion', '')}") 
         st.write(f"**Localidad:** {oferta.get('localidad_empresa') or empresa.get('localidad', '')}")
         st.write(f"**Tutor Empresa:** {p.get('tutor') or 'No asignado'}")
-        st.write(f"**Tutor Centro:** {p.get('tutor_centro', 'Sin asignar')}")
-        st.write(f"**Gestor:** {alumno.get('gestor', 'Sin asignar')}")
+        st.write(f"**Tutor Centro:** {p.get('tutor_centro') or 'Sin asignar'}")
+        st.write(f"**Gestor:** {p.get('gestor') or 'Sin asignar'}")
 
 def seccion_planificacion_cancelado(folder_name, p):
     st.subheader("📅 Planificación de Formaciones")

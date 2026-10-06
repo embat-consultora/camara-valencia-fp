@@ -350,23 +350,24 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
-st.subheader("🔗 Enlaces a documentación")              
-files, folderId = list_drive_files(carpetaManuales)
-archivos_pdf = [
-    archivo
-    for archivo in files or []
-    if archivo.get("name", "").lower().endswith(".pdf")
-]
+st.subheader("🔗 Enlaces a documentación")
+with st.spinner("Cargando archivos ..."):     
+    files, folderId = list_drive_files(carpetaManuales)
+    archivos_pdf = [
+        archivo
+        for archivo in files or []
+        if archivo.get("name", "").lower().endswith(".pdf")
+    ]
 
-if archivos_pdf:
-    for archivo in archivos_pdf:
-        fecha = archivo.get("modifiedTime", "")[:10]
-        st.write(
-            f"- [{archivo['name']}]({archivo['webViewLink']}) "
-            f"_(última modificación: {fecha})_"
-        )
-else:
-    st.warning("No hay archivos PDF.")
+    if archivos_pdf:
+        for archivo in archivos_pdf:
+            fecha = archivo.get("modifiedTime", "")[:10]
+            st.write(
+                f"- [{archivo['name']}]({archivo['webViewLink']}) "
+                f"_(última modificación: {fecha})_"
+            )
+    else:
+        st.warning("No hay archivos PDF.")
 
 st.subheader(f"🎬 Videos para {rol_seleccionado}")
 
