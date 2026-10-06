@@ -100,7 +100,7 @@ def send_welcome_email(email: str, usuario: str, password:str,  nombre:str) -> b
     email_password = st.secrets['email']['password']
     url = st.secrets['urls']['URL']
 
-    subject = "Bienvenido a la plataforma Cámara FP Valencia - Ciclos Formativos"
+    subject = "Bienvenido a la plataforma MCC - Ciclos Formativos"
     body = render_welcome_email(nombre, usuario, password, url)
     return send_email(email_sender, email_password, [email], subject, body, [], html=True)
 

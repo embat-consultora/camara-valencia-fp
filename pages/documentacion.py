@@ -350,6 +350,7 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
+<<<<<<< HEAD
 st.subheader("🔗 Enlaces a documentación")
 with st.spinner("Cargando archivos ..."):     
     files, folderId = list_drive_files(carpetaManuales)
@@ -358,6 +359,15 @@ with st.spinner("Cargando archivos ..."):
         for archivo in files or []
         if archivo.get("name", "").lower().endswith(".pdf")
     ]
+=======
+st.subheader("🔗 Enlaces a documentación")            
+files, folderId = list_drive_files(carpetaManuales)
+archivos_pdf = [
+    archivo
+    for archivo in files or []
+    if archivo.get("name", "").lower().endswith(".pdf")
+]
+>>>>>>> 8a2bd0ea21a9436aea21df1a14116de80717d14a
 
     if archivos_pdf:
         for archivo in archivos_pdf:

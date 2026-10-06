@@ -60,8 +60,7 @@ def upload_to_drive(file_name, folder_id, folderName, nombre_archivo_drive=None)
 
     return uploaded["id"]
 
-
-def list_drive_files(folder_name):
+def list_drive_files(folder_id):
     files = []
     folder_id = None
     try:
@@ -86,6 +85,45 @@ def list_drive_files(folder_name):
 
         folder_id = folders[0]["id"]
 
+        files = service.files().list(
+            q=f"'{folder_id}' in parents and trashed = false",
+            fields="files(id, name, webViewLink,webContentLink, modifiedTime)",
+            orderBy="modifiedTime desc",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute().get("files", [])
+
+    except Exception as e:
+        st.error(f"Error al listar los archivos: {e}")
+        return []
+    return files,folder_id
+
+
+def list_drive_files(folder_name):
+    files = []
+    folder_id = None
+    try:
+        credentials_info = st.secrets.connections.gcs
+        credentials = service_account.Credentials.from_service_account_info(credentials_info)
+        service = build("drive", "v3", credentials=credentials)
+        query_folder = (
+            f"name = '{folder_name}' and "
+            f"mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        )
+
+        folders = service.files().list(
+            q=query_folder,
+            spaces="drive",
+            corpora="allDrives",
+            fields="files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute().get("files", [])
+
+        if not folders:
+             return files, folder_id
+
+        folder_id = folders[0]["id"]
         files = service.files().list(
             q=f"'{folder_id}' in parents and trashed = false",
             fields="files(id, name, webViewLink,webContentLink, modifiedTime)",
