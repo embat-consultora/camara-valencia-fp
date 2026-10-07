@@ -16,7 +16,6 @@ from variables import (
     estadosAlumno,
     feedbackResponseTabla,
     necesidadFP,
-    practicaEstadosTabla,
     practicaTabla,
     tutoresTabla,
 )
@@ -66,8 +65,6 @@ def exportar_excel(df):
 def load_all_data():
     df_alumnos = pd.DataFrame(get(alumnosTabla))
     df_empresas = pd.DataFrame(get(empresasTabla))
-    df_tutores = pd.DataFrame(get(tutoresTabla))
-    df_estados = pd.DataFrame(get(practicaEstadosTabla))
     df_practicas = pd.DataFrame(get(practicaTabla))
 
     df_ofertas = pd.DataFrame(get(necesidadFP))
@@ -119,7 +116,6 @@ def load_all_data():
 
     return (
         df_alumnos,
-        df_estados,
         df_empresas,
         df_practicas,
         df_ofertas,
@@ -324,7 +320,7 @@ def card(contenedor, icono, titulo, valor, color):
     )
 
 
-df_alumnos_raw, df_estados, df_empresas_raw, df_practicas_raw, df_ofertas_raw, df_master_raw = load_all_data()
+df_alumnos_raw, df_empresas_raw, df_practicas_raw, df_ofertas_raw, df_master_raw = load_all_data()
 df_feedback_stats, df_feedback_detalle = load_feedback_data()
 df_feedback_respuestas = load_feedback_respuestas()
 

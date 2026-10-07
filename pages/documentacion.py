@@ -368,7 +368,8 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
-st.subheader("🔗 Enlaces a documentación")              
+st.subheader("🔗 Enlaces a documentación")         
+    
 if(rol != "alumno"):
 
     with st.spinner("Cargando archivos ..."):     
