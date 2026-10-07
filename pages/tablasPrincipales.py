@@ -364,7 +364,7 @@ with tab_alumnos:
                         width=120,
                         cellEditor='agSelectCellEditor',
                         cellEditorParams={'values': nombres_gestores},
-                        editable=(rol_usuario != "tutor_centro"),
+                        editable=(rol_usuario != "tutor_centro"), 
                     )
 
                     gb.configure_column("horas_totales", headerName="Hrs", width=100)

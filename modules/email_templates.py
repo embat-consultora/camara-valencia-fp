@@ -1,7 +1,7 @@
 from html import escape
 
 
-LOGO_URL = "https://github.com/user-attachments/assets/e8f8238a-65f8-4132-9d9f-efe8c0effbc7"
+LOGO_URL = "https://github.com/user-attachments/assets/f1d559fc-def7-4907-b3ae-4a89e73ed00d"
 
 
 def render_welcome_email(
@@ -25,18 +25,18 @@ def render_welcome_email(
                       border-radius:16px; overflow:hidden;
                       box-shadow:0 4px 18px rgba(1,61,95,.12);">
             <div style="padding:28px 24px; text-align:center; background:#ffffff;">
-              <img src="{LOGO_URL}" alt="Cámara FP Valencia"
+              <img src="{LOGO_URL}" alt="MCC logo"
                    style="display:block; width:280px; max-width:100%; height:auto;
                           margin:0 auto;">
             </div>
             <div style="padding:34px 38px;">
-              <h1 style="margin:0 0 18px; color:#013d5f; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+              <h1 style="margin:0 0 18px; color:#172b47; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
                          font-size:32px; font-weight:normal; letter-spacing:.4px;">
                 ¡Bienvenido/a, {nombre_html}!
               </h1>
               <p style="margin:0 0 18px; font-size:17px;">
                 Te damos la bienvenida a la plataforma de
-                <strong style="color:#013d5f;">Cámara FP Valencia</strong>.
+                <strong style="color:#013d5f;">MCC</strong>.
                 Desde aquí podrás gestionar tu participación en los proyectos de
                 Formación Profesional.
               </p>
@@ -58,10 +58,10 @@ def render_welcome_email(
                 </a>
               </div>
             </div>
-            <div style="padding:18px 24px; text-align:center; background:#013d5f;
+            <div style="padding:18px 24px; text-align:center; background:#172b47;
                         color:#ffffff; font-size:14px;">
               <strong style="font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
-                             font-size:18px; font-weight:normal;">Cámara FP Valencia</strong>
+                             font-size:18px; font-weight:normal;">Cámara FP Valencia - MCC</strong>
             </div>
           </div>
         </div>
