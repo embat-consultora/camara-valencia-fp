@@ -65,6 +65,7 @@ def exportar_excel(df):
 def load_all_data():
     df_alumnos = pd.DataFrame(get(alumnosTabla))
     df_empresas = pd.DataFrame(get(empresasTabla))
+    df_estados = pd.DataFrame(get(practicaEstadosTabla))
     df_practicas = pd.DataFrame(get(practicaTabla))
 
     df_ofertas = pd.DataFrame(get(necesidadFP))
@@ -707,12 +708,12 @@ with tab_ofertas:
             f"{tiempos_match_df['dias_match'].mean():.1f} días",
         )
         match_total.metric(
-            "Formaciones enlazadas con ofertas",
-            len(tiempos_match_df)
+            "Formaciones creadas desde ofertas",
+            len(tiempos_match_df),
         )
     else:
         st.info(
-            "No hay formaciones enlazadas por ID de oferta con fechas de creación "
+            "No hay Formaciones enlazadas por ID de oferta con fechas de creación "
             "válidas para calcular el tiempo medio."
         )
 
@@ -929,4 +930,3 @@ with tab_feedback:
       st.plotly_chart(fig_fp, use_container_width=True)
     else:
       st.info("Sin datos disponibles para la columna FP Dual.")
-
