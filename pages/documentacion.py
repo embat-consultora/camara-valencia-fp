@@ -176,6 +176,18 @@ datos_roles = {
             }
         ],
     },
+    "Alumno": {
+        "descripcion": "Realiza el seguimiento diario y evaluación práctica de los alumnos que tiene a su cargo.",
+        "paginas_acceso": ["Formación en Empresa"],
+        "recursos": [
+            {
+                "titulo": "Formaciones en empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+            },
+        ],
+    },
 }
 
 # ----------------------------------------------------
@@ -356,25 +368,27 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
-st.subheader("🔗 Enlaces a documentación")              
+st.subheader("🔗 Enlaces a documentación")         
+    
+if(rol != "alumno"):
 
-with st.spinner("Cargando archivos ..."):     
-    files, folderId = list_drive_files(carpetaManuales)
-    archivos_pdf = [
-        archivo
-        for archivo in files or []
-        if archivo.get("name", "").lower().endswith(".pdf")
-    ]
+    with st.spinner("Cargando archivos ..."):     
+        files, folderId = list_drive_files(carpetaManuales)
+        archivos_pdf = [
+            archivo
+            for archivo in files or []
+            if archivo.get("name", "").lower().endswith(".pdf")
+        ]
 
-    if archivos_pdf:
-        for archivo in archivos_pdf:
-            fecha = archivo.get("modifiedTime", "")[:10]
-            st.write(
-                f"- [{archivo['name']}]({archivo['webViewLink']}) "
-                f"_(última modificación: {fecha})_"
-            )
-    else:
-        st.warning("No hay archivos PDF.")
+        if archivos_pdf:
+            for archivo in archivos_pdf:
+                fecha = archivo.get("modifiedTime", "")[:10]
+                st.write(
+                    f"- [{archivo['name']}]({archivo['webViewLink']}) "
+                    f"_(última modificación: {fecha})_"
+                )
+        else:
+            st.warning("No hay archivos PDF.")
 
 recursos_video = [
     (rol_seleccionado, recurso)
