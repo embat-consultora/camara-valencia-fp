@@ -3,7 +3,7 @@ import pandas as pd
 from page_utils import apply_page_config
 from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,practicaEstadosTabla,linkCalendar,carpetaPractica,locale_tabla_principal
+from variables import empresasTabla, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica
 from pathlib import Path
@@ -28,8 +28,6 @@ if "practicas" not in st.session_state:
     st.session_state["practicas"] = []
 if "practica_seleccionada" not in st.session_state:
     st.session_state.practica_seleccionada = None
-if "estados" not in st.session_state:
-    st.session_state["estados"] = []
 # --- Traer todas las empresas ---
 anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 empresas = getEquals(empresasTabla, {"CIF": cif})
@@ -52,12 +50,10 @@ def fetch_practicas_tutores():
         p for p in practicaTodas 
         if p.get("status") not in [ estadosPractica[5]]
     ]
-    estados = getEquals(practicaEstadosTabla, {})
     tutores = getEquals(tutoresTabla, {'cif_empresa': cif})
     
     st.session_state["practicas"] = practicas
     st.session_state["tutores"] = tutores
-    st.session_state["estados"] = estados
     return practicas, tutores
 
 if not empresas:
@@ -351,7 +347,7 @@ def seccion_detalle(alumno, empresa, p, oferta):
             tutor_actual = p.get("tutor") 
             indice_tutor = lista_nombres_tutores.index(tutor_actual) if tutor_actual in lista_nombres_tutores else 0
             clave_tutor = f"tutor_{alumno['id']}"
-            if p.get("status") in [ estadosPractica[3] , estadosPractica[2], estadosPractica[1]]:
+            if p.get("status") in [ estadosPractica[3] , estadosPractica[2]]:
                 st.write(f"**Tutor Empresa:** {tutor_actual or 'No asignado'}")
             else:
                 st.selectbox(

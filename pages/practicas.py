@@ -14,7 +14,7 @@ from modules.feedback_helper import render_feedback_card
 import uuid
 import random
 from variables import (forms as formsFeedback, 
-    practicaTabla, tutoresTabla, practicaEstadosTabla,
+    practicaTabla, tutoresTabla,
     max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
     empresasTabla,tipoPracticas,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList,locale_tabla_principal
 )
@@ -94,9 +94,8 @@ def fetch_base_data_cached(statuses_key):
     tutores = getEquals(tutoresTabla, {})
     tutoresCentro = getEquals(tutoresCentroTabla, {})
     feedback = get(feedbackResponseTabla)
-    estados_db = getEquals(practicaEstadosTabla, {})
     gestores = get(gestoresTabla)
-    return practicas, tutores, tutoresCentro, feedback, estados_db, gestores
+    return practicas, tutores, tutoresCentro, feedback, gestores
 
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -161,8 +160,7 @@ def handle_update(tabla, dni_o_id, campo_a_actualizar, columna_id, key_widget, l
 # CARGA DE DATOS
 # ----------------------------------------------
 def load_data():
-    practicas, tutores, tutoresCentro, feedback, estados_db, gestores = fetch_base_data_cached(tuple(estados[:5]))
-    estados_map = {e["practicaId"]: e for e in estados_db}
+    practicas, tutores, tutoresCentro, feedback, gestores = fetch_base_data_cached(tuple(estados[:5]))
     user_email = st.session_state.get("username")
     if rol_usuario == "gestor":
         gestorDatos = [g for g in gestores if g.get("email") == user_email]
@@ -170,9 +168,8 @@ def load_data():
             gestorNombre = gestorDatos[0].get("nombre")
             practicas = [
             p for p in practicas 
-            if p.get("gestor") is not None and p.get("gestor") == gestorNombre
+            if p.get("gestor") == gestorNombre or p.get("gestor") is None
         ]
-            
         else:
             practicas = []
    
@@ -200,7 +197,6 @@ def load_data():
     st.session_state["tutores"] = tutores
     st.session_state["tutorCentro"] = tutoresCentro
     st.session_state["gestores"] = gestores
-    st.session_state["estados"] = estados_map
     st.session_state["feedbacks"] = feedback
     st.session_state["data_loaded"] = True
     st.session_state["force_reload"] = False
@@ -283,10 +279,22 @@ def mostrar_lista():
 # PAGINA: DETALLE
 # ----------------------------------------------
 def mostrar_lista_practicas():
-        colText, colFiltro = st.columns([2, 2])
+        colText, colEmpresa, colFiltro = st.columns([1.5,1.5, 3])
         with colText:
             st.write("")
-            st.write("**Selecciona una fila para ver el detalle:**")
+            st.write("**Selecciona una fila para ver el detalle.**")
+        with colEmpresa:
+            empresas_disponibles = list(
+                dict.fromkeys(
+                    p.get("empresas", {}).get("nombre") for p in practicas
+                )
+            )
+            st.selectbox(
+                "**Empresa**",
+                options=["Todas"] + empresas_disponibles,
+                index=0,
+                key="selector_empresa"
+            )
         with colFiltro:
             estadoFiltro = st.multiselect("**Estado**", options= estados,placeholder="Seleccione uno o más estados", default=[estados[0], estados[1], estados[4]], key="estados_tabla")
         if not practicas:
@@ -300,7 +308,9 @@ def mostrar_lista_practicas():
             estados_p = p.get("status", {})
             if estadoFiltro and (estados_p not in estadoFiltro):
                 continue
-            
+            if st.session_state.get("selector_empresa") and st.session_state.get("selector_empresa") != "Todas":
+                if p.get("empresas", {}).get("nombre") != st.session_state.get("selector_empresa"):
+                    continue
             practicas_filtradas_raw.append(p)
             data_for_grid.append({
                 "ID": pid,
@@ -887,9 +897,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         colGestor, colTutor, colTCentro = st.columns(3)
         with colGestor:
             clave_gestor = f"gestor_{alumno['id']}"
-            if rol_usuario != 'admin':
-                st.write(f"**Gestor:** {gestor_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Gestor Asignado**",
                     options=lista_nombres_gestores,
@@ -900,6 +908,9 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "gestor", "id", clave_gestor, "Gestor"),
                     disabled=st.session_state["edit_disabled"]
                 )
+            else:
+                 st.write(f"**Gestor:** {gestor_actual or 'Sin asignar'}")
+   
         tutores_filtrados = [g for g in tutores if g["cif_empresa"] == empresa['CIF']]
         lista_nombres_tutores = [g["nombre"] for g in tutores_filtrados]
         if "No asignado" not in lista_nombres_tutores:
@@ -922,9 +933,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
             )
 
             st.session_state[f"tutor_empresa_{p['id']}"] = tutor_empresa
-            if rol_usuario != 'admin':
-                st.write(f"**Tutor Empresa:** {tutor_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Tutor Empresa**",
                     options=lista_nombres_tutores,
@@ -934,6 +943,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "tutor", "id", clave_tutor, "Tutor"),
                     disabled=st.session_state["edit_disabled"]
                     )
+            else:
+                st.write(f"**Tutor Empresa:** {tutor_actual  or 'Sin asignar'}")
                 
 
         lista_nombres_tutoresCentro = [g["nombre"] for g in tutoresCentro]
@@ -943,9 +954,7 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
         indice_tutorc = lista_nombres_tutoresCentro.index(tutorc_actual) if tutorc_actual in lista_nombres_tutoresCentro else 0
         with colTCentro:
             clave_tutorc = f"tutor_centro_{alumno['id']}"
-            if rol_usuario != 'admin':
-                st.write(f"**Tutor Centro:** {tutorc_actual}")
-            else:
+            if rol_usuario in {"admin", "gestor"}:
                 st.selectbox(
                     "**Tutor Centro**",
                     options=lista_nombres_tutoresCentro,
@@ -955,6 +964,8 @@ def seccion_detalle(alumno, empresa, p, oferta, gestores, tutores):
                     args=(practicaTabla, p['id'], "tutor_centro", "id", clave_tutorc, "TutorCentro"),
                     disabled=st.session_state["edit_disabled"]
                 )
+            else:
+                st.write(f"**Tutor Centro:** {tutorc_actual or 'Sin asignar'}")
 
         pass
 

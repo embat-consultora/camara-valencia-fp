@@ -132,6 +132,12 @@ datos_roles = {
                           "descripcion": "Tutorial sobre el proceso de match de alumnos.",
                           "video_url": "https://www.youtube.com/watch?v=HmMRZ_EfIVo",
                       },
+                       {
+                                      "titulo": "Gestión de alumnos",
+                                      "duracion": "Video tutorial",
+                                      "descripcion": "Tutorial sobre la gestión de alumnos.",
+                                      "video_url": "http://youtube.com/watch?v=dqMvyF9QcOs",
+                                  },
         ],
     },
     "Tutor de centro": {
@@ -168,6 +174,18 @@ datos_roles = {
                 "descripcion": "Paso a paso para registrar actividades, validar asistencias y calificar el desempeño del alumno.",
                 "video_url": "https://www.youtube.com/watch?v=XjC6Ceyis90",
             }
+        ],
+    },
+    "Alumno": {
+        "descripcion": "Realiza el seguimiento diario y evaluación práctica de los alumnos que tiene a su cargo.",
+        "paginas_acceso": ["Formación en Empresa"],
+        "recursos": [
+            {
+                "titulo": "Formaciones en empresa",
+                "duracion": "Video tutorial",
+                "descripcion": "Tutorial sobre la gestión de formaciones en empresa.",
+                "video_url": "https://www.youtube.com/watch?v=D7aRJ3KQ5lk",
+            },
         ],
     },
 }
@@ -350,26 +368,27 @@ if rol == "admin":
     
     # --- MOSTRAR NAVEGACIÓN A LAS ÚLTIMAS VERSIONES ---
 
-st.subheader("🔗 Enlaces a documentación")
-with st.spinner("Cargando archivos ..."):     
-    files, folderId = list_drive_files(carpetaManuales)
-    archivos_pdf = [
-        archivo
-        for archivo in files or []
-        if archivo.get("name", "").lower().endswith(".pdf")
-    ]
+st.subheader("🔗 Enlaces a documentación")         
+    
+if(rol != "alumno"):
 
-    if archivos_pdf:
-        for archivo in archivos_pdf:
-            fecha = archivo.get("modifiedTime", "")[:10]
-            st.write(
-                f"- [{archivo['name']}]({archivo['webViewLink']}) "
-                f"_(última modificación: {fecha})_"
-            )
-    else:
-        st.warning("No hay archivos PDF.")
+    with st.spinner("Cargando archivos ..."):     
+        files, folderId = list_drive_files(carpetaManuales)
+        archivos_pdf = [
+            archivo
+            for archivo in files or []
+            if archivo.get("name", "").lower().endswith(".pdf")
+        ]
 
-st.subheader(f"🎬 Videos para {rol_seleccionado}")
+        if archivos_pdf:
+            for archivo in archivos_pdf:
+                fecha = archivo.get("modifiedTime", "")[:10]
+                st.write(
+                    f"- [{archivo['name']}]({archivo['webViewLink']}) "
+                    f"_(última modificación: {fecha})_"
+                )
+        else:
+            st.warning("No hay archivos PDF.")
 
 recursos_video = [
     (rol_seleccionado, recurso)

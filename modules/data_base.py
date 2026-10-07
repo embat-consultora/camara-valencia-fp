@@ -7,7 +7,6 @@ import random
 from datetime import datetime, timedelta
 from variables import (
     practicaTabla,
-    practicaEstadosTabla,
     alumnosTabla,
     alumnoEstadosTabla,
     estadosAlumno,
@@ -918,8 +917,12 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                     print(f"Entro a sin asignar")
                     if practicaId is not None: 
                         print(f"Elimino borrador - practica {practicaId}")
+                        print("Entro a eliminar el form")
+                        delete(feedbackFormsTabla, "practica_id", practicaId)
                         delete(practicaTabla, "id", practicaId)
+                        print(f"Éxito: Se eliminaron la practica {practicaId}.")
                         upsert(alumnosTabla, {"dni": dni,"estado": estadosAlumno[0]}, keys=["dni"])
+                        print(f"Cambiando estado alumno")
                     else:
                         print(f"sin asignar y sin practica, entro a crear una borrador y sin cif")
                         practica_res = crearDraftPractica(
@@ -939,7 +942,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                                                 curso=curr_curso
                                             )
                         practicaId = practica_res[0].get("id")
-                        print(f"Practica creada borrador sin empresa: {practicaId}")
+                        print(f"Practica creada borrador sin empresa: {practicaId}")               
                 if nueva_empresa != "⚠️ SIN ASIGNAR":
                     newCif = mapa_nombres_id.get(nueva_empresa)        
                     upsert(alumnosTabla, {"dni": dni,"estado":estadosAlumno[5]}, keys=["dni"])
@@ -974,8 +977,6 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 upsert(alumnosTabla, datos_alumno, keys=["dni"])
                 print(f"Cambio en tabla alumnos: {dni} a Asignado")
                 update(practicaTabla, {"status": estados[4]}, {"id": practicaId})
-                print(f"Cambio en practica el estado a falta documentacion {practicaId}")
-                upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
                 print(f"Restando cupo (-1) en: {nueva_empresa} ({cif_nuevo})")
                 actualizar_cupo(cif_nuevo, row['ciclo_formativo'], -1)
             else:
@@ -1054,10 +1055,6 @@ def cancelarPractica(practica, motivo):
          }
     try:
         resp = upsert(practicaTabla, payload_practica, keys=["id"])
-        upsert(
-                    practicaEstadosTabla,
-                    {"practicaId": int(practicaId), 'cancelada': None, 'documentacion_pedida': None,'documentacion_firmada': None, 'en_progreso': None,'finalizada': None},
-                    keys=["practicaId"])
         resp = add(practicaCanceladaTabla, payload_practica_cancelada)
         dateToday = datetime.now().isoformat()
         if resp:
@@ -1095,7 +1092,6 @@ def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_inf
     else:
         res_practica = add(practicaTabla, payload_practica)
         practicaId = res_practica.data[0]["id"]
-        upsert(practicaEstadosTabla, {"practicaId": practicaId}, keys=["practicaId"])
         upsert(
         alumnosTabla,
         {"dni": alumnoDni, "estado": estadosAlumno[1]},
@@ -1142,7 +1138,7 @@ def generarFormularioCierre(practica_id, email_destino):
                 "email_destino": email_destino,
                 "tipo_form": formCierre,
                 "token": token,
-                "estado": "pendiente",
+                "estado": "enviado",
             }
             if registro_existente:
                 id_registro = registro_existente[0]['id']

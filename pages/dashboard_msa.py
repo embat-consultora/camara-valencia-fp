@@ -16,8 +16,8 @@ from variables import (
     estadosAlumno,
     feedbackResponseTabla,
     necesidadFP,
-    practicaEstadosTabla,
-    practicaTabla
+    practicaTabla,
+    tutoresTabla,
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -117,7 +117,6 @@ def load_all_data():
 
     return (
         df_alumnos,
-        df_estados,
         df_empresas,
         df_practicas,
         df_ofertas,
@@ -322,7 +321,7 @@ def card(contenedor, icono, titulo, valor, color):
     )
 
 
-df_alumnos_raw, df_estados, df_empresas_raw, df_practicas_raw, df_ofertas_raw, df_master_raw = load_all_data()
+df_alumnos_raw, df_empresas_raw, df_practicas_raw, df_ofertas_raw, df_master_raw = load_all_data()
 df_feedback_stats, df_feedback_detalle = load_feedback_data()
 df_feedback_respuestas = load_feedback_respuestas()
 
