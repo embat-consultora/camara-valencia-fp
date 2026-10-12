@@ -36,7 +36,7 @@ def render_welcome_email(
               </h1>
               <p style="margin:0 0 18px; font-size:17px;">
                 Te damos la bienvenida a la plataforma de
-                <strong style="color:#013d5f;">MCC</strong>.
+                <strong style="color:#013d5f;">FP MATCH</strong>.
                 Desde aquí podrás gestionar tu participación en los proyectos de
                 Formación Profesional.
               </p>

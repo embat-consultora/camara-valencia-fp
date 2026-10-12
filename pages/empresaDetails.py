@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 from page_utils import apply_page_config
-from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas
+from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas,logError
 from navigation import make_sidebar
-from variables import empresasTabla, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,linkCalendar,carpetaPractica,locale_tabla_principal
+from modules.forms_helper import file_size_bytes
+from variables import empresasTabla, max_file_size, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
-from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica
+from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica,archivoNombre
+
 from pathlib import Path
 import uuid
 apply_page_config()
@@ -55,6 +57,10 @@ def fetch_practicas_tutores():
     st.session_state["practicas"] = practicas
     st.session_state["tutores"] = tutores
     return practicas, tutores
+
+@st.cache_data(ttl=180, show_spinner=False)
+def list_drive_files_cached(folder_name):
+    return list_drive_files(folder_name)
 
 if not empresas:
     st.warning("No encontramos tu empresa")
@@ -305,9 +311,11 @@ def mostrar_detalle():
     oferta = p["oferta_fp"]
     empresa = p["empresas"]
     alumno = p["alumnos"]
+    folder_name= folderNamePractica(alumno['nombre'],alumno['apellido'], alumno['dni'], empresa['nombre'])
     st.title(f"{alumno['nombre']} {alumno['apellido']} – {empresa['nombre']}")
     seccion_detalle(alumno, empresa, p, oferta)
     seccion_planificacion(alumno, empresa, p)
+    seccion_documentos(folder_name,alumno, p)
     if st.button("⬅ Volver",type="primary"):
         st.session_state.page = "lista"
         st.rerun()
@@ -485,6 +493,86 @@ def seccion_planificacion(alumno, empresa, practica):
                 #     st.write("No han subido calendario aun")
         pass
 
+def seccion_documentos(folder_name, alumno, practicaId):
+    st.subheader("📎 Documentos")
+
+    files, folderId = list_drive_files_cached(folder_name)
+    if files:
+        for f in files:
+            fecha = f.get("modifiedTime", "")[:10]
+            st.write(f"- [{f['name']}]({f['webViewLink']}) _(última modificación: {fecha})_")
+    else:
+        st.warning("No hay documentación subida.")
+
+    uploader_version = st.session_state.get(f"uploader_version_{practicaId}",0)
+
+    uploaded_files = st.file_uploader(
+        "Subir archivos",
+        type=["pdf", "doc", "docx", "odt", "jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key=f"up_{practicaId}_{uploader_version}"
+    )
+    st.html(
+                """
+                <style>
+
+                [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                display: none;
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                content: 'Arrastre aquí los archivos';
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary'] {
+                text-indent: -9999px;
+                line-height: 0;
+                }
+                [data-testid='stFileUploader'] [data-testid='stBaseButton-secondary']::after {
+                line-height: initial;
+                content: "Buscar";
+                text-indent: 0;
+                }
+
+                [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions'] {
+                text-indent: -9999px;
+                line-height: 0;
+                }
+                [data-testid='stFileUploader'] [data-testid='stFileDropzoneInstructions']::after {
+                line-height: initial;
+                content: "Límite 1MB por archivo";
+                text-indent: 0;
+                }
+
+                </style>
+                """
+            )
+    if uploaded_files:
+        too_big = [f.name for f in uploaded_files if file_size_bytes(f) > max_file_size]
+        if too_big:
+            st.error("Archivos demasiado grandes: " + ", ".join(too_big))
+        else:
+            if st.button("Subir Archivos", key=f"subir_{practicaId}"):
+                try:
+                    total = len(uploaded_files)
+                    st.info(f"Subiendo {total} archivo(s), por favor espera...")
+                    for file in uploaded_files:
+                            nuevo_nombre = archivoNombre(alumno['nombre'],alumno['apellido'],file.name)
+                            temp = Path("/tmp") / f"{uuid.uuid4()}_{nuevo_nombre}"
+                            with open(temp, "wb") as f:
+                                f.write(file.getbuffer())
+                            upload_to_drive(str(temp), carpetaPractica, folder_name, nuevo_nombre)
+                    st.session_state[f"uploader_version_{practicaId}"] = (uploader_version + 1)
+                    list_drive_files_cached.clear()
+                    st.success(f"Subido: {nuevo_nombre}")
+                    st.rerun()
+                    invalidate_runtime_caches()
+                except Exception as e:
+                        logError(f"{type(e).__name__}: {str(e)}", "Practica - Subida de Archivos")
+                        st.error(f"❌ Error al subir los archivos: {e}")
+
+    
+    pass
 with tabPractica:
     if st.session_state.page == "lista":
         mostrarLista()

@@ -7,7 +7,14 @@ from navigation import make_sidebar
 from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados,aniosList
 from datetime import datetime
 from modules.text_helper import st_custom_message
+from modules.drive_helper import copiar_archivos_alumno_a_practica
 now = datetime.now().isoformat()
+
+def copiarArchivosAlumno(nombre, apellido, dni, empresa_nombre):
+    try:
+        copiar_archivos_alumno_a_practica(nombre, apellido, dni, empresa_nombre)
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron copiar los archivos del alumno a la carpeta de la formación: {e}")
 
 def checkEstadoOferta(ofertaId):
     oferta = getOfertaEmpresas(necesidadFP, {"id": ofertaId})
@@ -187,13 +194,21 @@ for oferta_data in ofertas:
                                     )
 
                                 with col2:
+                                    def detalle_match(puntos, valor):
+                                        if puntos > 0 and valor is not None and str(valor).strip() and str(valor) != "nan":
+                                            return f" _({valor})_"
+                                        return ""
+
+                                    vehiculo_alumno = row.get('alumno_vehiculo')
+                                    if isinstance(vehiculo_alumno, bool):
+                                        vehiculo_alumno = "Sí" if vehiculo_alumno else "No"
                                     st.write(
                                         f"Puntaje total: {row['puntaje']}\n"
-                                        f"- Ciclo: {row['pts_ciclo']} {'✅' if row['pts_ciclo'] > 0 else ''}\n"
-                                        f"- Vehículo: {row['pts_vehiculo']} {'✅' if row['pts_vehiculo'] > 0 else ''}\n"
-                                        f"- Localidad: {row['pts_localidad']} {'✅' if row['pts_localidad'] > 0 else ''}\n"
-                                        f"- Preferencias: {row['pts_pref']} {'✅' if row['pts_pref'] > 0 else ''}\n"
-                                        f"- Requisitos: {row['pts_requisitos']} {'✅' if row['pts_requisitos'] > 0 else ''}"
+                                        f"- Ciclo: {row['pts_ciclo']} {'✅' if row['pts_ciclo'] > 0 else ''}{detalle_match(row['pts_ciclo'], row.get('ciclo'))}\n"
+                                        f"- Vehículo: {row['pts_vehiculo']} {'✅' if row['pts_vehiculo'] > 0 else ''}{detalle_match(row['pts_vehiculo'], vehiculo_alumno)}\n"
+                                        f"- Localidad: {row['pts_localidad']} {'✅' if row['pts_localidad'] > 0 else ''}{detalle_match(row['pts_localidad'], row.get('alumno_localidad'))}\n"
+                                        f"- Preferencias: {row['pts_pref']} {'✅' if row['pts_pref'] > 0 else ''}{detalle_match(row['pts_pref'], row.get('pref_match'))}\n"
+                                        f"- Requisitos: {row['pts_requisitos']} {'✅' if row['pts_requisitos'] > 0 else ''}{detalle_match(row['pts_requisitos'], row.get('requisitos_match'))}"
 
                                     )
 
@@ -205,6 +220,7 @@ for oferta_data in ofertas:
                                                     curso =  row['curso']
                                                     crearPractica(empresa.get("CIF"), row['alumno_dni'], ciclo, area,proyecto, fecha=now,ciclos_info=ciclos_info ,cupos_disp=cupos_disp,oferta_id=row["oferta_id"],status=estados[4], anio=anioFiltro, curso=curso)
                                                     print('practica creada')
+                                                    copiarArchivosAlumno(row['alumno_nombre'], row['alumno_apellido'], row['alumno_dni'], empresa.get("nombre", ""))
                                                     checkEstadoOferta(oferta_id)
                                                     print('oferta actualizada')
                                                     actualizar_cupo(empresa.get("CIF"),ciclo, -1)
@@ -249,6 +265,7 @@ for oferta_data in ofertas:
                                 with st.spinner("Creando match... la página se recargará automáticamente al finalizar."):
                                     try:
                                         crearPractica(empresa.get("CIF"), dni_alumno, ciclo,area,proyecto, fecha=now, ciclos_info=ciclos_info, cupos_disp=cupos_disp ,oferta_id=oferta_id, status=estados[4], anio=anioFiltro, curso=curso)
+                                        copiarArchivosAlumno(alumno_info.get("nombre", ""), alumno_info.get("apellido", ""), dni_alumno, empresa.get("nombre", ""))
                                         checkEstadoOferta(oferta_id)
                                         actualizar_cupo(empresa.get("CIF"), ciclo, -1)
                                         st.success(f"✅ Match creado con {alumnoSeleccionado} 🎉")

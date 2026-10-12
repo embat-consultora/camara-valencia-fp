@@ -13,7 +13,7 @@ make_sidebar()
 
 import json
 
-def extraer_ofertas_por_ciclo(df_empresas):
+def extraer_ofertas_por_ciclo(df_empresas, anio=None):
     mapping = {}
     for empresa_dict in df_empresas:
         nombre_empresa = empresa_dict.get('nombre')
@@ -31,6 +31,8 @@ def extraer_ofertas_por_ciclo(df_empresas):
             continue
 
         for oferta in ofertas_json:
+            if anio and anio != aniosList[0] and oferta.get("anio") != anio:
+                continue
             t_data = oferta.get('tutores')
             if isinstance(t_data, dict):
                 tutor_general = t_data.get('nombre', 'Sin tutor')
@@ -244,7 +246,7 @@ with tab_alumnos:
                 lista_empresas_db = ["⚠️ SIN ASIGNAR"] + df_empresas_raw["nombre"].tolist()
                 mapa_nombres_id = dict(zip(df_empresas_raw['nombre'], df_empresas_raw['CIF']))
 
-                dict_mapeo = extraer_ofertas_por_ciclo(df_empresas_filtrado)
+                dict_mapeo = extraer_ofertas_por_ciclo(df_empresas_filtrado, anioFiltro)
                 json_mapeo = json.dumps(dict_mapeo)
 
                 mapeo_ciclo_empresas = {}

@@ -16,7 +16,8 @@ import random
 from variables import (forms as formsFeedback, 
     practicaTabla, tutoresTabla,
     max_file_size, carpetaPractica,linkCalendar,feedbackResponseTabla,forms,gestoresTabla, feedbackFormsTabla, alumnosTabla,
-    empresasTabla,tipoPracticas,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList,locale_tabla_principal
+    empresasTabla,tipoPracticas,estadosAlumno,usuariosTabla,tutoresCentroTabla,estados,aniosList,cursoList,locale_tabla_principal,
+    formsTutorEmpresa
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 # ----------------------------------------------
@@ -65,6 +66,8 @@ if "data_loaded" not in st.session_state:
 if "force_reload" not in st.session_state:
     st.session_state["force_reload"] = True
 rol_usuario = st.session_state.get("rol")
+
+
 col_refresh, col_volver = st.columns([1, 0.15])
 with col_refresh:
     if st.session_state.page == "lista":
@@ -348,7 +351,11 @@ def mostrar_lista_practicas():
             fit_columns_on_grid_load=True,
             theme='streamlit', # O 'balham', 'alpine'
             height=400,
-            allow_unsafe_html=True
+            allow_unsafe_html=True,
+            custom_css={
+                ".ag-cell": {"font-size": "15px !important"},
+                ".ag-header-cell-text": {"font-size": "15px !important"},
+            }
         )
 
         # 4. Lógica de Navegación (Detección de Click)
@@ -746,65 +753,113 @@ def mostrar_dashboard():
         </style>
         """, unsafe_allow_html=True)
 
-        st.subheader("📊 Métricas Envio Correos y Respuestas")
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-circle" style="background:#f3e5f5; color:#8e24aa;">
-                    <div class="kpi-number">{total_pendientes}</div>
-                    <div class="kpi-pct">Total</div>
-                </div>
-                <div class="kpi-title">Pendiente de Envio</div>
-            </div>""", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
-                    <div class="kpi-number">{total_enviados}</div>
-                    <div class="kpi-pct">Enviados</div>
-                </div>
-                <div class="kpi-title">Total Enviados</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c3:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
-                    <div class="kpi-number">{total_respondidos}</div>
-                    <div class="kpi-pct">{pct_respuesta}%</div>
-                </div>
-                <div class="kpi-title">Total Respondidos y %</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c4:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
-                    <div class="kpi-number">{total_enviados - total_respondidos}</div>
-                    <div class="kpi-pct">{pct_pendiente}%</div>
-                </div>
-                <div class="kpi-title">Total Pendientes Respuesta y %</div>
-            </div>""", unsafe_allow_html=True)
-
-        tipos = [
-            ("feedback_inicial", "Acogida", "#fff3e0", "#f57c00"),
-            ("feedback_adaptacion", "Adaptación", "#f3e5f5", "#8e24aa"),
-            ("feedback_cierre", "Cierre", "#e0f2f1", "#00897b"),
-        ]
-        st.subheader("📊 Métricas Por tipo")
-        col1, col2, col3 = st.columns(3)
-        for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos):  # reutiliza columnas o ajusta
-            count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
-            with col:
+        with st.expander("👨‍🎓 Métricas Alumno", expanded=True):
+            st.subheader("📊 Métricas Envio Correos y Respuestas")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
                 st.markdown(f"""
-                <div class="kpi-card" style="margin-top:12px">
-                    <div class="kpi-circle" style="background:{bg}; color:{color};">
-                        <div class="kpi-number">{count}</div>
-                        <div class="kpi-pct">Completos</div>
+                <div class="kpi-card">
+                    <div class="kpi-circle" style="background:#f3e5f5; color:#8e24aa;">
+                        <div class="kpi-number">{total_pendientes}</div>
+                        <div class="kpi-pct">Total</div>
                     </div>
-                    <div class="kpi-title">{label}</div>
+                    <div class="kpi-title">Pendiente de Envio</div>
                 </div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-circle" style="background:#e8f4fd; color:#1a73e8;">
+                        <div class="kpi-number">{total_enviados}</div>
+                        <div class="kpi-pct">Enviados</div>
+                    </div>
+                    <div class="kpi-title">Total Enviados</div>
+                </div>""", unsafe_allow_html=True)
+
+            with c3:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-circle" style="background:#e6f4ea; color:#34a853;">
+                        <div class="kpi-number">{total_respondidos}</div>
+                        <div class="kpi-pct">{pct_respuesta}%</div>
+                    </div>
+                    <div class="kpi-title">Total Respondidos y %</div>
+                </div>""", unsafe_allow_html=True)
+
+            with c4:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-circle" style="background:#fce8e6; color:#ea4335;">
+                        <div class="kpi-number">{total_enviados - total_respondidos}</div>
+                        <div class="kpi-pct">{pct_pendiente}%</div>
+                    </div>
+                    <div class="kpi-title">Total Pendientes Respuesta y %</div>
+                </div>""", unsafe_allow_html=True)
+
+            tipos = [
+                ("feedback_inicial", "Acogida", "#fff3e0", "#f57c00"),
+                ("feedback_adaptacion", "Adaptación", "#f3e5f5", "#8e24aa"),
+                ("feedback_cierre", "Cierre", "#e0f2f1", "#00897b"),
+            ]
+            st.subheader("📊 Métricas Por tipo")
+            col1, col2, col3 = st.columns(3)
+            for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos):  # reutiliza columnas o ajusta
+                count = len(df_filtrado[(df_filtrado['tipo_form'] == tipo) & (df_filtrado['estado'] == 'Completado')])
+                with col:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="margin-top:12px">
+                        <div class="kpi-circle" style="background:{bg}; color:{color};">
+                            <div class="kpi-number">{count}</div>
+                            <div class="kpi-pct">Completos</div>
+                        </div>
+                        <div class="kpi-title">{label}</div>
+                    </div>""", unsafe_allow_html=True)
+
+        # --- Métricas Feedback Tutor Empresa ---
+        df_tutor = df_filtrado[df_filtrado['tipo_form'].isin(formsTutorEmpresa)]
+        tutor_pendientes = len(df_tutor[df_tutor['estado'] == 'pendiente'])
+        tutor_enviados = len(df_tutor[df_tutor['estado'] != 'pendiente'])
+        tutor_respondidos = len(df_tutor[df_tutor['fecha_respuesta'].notna()])
+        tutor_pct_respuesta = round((tutor_respondidos / tutor_enviados * 100) if tutor_enviados > 0 else 0)
+        tutor_pct_pendiente = 100 - tutor_pct_respuesta
+
+        with st.expander("🏢 Métricas Tutor Empresa", expanded=True):
+            st.subheader("🏢 Métricas Envio Correos y Respuestas Tutor Empresa")
+            c1, c2, c3, c4 = st.columns(4)
+            kpis_tutor = [
+                (c1, tutor_pendientes, "Total", "Pendiente de Envio", "#f3e5f5", "#8e24aa"),
+                (c2, tutor_enviados, "Enviados", "Total Enviados", "#e8f4fd", "#1a73e8"),
+                (c3, tutor_respondidos, f"{tutor_pct_respuesta}%", "Total Respondidos y %", "#e6f4ea", "#34a853"),
+                (c4, tutor_enviados - tutor_respondidos, f"{tutor_pct_pendiente}%", "Total Pendientes Respuesta y %", "#fce8e6", "#ea4335"),
+            ]
+            for col, numero, sub, label, bg, color in kpis_tutor:
+                with col:
+                    st.markdown(f"""
+                    <div class="kpi-card">
+                        <div class="kpi-circle" style="background:{bg}; color:{color};">
+                            <div class="kpi-number">{numero}</div>
+                            <div class="kpi-pct">{sub}</div>
+                        </div>
+                        <div class="kpi-title">{label}</div>
+                    </div>""", unsafe_allow_html=True)
+
+            tipos_tutor = [
+                (formsTutorEmpresa[0], "Inicial Tutor", "#fff3e0", "#f57c00"),
+                (formsTutorEmpresa[1], "Adaptación Tutor", "#f3e5f5", "#8e24aa"),
+                (formsTutorEmpresa[2], "Cierre Tutor", "#e0f2f1", "#00897b"),
+            ]
+            st.subheader("🏢 Métricas Por tipo Tutor Empresa")
+            col1, col2, col3 = st.columns(3)
+            for col, (tipo, label, bg, color) in zip([col1, col2, col3], tipos_tutor):
+                count = len(df_tutor[(df_tutor['tipo_form'] == tipo) & (df_tutor['estado'] == 'Completado')])
+                with col:
+                    st.markdown(f"""
+                    <div class="kpi-card" style="margin-top:12px">
+                        <div class="kpi-circle" style="background:{bg}; color:{color};">
+                            <div class="kpi-number">{count}</div>
+                            <div class="kpi-pct">Completos</div>
+                        </div>
+                        <div class="kpi-title">{label}</div>
+                    </div>""", unsafe_allow_html=True)
 
         st.divider()
 
@@ -1042,14 +1097,12 @@ def feedback_formaciones(practica):
     feedbacks_forms = get_feedback_forms_cached(practicaId)
     fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
 
-    if(practica.get('status') is not None and practica.get('status') != estados[1]):
-        st.info(f"ℹ️ **Estado:** {practica.get('status')}", icon="🚀")
-    else:
-        st.info(f"ℹ️ **Estado:** {practica.get('status')}", icon="🚀")
+    if practica.get('status') is None or practica.get('status') == estados[1]:
         if len(feedbacks_forms) <= 0:
             fecha_inicio_dt = datetime.fromisoformat(practica.get('fecha_inicio'))
             fecha_fin_dt = datetime.fromisoformat(practica.get('fecha_fin'))
-            asignarFechasFormsFeedback(int(practica.get('id')), fecha_inicio_dt, alumno.get('email_alumno'), fecha_fin_dt)
+            tutor_empresa = st.session_state.get(f"tutor_empresa_{practica.get('id')}") or {}
+            asignarFechasFormsFeedback(int(practica.get('id')), fecha_inicio_dt, alumno.get('email_alumno'), fecha_fin_dt, tutor_empresa.get("email"))
             invalidate_runtime_caches()
             st.toast("Generando formularios de feedback.")
             st.caption("Actualice la formación para ver los hitos")
@@ -1062,11 +1115,40 @@ def feedback_formaciones(practica):
                     link_ada = links_map.get('feedback_adaptacion', '#')
                     link_cie = links_map.get('feedback_cierre', '#')
                     st.markdown(f"""
-                    **Próximo Hito:**
+                    **Próximo Hito Alumno:**
                     * 📅 **Envio Feedback Acogida:** : {fechas.get('feedback_inicial', '--')} | [🔗 Abrir Formulario]({link_ini})
                     * 🕒 **Envio Feedback Adaptación:** {fechas.get('feedback_adaptacion', '--')} | [🔗 Abrir Formulario]({link_ada})
                     * ⏲️ **Envio Feedback Cierre:** {fechas.get('feedback_cierre', '--')} | [🔗 Abrir Formulario]({link_cie})
                     """)
+
+def seccion_feedback_tutor_empresa(p, practicaId, feedbacks_db):
+    st.subheader("¿Cómo valora el tutor de empresa al candidato?")
+    if p.get('status') is not None and p.get('status') == estados[1]:
+        feedbacks_forms = get_feedback_forms_cached(practicaId)
+        fechas = {f['tipo_form']: datetime.strptime(f['fecha_envio'], "%Y-%m-%d").strftime("%d/%m/%Y") for f in feedbacks_forms}
+        links = getFormsLinks(practicaId)
+        links_map = {item['tipo']: item['url'] for item in links}
+        with st.container(border=True):
+            st.markdown(f"""
+            **Próximo Hito Tutor Empresa:**
+            * 📅 **Envio Feedback Inicial Tutor:** {fechas.get(formsTutorEmpresa[0], '--')} | [🔗 Abrir Formulario]({links_map.get(formsTutorEmpresa[0], '#')})
+            * 🕒 **Envio Feedback Adaptación Tutor:** {fechas.get(formsTutorEmpresa[1], '--')} | [🔗 Abrir Formulario]({links_map.get(formsTutorEmpresa[1], '#')})
+            * ⏲️ **Envio Feedback Cierre Tutor:** {fechas.get(formsTutorEmpresa[2], '--')} | [🔗 Abrir Formulario]({links_map.get(formsTutorEmpresa[2], '#')})
+            """)
+
+    progreso_tutor = {tipo: None for tipo in formsTutorEmpresa}
+    for f in feedbacks_db:
+        tipo = (f.get("respuestas_json") or {}).get("tipo")
+        if tipo in progreso_tutor:
+            progreso_tutor[tipo] = f["respuestas_json"]
+
+    col_ini, col_ada, col_cie = st.columns(3)
+    with col_ini:
+        render_feedback_card(progreso_tutor[formsTutorEmpresa[0]], "Inicial Tutor")
+    with col_ada:
+        render_feedback_card(progreso_tutor[formsTutorEmpresa[1]], "Adaptación Tutor")
+    with col_cie:
+        render_feedback_card(progreso_tutor[formsTutorEmpresa[2]], "Cierre Tutor")
 
 def seccion_feedback_candidato(p, practicaId, forms):
     feedback_formaciones(p)
@@ -1098,6 +1180,9 @@ def seccion_feedback_candidato(p, practicaId, forms):
     with col_cie:
         render_feedback_card(respuestasCierre, "Cierre")
     pass
+    st.divider()
+    seccion_feedback_tutor_empresa(p, practicaId, feedbacks_db)
+    st.divider()
     st.subheader(f"Resultado de la formación en Empresa")
     tabResultado, tabFeedback = st.tabs(["Resultado Formación", "Formulario Cierre Tutor Empresa"])
     with tabResultado:
@@ -1271,10 +1356,19 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
             st.session_state.fp_contacto = ultimo_feedback.get("programaFP", False)
 
         with st.form("form_feedback_tutor_centro"):
-            st.info("Aquí puede añadir comentarios sobre el seguimiento de la formación del alumno, así como cualquier observación relevante para la empresa o el alumno.")
-            comentarios_contacto1 = st.text_area("Comentarios",
-                value=ultimo_feedback.get("primerContacto", ""),
-                disabled=not puede_editar)
+            if puede_editar:
+                st.info("Aquí puede añadir comentarios sobre el seguimiento de la formación del alumno, así como cualquier observación relevante para la empresa o el alumno.")
+            historial_comentarios = ultimo_feedback.get("primerContacto", "") or ""
+            if historial_comentarios:
+                st.markdown("**Comentarios**")
+                with st.container(height=200):
+                    st.markdown("  \n".join(reversed(historial_comentarios.split("\n"))))
+            comentarios_contacto1 = ""
+            if puede_editar:
+                comentarios_contacto1 = st.text_area("Nuevo Comentario",
+                    value="",
+                    disabled=not puede_editar,
+                    placeholder="Escribe aquí tus comentarios sobre el seguimiento de la formación del alumno...",)
             fp = st.checkbox("¿He informado de los programas del ecosistema de FP?",
                 disabled=not puede_editar, key="fp_contacto")
             ha_acogido = st.radio(
@@ -1286,31 +1380,35 @@ def seccion_feedback_tutorCentro(practicaId, p, tutor_actual):
                 format_func=lambda x: "Sí" if x else "No",
                 disabled=not puede_editar
             )
-            
-            submit = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True, disabled= not puede_editar)
+            if puede_editar:
+                submit = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True, disabled= not puede_editar)
 
-        if submit:
-            nuevo_registro = {
-                "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "tutorCentro": tutor_actual,
-                "primerContacto": comentarios_contacto1.strip(),
-                "programaFP": fp,
-                "FPPYME": ha_acogido
-            }
+                if submit:
+                    nuevo_comentario = comentarios_contacto1.strip()
+                    if nuevo_comentario:
+                        linea = f"{datetime.now().strftime('%d/%m/%Y - %I:%M %p')} - {nuevo_comentario}"
+                        historial_comentarios = f"{historial_comentarios}\n{linea}" if historial_comentarios else linea
+                    nuevo_registro = {
+                        "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "tutorCentro": tutor_actual,
+                        "primerContacto": historial_comentarios,
+                        "programaFP": fp,
+                        "FPPYME": ha_acogido
+                    }
 
-            try:
-                upsert(practicaTabla, {
-                    "id": int(practicaId),
-                    "feedback_tutor_centro": nuevo_registro,
-                    "fp_dual_cogido":ha_acogido
-                }, keys=["id"])
-                invalidate_runtime_caches()
+                    try:
+                        upsert(practicaTabla, {
+                            "id": int(practicaId),
+                            "feedback_tutor_centro": nuevo_registro,
+                            "fp_dual_cogido":ha_acogido
+                        }, keys=["id"])
+                        invalidate_runtime_caches()
 
-                st.toast("✅ Seguimiento guardado")
-                p["feedback_tutor_centro"] = nuevo_registro
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al guardar: {e}")
+                        st.toast("✅ Seguimiento guardado")
+                        p["feedback_tutor_centro"] = nuevo_registro
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
 
 def actualizar_fecha(key_nombre, id_registro, tipo):
     nueva_fecha = st.session_state[key_nombre]
@@ -1633,9 +1731,12 @@ def mostrar_detalle():
         st.session_state["edit_disabled"] = p.get("status") == estados[2]
 
 
-        st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
-        planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento y Feedback", "Documentación"])
+        if p.get("status") == estados[1]:
+            st.success(f"**Estado:** {p.get('status')}", icon="🚀")
+        else:
+            st.info(f"ℹ️ **Estado:** {p.get('status')}", icon="🚀")
         if rol_usuario == 'tutor':
+            planificacionTab, seguimientoTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento", "Documentación"])
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
                 seccion_planificacion(folder_name, p)
@@ -1644,6 +1745,7 @@ def mostrar_detalle():
             with documentacionTab:
                 seccion_documentos(folder_name,alumno, practicaId)
         else:
+            planificacionTab, seguimientoTab, feedbackTab, documentacionTab = st.tabs(["Detalle Formación", "Seguimiento", "Feedback", "Documentación"])
             with planificacionTab:
                 seccion_detalle(alumno, empresa, p, oferta, gestores, tutores)
                 mostrar_anexos_practica(p)
@@ -1654,7 +1756,7 @@ def mostrar_detalle():
                 seccion_feedback_tutorCentro(practicaId, p, tutorCentro_actual)
                 st.divider()
                 seccion_feedback_tutor(practicaId, p, tutor_actual, True)
-                st.divider()
+            with feedbackTab:
                 seccion_feedback_candidato(p, practicaId, forms)
             with documentacionTab:
                 seccion_documentos(folder_name,alumno, practicaId)

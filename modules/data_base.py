@@ -12,7 +12,7 @@ from variables import (
     estadosAlumno,
     necesidadFP,
     feedbackFormsTabla,
-    forms,empresasTabla, practicaTabla, alumnosTabla,
+    forms,formsTutorEmpresa,empresasTabla, practicaTabla, alumnosTabla,
     gestoresTabla,
     usuariosTabla,
     tutoresTabla,
@@ -681,6 +681,29 @@ def getMatches(ciclo):
       CROSS JOIN LATERAL jsonb_each(o.ciclos_js) AS each(key, value)
       WHERE ((each.value ->> 'disponibles')::int) > 0
     ),
+    -- Requisitos separados por coma, normalizados (minúsculas, sin tildes, espacios simples)
+    requisitos_oferta AS (
+      SELECT DISTINCT o.id AS oferta_id, req.valor AS requisito
+      FROM ofertas_activas o
+      CROSS JOIN LATERAL regexp_split_to_table(COALESCE(o.requisitos::text, ''), ',') AS token(texto)
+      CROSS JOIN LATERAL (
+        SELECT TRIM(regexp_replace(
+          translate(LOWER(token.texto), 'áéíóúüàèìòùäëïö[]"', 'aeiouuaeiouaeio'),
+          '\\s+', ' ', 'g')) AS valor
+      ) AS req
+      WHERE req.valor <> ''
+    ),
+    requisitos_alumno AS (
+      SELECT DISTINCT a.id AS alumno_id, req.valor AS requisito
+      FROM alumnos_disponibles a
+      CROSS JOIN LATERAL regexp_split_to_table(COALESCE(a.requisitos::text, ''), ',') AS token(texto)
+      CROSS JOIN LATERAL (
+        SELECT TRIM(regexp_replace(
+          translate(LOWER(token.texto), 'áéíóúüàèìòùäëïö[]"', 'aeiouuaeiouaeio'),
+          '\\s+', ' ', 'g')) AS valor
+      ) AS req
+      WHERE req.valor <> ''
+    ),
     candidatos AS (
       SELECT
         a.id AS alumno_id,
@@ -729,21 +752,43 @@ def getMatches(ciclo):
           THEN 1 ELSE 0
         END AS pts_pref,
 
-        -- Requisitos (comparación entre alumno y oferta, tolerante a tildes/espacios)
-        CASE
-          WHEN c.requisitos IS NOT NULL
-               AND c.oferta_requisitos IS NOT NULL
-               AND TRIM(c.requisitos) <> ''
-               AND TRIM(c.oferta_requisitos) <> ''
-               AND (
-                 translate(LOWER(regexp_replace(c.requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu')
-                   ILIKE '%' || translate(LOWER(regexp_replace(c.oferta_requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu') || '%'
-                 OR
-                 translate(LOWER(regexp_replace(c.oferta_requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu')
-                   ILIKE '%' || translate(LOWER(regexp_replace(c.requisitos, '\\s+', ' ', 'g')), 'áéíóúü', 'aeiouu') || '%'
-               )
-          THEN 1 ELSE 0
-        END AS pts_requisitos
+        -- Requisitos: 1 punto por cada requisito de la oferta que cumple el alumno
+        (
+          SELECT COUNT(DISTINCT ro.requisito)
+          FROM requisitos_oferta ro
+          JOIN requisitos_alumno ra
+            ON ra.alumno_id = c.alumno_id
+           AND (
+             ra.requisito = ro.requisito
+             OR (LENGTH(ro.requisito) >= 3 AND strpos(ra.requisito, ro.requisito) > 0)
+             OR (LENGTH(ra.requisito) >= 3 AND strpos(ro.requisito, ra.requisito) > 0)
+           )
+          WHERE ro.oferta_id = c.oferta_id
+        ) AS pts_requisitos,
+
+        -- Detalle de lo que coincide (para mostrar al usuario)
+        (
+          SELECT string_agg(DISTINCT v.valor, ', ')
+          FROM oferta_fp of2,
+               jsonb_each(of2.puestos) AS ciclo(ciclo_text, puestos_array),
+               jsonb_array_elements(puestos_array) AS puesto_obj,
+               LATERAL (VALUES (puesto_obj ->> 'area'), (puesto_obj ->> 'proyecto'), (ciclo.ciclo_text)) AS v(valor)
+          WHERE of2.id = c.oferta_id
+            AND TRIM(v.valor) <> ''
+            AND LOWER(c.preferencias_fp::text) LIKE '%' || LOWER(v.valor) || '%'
+        ) AS pref_match,
+        (
+          SELECT string_agg(DISTINCT ro.requisito, ', ')
+          FROM requisitos_oferta ro
+          JOIN requisitos_alumno ra
+            ON ra.alumno_id = c.alumno_id
+           AND (
+             ra.requisito = ro.requisito
+             OR (LENGTH(ro.requisito) >= 3 AND strpos(ra.requisito, ro.requisito) > 0)
+             OR (LENGTH(ra.requisito) >= 3 AND strpos(ro.requisito, ra.requisito) > 0)
+           )
+          WHERE ro.oferta_id = c.oferta_id
+        ) AS requisitos_match
 
       FROM candidatos c
     )
@@ -762,7 +807,11 @@ def getMatches(ciclo):
       r.pts_vehiculo,
       r.pts_localidad,
       r.pts_pref,
-      r.pts_requisitos
+      r.pts_requisitos,
+      r.alumno_vehiculo,
+      r.alumno_localidad,
+      r.pref_match,
+      r.requisitos_match
     FROM ranking r
     ORDER BY puntaje DESC, r.pts_pref DESC, r.pts_localidad DESC
     """
@@ -979,6 +1028,13 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 update(practicaTabla, {"status": estados[4]}, {"id": practicaId})
                 print(f"Restando cupo (-1) en: {nueva_empresa} ({cif_nuevo})")
                 actualizar_cupo(cif_nuevo, row['ciclo_formativo'], -1)
+                if curr_asignado == "Asignar":
+                    try:
+                        from modules.drive_helper import copiar_archivos_alumno_a_practica
+                        copiados = copiar_archivos_alumno_a_practica(curr_nombre, curr_apellido, dni, nueva_empresa)
+                        print(f"Archivos del alumno copiados a la formación: {copiados}")
+                    except Exception as e:
+                        st.warning(f"⚠️ No se pudieron copiar los archivos de {curr_nombre} {curr_apellido} a la carpeta de la formación: {e}")
             else:
                 st.warning(f"No se puede confirmar la formación de {curr_nombre} sin una empresa asignada.")
 
@@ -1011,7 +1067,6 @@ def crearDraftPractica(empresaCif, alumnoDni, ciclo, area, proyecto, tutorCentro
         
         return response.data
         
-        #create_drive_folder_practica(alumnoDni,alumnoNombre,alumnoApellido, empresaCif,carpetaPractica)
 
 def finalizarPractica(practica):
     practicaId = practica.get("id")
@@ -1150,7 +1205,35 @@ def generarFormularioCierre(practica_id, email_destino):
         except Exception as e:
             st.error(f"Error procesando feedback para {formCierre}: {e}")
 
-def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_fin):
+def asignarFechasFormsFeedback(practica_id, fecha_inicio, email_destino, fecha_fin, email_tutor=None):
+    if email_tutor:
+        for tipo in formsTutorEmpresa:
+            if tipo == formsTutorEmpresa[2]:
+                fecha_envio = fecha_fin.isoformat()
+            else:
+                dias_a_sumar = 7 if tipo == formsTutorEmpresa[0] else 30
+                fecha_envio = (fecha_inicio + timedelta(days=dias_a_sumar)).isoformat()
+
+            try:
+                registro_existente = getEquals(feedbackFormsTabla, {"practica_id": int(practica_id), "tipo_form":tipo})
+
+                token = uuid.uuid4().hex
+                data_feedback = {
+                    "practica_id": int(practica_id),
+                    "fecha_envio": fecha_envio,
+                    "email_destino": email_tutor,
+                    "tipo_form": tipo,
+                    "token": token,
+                    "estado": "pendiente",
+                }
+                if registro_existente:
+                    id_registro = registro_existente[0]['id']
+                    update(feedbackFormsTabla, data_feedback, {"id": id_registro})
+                else:
+                    add(feedbackFormsTabla, data_feedback)
+            except Exception as e:
+                st.error(f"Error procesando feedback para {tipo}: {e}")
+
     for i, tipo in enumerate(forms):
         if i == len(forms) - 1:
             fecha_envio = fecha_fin.isoformat()
