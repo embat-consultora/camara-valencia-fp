@@ -399,7 +399,7 @@ localidades = [
 ]
 
 linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
-urlPoliticaPrivacidad = 'https://www.campuscamarafp.com/politica-privacidad/'
+urlPoliticaPrivacidad = 'https://mediterraneoculinary.com/politica-privacidad/'
 aniosList= ("Seleccionar", "2025-2026", "2026-2027","2027-2028","2028-2029","2029-2030","2030-2031","2031-2032","2032-2033","2033-2034","2034-2035","2035-2036","2036-2037","2037-2038","2038-2039","2039-2040")
 cursoList= ("Seleccionar","1ro","2do")
 locale_tabla_principal = {
