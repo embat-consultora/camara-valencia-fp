@@ -6,6 +6,7 @@ from modules.emailSender import send_welcome_email
 from modules.drive_helper import upload_to_drive,folderNombreAlumno
 from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
 from modules.forms_helper import required_ok, file_size_bytes, slug
+from modules.privacidad import render_info_basica, render_aviso_envio, datos_aceptacion
 from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 import random
 # ---------------------------------
@@ -193,6 +194,10 @@ if cv_too_big: missing.append("CV ≤ 20 MB")
 if missing:
     st.info("Completa los campos obligatorios: " + ", ".join(missing))
 
+# Protección de datos
+render_info_basica("alumno")
+render_aviso_envio("alumno")
+
 can_submit = (len(missing) == 0) and (not cv_too_big)
 submit = st.button("Enviar", disabled=not can_submit)
 
@@ -220,7 +225,7 @@ if submit:
                 "anio": ano.strip(),
                 "curso": curso.strip(),
                 "requisitos": requisitos.strip(),
-        }
+        } | datos_aceptacion("alumno")
         res_al = upsert(alumnosTabla, payload, keys=["dni"])
 
         if res_al and res_al.data:
