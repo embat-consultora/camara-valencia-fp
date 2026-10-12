@@ -5,7 +5,7 @@ from pathlib import Path
 from modules.data_base import get, update, upsert,getEqual,logError,getCiclosYAreas,upsertCustome
 from page_utils import apply_page_config
 from navigation import make_sidebar
-from variables import usuariosTabla,alumnosTabla, aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,alumnoEstadosTabla,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla
+from variables import usuariosTabla,alumnosTabla, aniosList, cursoList, localidades, max_file_size,tipoPracticas,carpetaAlumnos,alumnoEstadosTabla,alumnosTabla, bodyEmailsAlumno, alumnoEstadosTabla, estadosAlumno
 from datetime import datetime
 from modules.emailSender import send_email, send_welcome_email
 from modules.drive_helper import list_drive_files,upload_to_drive,folderNombreAlumno,archivoNombre
@@ -37,7 +37,7 @@ COLUMNAS = [
     "ciclo_formativo", "anio", "curso",
     "dni", "nombre", "apellido", "direccion", 
     "localidad", "telefono", "email_alumno", 
-    "vehiculo", "tipoPractica"
+    "vehiculo", "tipoPractica", "estado"
 ]
 
 df_alumnos = pd.DataFrame(alumnos) if alumnos else pd.DataFrame(columns=COLUMNAS)
@@ -103,9 +103,14 @@ with tab1:
         "email_alumno": "Email",
         "vehiculo": "Vehículo",
         "tipoPractica": "Tipo Formación",
+        "estado": "Estado",
     }
     df_view = df_alumnos[list(cols_map.keys())].rename(columns=cols_map)
-    st.dataframe(df_view, hide_index=True, width='stretch')
+    df_view_style = df_view.style.apply(
+        lambda fila: ["background-color: #e6f4ea" if fila["Estado"] == estadosAlumno[1] else "" for _ in fila],
+        axis=1
+    )
+    st.dataframe(df_view_style, hide_index=True, width='stretch')
 
     # Selección de alumno
     if not df_alumnos.empty:

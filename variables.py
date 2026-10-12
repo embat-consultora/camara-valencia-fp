@@ -12,6 +12,7 @@ categoria=["Empresa", "FP", "Alumno"]
 estados=["Documentación lista", "Iniciada", "Finalizada", "Cancelada", "Falta Documentación","Borrador"]
 estadosAlumno=["Sin Empresa","Asignado", "Finalizado", "En progreso", "Cancelado","Analizando"]
 forms =["feedback_inicial", "feedback_adaptacion", "feedback_cierre", "formulario_cierre_tutor_empresa"]
+formsTutorEmpresa = ["feedback_inicial_tutor", "feedback_adaptacion_tutor", "feedback_cierre_tutor"]
 #fases
 fasesEmpresa = ["Form Enviado", "Form Completo", "Match en progreso", "Alumnos asignados",  "Documentación Completa","Formación en progreso", "Finalizada", "Evaluación Enviada"] 
 fasesAlumno = ["Form Enviado", "Form Completo",  "Match en progreso","Alumnos asignados","Documentación Completa", "Formación en progreso", "Finalizada", "Evaluación Enviada"] 
@@ -398,6 +399,7 @@ localidades = [
 ]
 
 linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
+urlPoliticaPrivacidad = 'https://www.campuscamarafp.com/politica-privacidad/'
 aniosList= ("Seleccionar", "2025-2026", "2026-2027","2027-2028","2028-2029","2029-2030","2030-2031","2031-2032","2032-2033","2033-2034","2034-2035","2035-2036","2036-2037","2037-2038","2038-2039","2039-2040")
 cursoList= ("Seleccionar","1ro","2do")
 locale_tabla_principal = {

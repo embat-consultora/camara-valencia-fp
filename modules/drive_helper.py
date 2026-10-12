@@ -199,6 +199,82 @@ def folderNombreAlumno(nombre, apellido, dni):
     folder_name = f"{nombre_limpio}_{apellido_limpio}_{dni}".strip()
     return folder_name
 
+def copiar_archivos_alumno_a_practica(nombre, apellido, dni, empresa_nombre):
+    """
+    Copia los archivos de la carpeta del alumno (CV, etc.) a la carpeta de la práctica.
+    Crea la carpeta de la práctica si no existe y no duplica archivos ya copiados.
+    Devuelve la cantidad de archivos copiados.
+    """
+    from variables import carpetaAlumnos, carpetaPractica
+
+    def escapar(valor):
+        return str(valor).replace("\\", "\\\\").replace("'", "\\'")
+
+    credentials_info = st.secrets.connections.gcs
+    credentials = service_account.Credentials.from_service_account_info(credentials_info)
+    service = build("drive", "v3", credentials=credentials)
+    carpeta_tipo = "application/vnd.google-apps.folder"
+
+    # 1. Carpeta del alumno
+    nombre_folder_alumno = folderNombreAlumno(nombre, apellido, dni)
+    res_alumno = service.files().list(
+        q=f"'{carpetaAlumnos}' in parents and name = '{escapar(nombre_folder_alumno)}' and mimeType = '{carpeta_tipo}' and trashed = false",
+        fields="files(id)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute().get("files", [])
+    if not res_alumno:
+        return 0
+    alumno_folder_id = res_alumno[0]["id"]
+
+    archivos_alumno = service.files().list(
+        q=f"'{alumno_folder_id}' in parents and mimeType != '{carpeta_tipo}' and trashed = false",
+        fields="files(id, name)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute().get("files", [])
+    if not archivos_alumno:
+        return 0
+
+    # 2. Carpeta de la práctica (se crea si no existe)
+    nombre_folder_practica = folderNamePractica(nombre, apellido, dni, empresa_nombre)
+    res_practica = service.files().list(
+        q=f"'{carpetaPractica}' in parents and name = '{escapar(nombre_folder_practica)}' and mimeType = '{carpeta_tipo}' and trashed = false",
+        fields="files(id)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute().get("files", [])
+    if res_practica:
+        practica_folder_id = res_practica[0]["id"]
+    else:
+        practica_folder_id = service.files().create(
+            body={"name": nombre_folder_practica, "mimeType": carpeta_tipo, "parents": [carpetaPractica]},
+            fields="id",
+            supportsAllDrives=True
+        ).execute()["id"]
+
+    # 3. Copiar los archivos que todavía no estén en la carpeta de la práctica
+    existentes = {
+        f["name"] for f in service.files().list(
+            q=f"'{practica_folder_id}' in parents and trashed = false",
+            fields="files(name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute().get("files", [])
+    }
+    copiados = 0
+    for archivo in archivos_alumno:
+        if archivo["name"] in existentes:
+            continue
+        service.files().copy(
+            fileId=archivo["id"],
+            body={"name": archivo["name"], "parents": [practica_folder_id]},
+            supportsAllDrives=True
+        ).execute()
+        copiados += 1
+    return copiados
+
+
 def archivoNombre(nombre, apellido, archivo):
     apellido_limpio = "_".join(apellido.split())
     nombre_limpio = "_".join(nombre.split())
