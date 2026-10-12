@@ -151,7 +151,6 @@ for oferta_data in ofertas:
             continue
 
         tab_objs = st.tabs(ciclos)
-
         for i, ciclo in enumerate(ciclos):
             with tab_objs[i]:
                 st.subheader(f"🎓 {ciclo}")

@@ -19,7 +19,6 @@ from variables import (
     formsTutorEmpresa,
     necesidadFP,
     practicaTabla,
-    tutoresTabla,
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -797,12 +796,12 @@ with tab_ofertas:
             f"{tiempos_match_df['dias_match'].mean():.1f} días",
         )
         match_total.metric(
-            "Formaciones enlazadas con ofertas",
-            len(tiempos_match_df)
+            "Formaciones creadas desde ofertas",
+            len(tiempos_match_df),
         )
     else:
         st.info(
-            "No hay formaciones enlazadas por ID de oferta con fechas de creación "
+            "No hay Formaciones enlazadas por ID de oferta con fechas de creación "
             "válidas para calcular el tiempo medio."
         )
 

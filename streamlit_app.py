@@ -1,47 +1,36 @@
 import streamlit as st
 import extra_streamlit_components as stx
 from modules.data_base import getEqual
-from modules.session_manager import load_user
-from variables import page_icon, usuariosTabla
-import base64
-
-st.markdown("""
+from modules.session_manager import load_user, validate_get_user
+from variables import page_icon,usuariosTabla
+import os
+# Configuración inicial
+st.markdown(
+    """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
-    html, body, [class*="css"], .stApp { font-family: 'Montserrat', sans-serif; }
-    </style>
-""", unsafe_allow_html=True)
 
-st.set_page_config(page_title="Cámara FP - Inicio", page_icon=page_icon, layout="centered")
-def get_base64(bin_file):
-    with open(bin_file, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-img = get_base64("images/fondo.webp")
-
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{img}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }}
+    /* Esto aplica la fuente a toda la app */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Montserrat', sans-serif;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
+st.set_page_config(page_title="MCC - Inicio", page_icon=page_icon)
+import base64
+
+def get_base64(bin_file):
+    with open(bin_file, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
 cookie_manager = stx.CookieManager(key="main_cookie_manager")
 st.session_state["current_page"] = "streamlit_app"
 
-# Inicializar estado
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# ✅ Restaurar sesión desde cookie
-# El cookie_manager necesita un render para estar listo, 
-# get() devuelve None si aún no cargó
 if not st.session_state["logged_in"]:
     saved_email = cookie_manager.get("saved_user_email")
     if saved_email:
@@ -49,7 +38,6 @@ if not st.session_state["logged_in"]:
         st.session_state["logged_in"] = True
         st.rerun()
 
-# ✅ Redirigir si ya está logueado
 if st.session_state["logged_in"]:
     rol = st.session_state.get("rol")
     if rol == 'admin':
@@ -65,6 +53,9 @@ if st.session_state["logged_in"]:
     elif rol == 'alumno':
         st.switch_page("pages/alumno.py")
     st.stop()
+
+
+
 col1, col2, col3 = st.columns([1, 4, 1])
 with col2:
     css = """
@@ -104,7 +95,7 @@ with col2:
     # Eliminamos el parámetro 'width=500' que no pertenece a st.container
     with st.container(key="my_white_container"):
         
-        url_logo = "https://github.com/user-attachments/assets/e8f8238a-65f8-4132-9d9f-efe8c0effbc7"
+        url_logo = "https://github.com/user-attachments/assets/387c2e80-609b-4123-8c2c-d2e45d15eeda" 
         
         st.markdown(
             f"""
