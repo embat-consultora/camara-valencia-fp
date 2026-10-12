@@ -19,7 +19,6 @@ from variables import (
     formsTutorEmpresa,
     necesidadFP,
     practicaTabla,
-    tutoresTabla,
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -73,7 +72,6 @@ def exportar_excel(df):
 def load_all_data():
     df_alumnos = pd.DataFrame(get(alumnosTabla))
     df_empresas = pd.DataFrame(get(empresasTabla))
-    df_estados = pd.DataFrame(get(practicaEstadosTabla))
     df_practicas = pd.DataFrame(get(practicaTabla))
 
     df_ofertas = pd.DataFrame(get(necesidadFP))
