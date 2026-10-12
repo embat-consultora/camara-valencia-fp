@@ -75,6 +75,8 @@ with col_refresh:
     else:
         st.title("Datos formación en Empresa", text_alignment="center")
 with col_volver:
+    # Espacio para que el botón no quede tapado por la barra de Streamlit
+    st.markdown("<div style='height: 2.5rem;'></div>", unsafe_allow_html=True)
     if st.button("🔄 Actualizar", key="btn_refresh"):
         st.session_state["force_reload"] = True
         st.session_state["data_loaded"] = False
