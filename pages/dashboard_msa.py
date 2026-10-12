@@ -401,6 +401,7 @@ def card(contenedor, icono, titulo, valor, color):
 
 _, col_actualizar = st.columns([5, 1])
 with col_actualizar:
+    st.markdown("<div style='height: 2.5rem;'></div>", unsafe_allow_html=True)
     if st.button("🔄 Actualizar", use_container_width=True):
         load_all_data.clear()
         load_feedback_data.clear()
