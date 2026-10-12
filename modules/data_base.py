@@ -474,8 +474,11 @@ def delete(tableName,searchFor, searchValue):
 
 def actualizar_cupo(cif_empresa, ciclo, cambio):
     # 1. Traer la oferta actual
+    print("Entro a actualizar cupo")
     res = supabase.table(necesidadFP).select("id, ciclos_formativos").eq("empresa", cif_empresa).execute()
-
+    print(cif_empresa)
+    print(ciclo)
+    print(cambio)
     # 2. Modificar el JSON en Python
     if res.data and len(res.data) > 0:
         oferta_dict = res.data[0]
