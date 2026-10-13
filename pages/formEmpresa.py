@@ -8,7 +8,7 @@ from httpx import HTTPError
 from modules.forms_helper import required_ok, slug
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
 from modules.emailSender import send_welcome_email
-from modules.privacidad import render_info_basica, render_aviso_envio, datos_aceptacion
+from modules.privacidad import render_aviso_legal, datos_aceptacion
 from postgrest.exceptions import APIError
 from streamlit_javascript import st_javascript
 from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
@@ -405,15 +405,14 @@ faltantes = [k for k, v in required_fields.items() if not required_ok(v)]
 if faltantes:
     st.info("Completa los campos obligatorios: " + ", ".join(faltantes))
 
-render_info_basica("empresa")
-
-# Aviso: al enviar el formulario se acepta la política de privacidad
-render_aviso_envio("empresa")
+# Aviso legal y protección de datos: hay que aceptarlo para poder enviar
+acepta_privacidad = render_aviso_legal("empresa")
 
 can_submit = (
     len(faltantes) == 0
     and len(errores_ciclos) == 0
     and len(selected_ciclos) > 0
+    and acepta_privacidad
 )
 
 st.write("*Si completó todo el formulario, y aun no se habilita el botón de enviar, presione dentro y fuera de los campos nombrados.")

@@ -8,7 +8,7 @@ RESPONSABLE_NOMBRE = "Cámara Oficial de Comercio, Industria, Servicios y Navega
 EMAIL_PRIVACIDAD = "avicente@campuscamarafp.com"
 URL_POLITICA = urlPoliticaPrivacidad
 # Subir la versión cada vez que cambie el texto de la política o de los avisos
-POLITICA_VERSION = "1.0"
+POLITICA_VERSION = "1.1"
 
 FINALIDADES = {
     "alumno": (
@@ -23,58 +23,23 @@ FINALIDADES = {
     ),
 }
 
-DESTINATARIOS = {
-    "alumno": (
-        "Las empresas colaboradoras a las que se proponga o asigne tu candidatura (datos de perfil y CV), "
-        "el centro educativo y, cuando exista obligación legal, la Administración educativa competente. "
-        "Proveedores tecnológicos que actúan como encargados del tratamiento."
-    ),
-    "empresa": (
-        "El centro educativo, los alumnos asignados (datos de contacto del tutor y del centro de trabajo) y, "
-        "cuando exista obligación legal, la Administración educativa competente. "
-        "Proveedores tecnológicos que actúan como encargados del tratamiento."
-    ),
-}
 
-
-def render_info_basica(tipo):
-    """Primera capa de información (art. 13 RGPD) que se muestra junto al formulario."""
+def render_aviso_legal(tipo):
+    """Aviso legal y de protección de datos con check de aceptación. Devuelve True si el usuario acepta."""
+    finalidad = FINALIDADES[tipo][0].lower() + FINALIDADES[tipo][1:].rstrip(".")
     st.markdown(
         f"""
         <div style="background-color: #f8f9fa; border-left: 4px solid #1E90FF; padding: 12px 16px; border-radius: 4px; font-size: 0.85rem; color: #333; margin-bottom: 12px;">
-            <strong style="font-size: 0.95rem;">Información básica sobre protección de datos</strong>
-            <ul style="margin-bottom: 6px;">
-                <li><strong>Responsable:</strong> {RESPONSABLE_NOMBRE}.</li>
-                <li><strong>Finalidad:</strong> {FINALIDADES[tipo]}</li>
-                <li><strong>Legitimación:</strong> La gestión del programa de formación en el que solicitas participar y el cumplimiento de las funciones públicas atribuidas a las Cámaras en materia de formación profesional.</li>
-                <li><strong>Destinatarios:</strong> {DESTINATARIOS[tipo]}</li>
-                <li><strong>Conservación:</strong> Durante tu participación en el programa y, después, durante los plazos legalmente exigidos.</li>
-                <li><strong>Derechos:</strong> Acceder, rectificar y suprimir los datos, así como otros derechos, escribiendo a <a href="mailto:{EMAIL_PRIVACIDAD}">{EMAIL_PRIVACIDAD}</a>. También puedes reclamar ante la Agencia Española de Protección de Datos (www.aepd.es).</li>
-            </ul>
-            Información adicional: <a href="{URL_POLITICA}" target="_blank">Política de Privacidad</a>.
+            <p><strong>AVISO LEGAL Y CONFIDENCIALIDAD:</strong> Este mensaje y sus archivos adjuntos van dirigidos exclusivamente a su destinatario, pudiendo contener información confidencial sometida a secreto profesional. No está permitida su comunicación, reproducción o distribución sin la autorización expresa del remitente. Si usted no es el destinatario final, por favor elimínelo e infórmenos por esta misma vía.</p>
+            <p style="margin-bottom: 0;"><strong>PROTECCIÓN DE DATOS:</strong> De conformidad con lo dispuesto en el Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), le informamos que los datos personales que nos facilite serán tratados por {RESPONSABLE_NOMBRE} con la finalidad de {finalidad}. Puede ejercer sus derechos de acceso, rectificación, portabilidad, supresión, limitación y oposición enviando un correo a <a href="mailto:{EMAIL_PRIVACIDAD}">{EMAIL_PRIVACIDAD}</a>.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-
-AVISO_ENVIO = {
-    "alumno": (
-        "Al pulsar <strong>Enviar</strong> declaras que has leído la información sobre protección de datos y la "
-        f'<a href="{URL_POLITICA}" target="_blank">Política de Privacidad</a>, que los datos facilitados son veraces '
-        "y que eres mayor de 14 años (o cuentas con la autorización de tu padre, madre o tutor legal). Tu perfil y tu CV "
-        "se compartirán con las empresas colaboradoras a las que se proponga tu candidatura, y recibirás por email las "
-        "comunicaciones necesarias para la gestión del programa (accesos, formularios de seguimiento, avisos y recordatorios)."
-    ),
-    "empresa": (
-        "Al pulsar <strong>Enviar formulario</strong> declaras que has leído la información sobre protección de datos y la "
-        f'<a href="{URL_POLITICA}" target="_blank">Política de Privacidad</a>, que los datos facilitados son veraces, '
-        "que tienes capacidad para actuar en nombre de la empresa y que has informado a las personas cuyos datos "
-        "facilitas (persona de contacto, responsable legal y tutor/a) sobre este tratamiento. La empresa y el tutor/a "
-        "recibirán por email las comunicaciones necesarias para la gestión del programa (accesos, formularios de "
-        "seguimiento, avisos y recordatorios)."
-    ),
-}
+    return st.checkbox(
+        "He leído y acepto el aviso legal y la información sobre protección de datos *",
+        key=f"acepta_privacidad_{tipo}",
+    )
 
 
 def datos_aceptacion(tipo):
@@ -86,10 +51,3 @@ def datos_aceptacion(tipo):
         "privacidad_origen": f"formulario_{tipo}",
     }
 
-
-def render_aviso_envio(tipo):
-    """Aviso de aceptación de la política al enviar el formulario (sin checks)."""
-    st.markdown(
-        f"<p style='font-size:0.8rem; color:#555; margin-top:4px;'>{AVISO_ENVIO[tipo]}</p>",
-        unsafe_allow_html=True,
-    )
