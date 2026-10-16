@@ -1,9 +1,11 @@
 import streamlit as st
 import extra_streamlit_components as stx
 from modules.data_base import getEqual
-from modules.session_manager import load_user, validate_get_user
+from modules.session_manager import load_user
 from variables import page_icon,usuariosTabla
-import os
+def get_base64(bin_file):
+    with open(bin_file, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 # Configuración inicial
 st.markdown(
     """
@@ -21,6 +23,22 @@ st.markdown(
 st.set_page_config(page_title="MCC - Inicio", page_icon=page_icon)
 import base64
 
+img = get_base64("images/fondo.webp")
+
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{img}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 def get_base64(bin_file):
     with open(bin_file, "rb") as f:
         return base64.b64encode(f.read()).decode()
