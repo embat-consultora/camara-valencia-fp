@@ -294,7 +294,7 @@ with tab_alumnos:
                 if not df_raw.empty:
                     df_raw['ciclo_acronimo'] = df_raw['abreviatura']
                     cols_visibles = [
-                        "ciclo_acronimo", "apellido", "nombre","telefono","localidad", "vehiculo", "horas_totales", 
+                        "ciclo_acronimo", "apellido", "nombre","telefono","localidad", "tipoPractica", "vehiculo", "horas_totales", 
                         "nombre_empresa","email_empresa","asignado","area", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro" 
                     ]
                 
@@ -360,6 +360,7 @@ with tab_alumnos:
                     gb.configure_column("comentarios_centro", headerName="Comentarios", width=200)
                     gb.configure_column("vehiculo", headerName="Vehículo", width=100, editable=False)
                     gb.configure_column("localidad", headerName="Localidad", width=150, editable=False)
+                    gb.configure_column("tipoPractica", headerName="Tipo Formación", width=180, editable=False)
 
                     gb.configure_column("gestor", 
                         headerName="Gestor", 
@@ -609,6 +610,7 @@ with tab_alumnos:
                             {"colId": "comentarios_centro", "width": 200},
                             {"colId": "vehiculo", "width": 100},
                             {"colId": "localidad", "width": 150},
+                            {"colId": "tipoPractica", "width": 180},
                             {"colId": "gestor", "width": 120},
                             {"colId": "horas_totales", "width": 100},
                             {"colId": "nombre_empresa", "width": 200},
