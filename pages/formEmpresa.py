@@ -5,13 +5,13 @@ import random
 import smtplib
 from datetime import datetime, time
 from httpx import HTTPError
-from modules.forms_helper import required_ok, slug
+from modules.forms_helper import required_ok, slug, render_requisitos
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
 from modules.emailSender import send_welcome_email
 from modules.privacidad import render_aviso_legal, datos_aceptacion
 from postgrest.exceptions import APIError
 from streamlit_javascript import st_javascript
-from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla
+from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla,idiomasRequisitos,nivelesIdioma,skillsRequisitos
 
 logger = logging.getLogger(__name__)
 DRAFT_STORAGE_KEY = "form_empresa_draft_v1"
@@ -89,7 +89,9 @@ draft_widget_keys = [
     "localidad_centro",
     "posible_contrato",
     "vehiculo",
-    "requisitos",
+    "req_idiomas",
+    "req_skills",
+    "req_otros",
 ]
 valid_widget_options = {
     "sector": sectorEmpresa,
@@ -98,6 +100,11 @@ valid_widget_options = {
     "vehiculo": ["Sí", "No"],
 }
 time_widget_keys = {"fin", "inicio"}
+list_widget_options = {"req_idiomas": idiomasRequisitos, "req_skills": skillsRequisitos}
+for idioma in idiomasRequisitos:
+    nivel_key = f"req_nivel_{slug(idioma)}"
+    draft_widget_keys.append(nivel_key)
+    valid_widget_options[nivel_key] = nivelesIdioma
 for ciclo in CICLOS:
     ciclo_key = slug(ciclo)
     draft_widget_keys.extend((f"chk_{ciclo_key}", f"num_{ciclo_key}"))
@@ -135,7 +142,10 @@ def load_form_draft():
                 continue
             if key in valid_widget_options and value not in valid_widget_options[key]:
                 continue
-            if key in time_widget_keys:
+            if key in list_widget_options:
+                if not isinstance(value, list) or not all(v in list_widget_options[key] for v in value):
+                    continue
+            elif key in time_widget_keys:
                 if not isinstance(value, str):
                     continue
                 try:
@@ -361,9 +371,12 @@ if selected_ciclos:
 if not puestos_seleccionados:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un puesto/area</span>", unsafe_allow_html=True)
 st.write("REQUISITOS ADICIONALES")
-requisitos = st.text_area(
-    "Por favor, indícanos si el alumno debe cumplir algún requisito adicional (por ejemplo, B1 de inglés, trabajo en equipo, residencia, etc.) *",
-    key="requisitos",
+st.caption("Por favor, indícanos si el alumno debe cumplir algún requisito adicional.")
+requisitos = render_requisitos(
+    "req",
+    idiomas_label="Idiomas",
+    skills_label="Skills",
+    otros_label="Otros requisitos (por ejemplo, residencia)",
 )
 errores_ciclos = []
 for ciclo in selected_ciclos:

@@ -12,6 +12,7 @@ from variables import (
     estadosAlumno,
     necesidadFP,
     feedbackFormsTabla,
+    feedbackResponseTabla,
     forms,formsTutorEmpresa,empresasTabla, practicaTabla, alumnosTabla,
     gestoresTabla,
     usuariosTabla,
@@ -414,7 +415,16 @@ def getEqual(tableName, variable, value):
     return response.data
 
 def getAlumnosSinPracticas(tableAlumno, filtroAnio):
-    response = supabase.table(tableAlumno).select("*, practicas_fp(*)").eq("estado", "Sin Empresa").eq("anio",filtroAnio).is_("practicas_fp.id", "null").execute()
+    response = (
+        supabase.table(tableAlumno)
+        .select("*, practicas_fp(*)")
+        .eq("estado", "Sin Empresa")
+        .eq("anio", filtroAnio)
+        .is_("practicas_fp.id", "null")
+        # neq alone would also drop rows where tipoPractica is NULL
+        .or_("tipoPractica.is.null,tipoPractica.neq.Autogestionada")
+        .execute()
+    )
     return response.data
 def getEquals(tableName, conditions: dict, in_filters: dict = None, not_equals: dict = None):
     query = supabase.table(tableName).select("*")
@@ -1123,7 +1133,42 @@ def cancelarPractica(practica, motivo):
             st.error(f"Error procesando la cancelación de la formación: {e}")
 
 
-def crearPractica(empresaCif, alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id, status:None, anio=None, curso=None):
+def anularPractica(practica):
+    """Deletes the practice as if it never existed: removes its feedback data and the
+    practice row, sets the student back to "Sin Empresa" and returns the place to the offer."""
+    practicaId = int(practica.get("id"))
+    alumnoDni = practica.get("alumno")
+    ciclo = practica.get("ciclo_formativo")
+    oferta_id = practica.get("oferta")
+    ya_cancelada = practica.get("status") == estados[3]  # cancelarPractica already returned the place
+
+    # 1. Return the place to the offer the practice was assigned to (by offer id, not by company)
+    if oferta_id and ciclo and not ya_cancelada:
+        res = supabase.table(necesidadFP).select("id, ciclos_formativos").eq("id", oferta_id).execute()
+        if res.data:
+            ciclos = res.data[0].get("ciclos_formativos") or {}
+            if ciclo in ciclos:
+                total = ciclos[ciclo].get("alumnos")
+                nuevo = (ciclos[ciclo].get("disponibles") or 0) + 1
+                ciclos[ciclo]["disponibles"] = min(nuevo, total) if total is not None else nuevo
+                update(necesidadFP, {"ciclos_formativos": ciclos}, {"id": oferta_id})
+
+    # 2. Delete the practice and the rows that reference it
+    delete(feedbackResponseTabla, "practica_id", practicaId)
+    delete(feedbackFormsTabla, "practica_id", practicaId)
+    delete(practicaTabla, "id", practicaId)
+
+    # 3. Student back to "Sin Empresa" and reset their progress dates
+    update(alumnosTabla, {"estado": estadosAlumno[0]}, {"dni": alumnoDni})
+    upsert(
+        alumnoEstadosTabla,
+        {"alumno": alumnoDni, "fp_asignada": None, "match_fp": None, "email_enviado": None,
+         "fp_enprogreso": None, "fp_finalizada": None, "fp_cancelada": None},
+        keys=["alumno"],
+    )
+
+
+def crearPractica(empresaCif,alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id, status:None, anio=None, curso=None):
     registro_existente = getEquals(practicaTabla, {"alumno": alumnoDni, "empresa":empresaCif})
     payload_practica = {
         "empresa": empresaCif,
