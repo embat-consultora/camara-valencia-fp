@@ -5,7 +5,7 @@ import  uuid
 from modules.emailSender import send_welcome_email
 from modules.drive_helper import upload_to_drive,folderNombreAlumno
 from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
-from modules.forms_helper import required_ok, file_size_bytes, slug
+from modules.forms_helper import required_ok, file_size_bytes, slug, render_requisitos
 from modules.privacidad import render_aviso_legal, datos_aceptacion
 from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 import random
@@ -121,8 +121,13 @@ if not ciclo:
     st.markdown("<span style='color:red;'>Debes seleccionar al menos un ciclo formativo</span>", unsafe_allow_html=True)
 ano = st.selectbox("Ciclo Académico *", aniosList, key="ano_alumno")
 curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
-requisitos = st.text_area(
-    "Por favor, indícanos skills que consideres relevantes (por ejemplo, B1 de inglés, trabajo en equipo, etc ) *"
+st.subheader("Idiomas y skills")
+st.caption("Por favor, indícanos los idiomas y skills que consideres relevantes.")
+requisitos = render_requisitos(
+    "req_alumno",
+    idiomas_label="Idiomas",
+    skills_label="Skills",
+    otros_label="Otras skills o conocimientos",
 )
 # Subida de CV
 st.subheader("Subir CV")

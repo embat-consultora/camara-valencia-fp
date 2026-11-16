@@ -700,7 +700,8 @@ with tab_ofertas:
                         "Localidad": empresa.get('localidad', ''),
                         "Horario": empresa.get('horario', ''),
                         "Ciclo": nombre_ciclo,
-                        "Alumnos Pedidos": datos_alumnos.get('disponibles', 0),
+                        "Alumnos Pedidos": datos_alumnos.get('alumnos', datos_alumnos.get('disponibles', 0)),
+                        "Disponibles": datos_alumnos.get('disponibles', 0),
                         "Área": nombre_area,
                         "Proyecto": area_item.get('proyecto', ''),
                         "Requisitos": record.get('requisitos', ''),
@@ -726,7 +727,7 @@ with tab_ofertas:
                     
                     columnas_fijas = [
                         "id", "Empresa", "Teléfono", "Localidad", "Horario",
-                        "Alumnos Pedidos", "Área", "Proyecto", "Requisitos", 
+                        "Alumnos Pedidos", "Disponibles", "Área", "Proyecto", "Requisitos", 
                         "Contrato", "Vehículo", "Nombre Tutor", "Email Tutor","Telefono Tutor"
                     ]
                     
@@ -756,7 +757,8 @@ with tab_ofertas:
                         "Nombre Tutor": st.column_config.TextColumn(disabled=True),
                         "Email Tutor": st.column_config.TextColumn(disabled=True),
                         "Telefono Tutor": st.column_config.TextColumn(disabled=True),
-                        "Alumnos Pedidos": st.column_config.NumberColumn("Cant.", disabled=True),
+                        "Alumnos Pedidos": st.column_config.NumberColumn("Pedidos", disabled=True),
+                        "Disponibles": st.column_config.NumberColumn("Disponibles", disabled=True),
                         "Área": st.column_config.TextColumn(disabled=True),
                     }
                     
