@@ -64,8 +64,7 @@ def render_welcome_email(
               </div>
               <p style="margin:0; font-size:14px; color:#4a6274;">
                 Recibes este correo porque se ha creado tu usuario en FP MATCH, la plataforma
-                de Formación Profesional de Cámara FP Valencia. Si tienes cualquier duda,
-                responde a este correo y te ayudaremos.
+                de Formación Profesional de MCC.
               </p>
             </div>
             <div style="padding:18px 24px; text-align:center; background:#172b47;
