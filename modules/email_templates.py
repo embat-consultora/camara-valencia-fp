@@ -61,7 +61,7 @@ def render_welcome_email(
             <div style="padding:18px 24px; text-align:center; background:#172b47;
                         color:#ffffff; font-size:14px;">
               <strong style="font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
-                             font-size:18px; font-weight:normal;">Cámara FP Valencia - MCC</strong>
+                             font-size:18px; font-weight:normal;">MCC</strong>
             </div>
           </div>
         </div>
