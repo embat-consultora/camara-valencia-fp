@@ -521,7 +521,13 @@ def upsertCustome(tableName, data, keys, return_created=False):
     if existing_record.data:
         # Si existe, actualizamos
         # Filtramos para asegurarnos de actualizar el registro correcto
-        update_query = supabase.table(tableName).update(data)
+        datos_update = data
+        if tableName == usuariosTabla:
+            # Never overwrite an existing user's password here: callers generate a new
+            # random password on every save but only email it when the user is new, so
+            # overwriting it locked users out. Password changes go through update().
+            datos_update = {k: v for k, v in data.items() if k != "password"}
+        update_query = supabase.table(tableName).update(datos_update)
         for key in keys:
             update_query = update_query.eq(key, data[key])
         
