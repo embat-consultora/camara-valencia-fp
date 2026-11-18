@@ -61,7 +61,7 @@ def render_welcome_email(
             <div style="padding:18px 24px; text-align:center; background:#013d5f;
                         color:#ffffff; font-size:14px;">
               <strong style="font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
-                             font-size:18px; font-weight:normal;">Cámara FP Valencia</strong>
+                             font-size:18px; font-weight:normal;">Cámara FP</strong>
             </div>
           </div>
         </div>
