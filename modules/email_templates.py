@@ -49,6 +49,11 @@ def render_welcome_email(
                 <p style="margin:0 0 8px;"><strong>Usuario:</strong> {usuario_html}</p>
                 <p style="margin:0;"><strong>Contraseña:</strong> {password_html}</p>
               </div>
+              <p style="margin:0 0 10px; font-size:16px;">
+                Para entrar, pulsa el botón «Acceder a la plataforma» e introduce tu
+                usuario y tu contraseña. Te recomendamos guardar este correo para tener
+                siempre a mano tus datos de acceso.
+              </p>
               <div style="text-align:center; margin:28px 0 24px;">
                 <a href="{url_html}" target="_blank" rel="noopener noreferrer"
                    style="display:inline-block; padding:14px 28px; border-radius:8px;
@@ -57,6 +62,11 @@ def render_welcome_email(
                   Acceder a la plataforma
                 </a>
               </div>
+              <p style="margin:0; font-size:14px; color:#4a6274;">
+                Recibes este correo porque se ha creado tu usuario en FP MATCH, la plataforma
+                de Formación Profesional de Cámara FP Valencia. Si tienes cualquier duda,
+                responde a este correo y te ayudaremos.
+              </p>
             </div>
             <div style="padding:18px 24px; text-align:center; background:#172b47;
                         color:#ffffff; font-size:14px;">

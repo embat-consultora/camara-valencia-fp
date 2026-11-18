@@ -1,5 +1,8 @@
 import streamlit as st
+import re
 import smtplib
+from html import unescape
+from email.utils import formatdate, make_msgid
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -31,6 +34,46 @@ from modules.email_templates import render_feedback_tutor_email, render_welcome_
 #         # Re-lanzamos para que Streamlit capture el error como vimos antes
 #         raise e
     
+def _html_a_texto(html_body: str) -> str:
+    """Plain-text version of an HTML email (sent alongside the HTML; spam filters
+    penalize HTML-only messages with little text)."""
+    texto = re.sub(r"(?is)<(head|style|script)\b.*?</\1>", "", html_body)
+    # Keep link targets: <a href="url">text</a> -> text (url)
+    texto = re.sub(r'(?is)<a\b[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"\2 (\1)", texto)
+    texto = re.sub(r"\s+", " ", texto)  # source line breaks aren't real line breaks in HTML
+    texto = re.sub(r"(?i)<br\s*/?>", "\n", texto)
+    texto = re.sub(r"(?i)</(p|h[1-6])>", "\n\n", texto)
+    texto = re.sub(r"(?i)</(div|li|tr)>", "\n", texto)
+    texto = unescape(re.sub(r"<[^>]+>", "", texto))
+    lineas = [" ".join(linea.split()) for linea in texto.splitlines()]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lineas)).strip() + "\n"
+
+
+def _crear_mensaje(sender, recipient, subject, body, html, adjuntos):
+    msg = MIMEMultipart("mixed")
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=sender.split("@")[-1])
+
+    if html:
+        cuerpo = MIMEMultipart("alternative")  # plain text first, HTML preferred
+        cuerpo.attach(MIMEText(_html_a_texto(body), "plain", "utf-8"))
+        cuerpo.attach(MIMEText(body, "html", "utf-8"))
+        msg.attach(cuerpo)
+    else:
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    for nombre, contenido in adjuntos:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(contenido)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=nombre)
+        msg.attach(part)
+    return msg
+
+
 def send_email(
     sender: str,
     password: str,
@@ -41,57 +84,44 @@ def send_email(
     html: bool = False,
 ) -> bool:
     """
-    Envía un email con adjuntos usando SMTP de Gmail con los destinatarios en BCC.
+    Envía un email con adjuntos usando SMTP de Gmail.
+    Se envía un mensaje por destinatario, con el destinatario en "To" (no en BCC):
+    los correos con el destinatario oculto en BCC suelen ir a spam, y así nadie ve
+    las direcciones de los demás en los envíos masivos.
     """
     if not recipients:
         raise ValueError("La lista de destinatarios está vacía.")
 
+    # Read attachments once (Streamlit UploadedFile), then rewind them so a rerun can read them again
+    adjuntos = []
+    for uploaded_file in attachments or []:
+        adjuntos.append((uploaded_file.name, uploaded_file.read()))
+        uploaded_file.seek(0)
+
+    fallidos = []
     try:
-        # 1. Cambiamos a MIMEMultipart para soportar adjuntos
-        msg = MIMEMultipart()
-        msg['From'] = sender
-        msg['To'] = sender  # Se envía a uno mismo para que los demás vayan en BCC
-        msg['Subject'] = subject
-
-        # 2. Adjuntamos el cuerpo del mensaje
-        msg.attach(MIMEText(body, "html" if html else "plain", "utf-8"))
-
-        # 3. Lógica para los archivos adjuntos
-        if attachments:
-            for uploaded_file in attachments:
-                # Creamos la parte del adjunto
-                part = MIMEBase("application", "octet-stream")
-                # Leemos el contenido del archivo de Streamlit
-                part.set_payload(uploaded_file.read())
-                # Codificamos en base64 para el envío
-                encoders.encode_base64(part)
-                
-                # Añadimos la cabecera con el nombre del archivo
-                part.add_header(
-                    "Content-Disposition",
-                    "attachment",
-                    filename=uploaded_file.name,
-                )
-                msg.attach(part)
-                
-                # IMPORTANTE: Volver al inicio del archivo para que Streamlit 
-                # no lo dé por "leído" si se re-ejecuta el script
-                uploaded_file.seek(0)
-
-        # 4. Envío del correo
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender, password)
-        
-        # Enviamos a la lista completa de recipients (irán como BCC ocultos)
-        server.sendmail(sender, recipients, msg.as_string())
-        server.quit()
-
-        return True
-
+        try:
+            for recipient in recipients:
+                try:
+                    msg = _crear_mensaje(sender, recipient, subject, body, html, adjuntos)
+                    server.sendmail(sender, [recipient], msg.as_string())
+                except smtplib.SMTPException as e:
+                    print(f"Error enviando email a {recipient}: {e}")
+                    fallidos.append(recipient)
+        finally:
+            server.quit()
     except Exception as e:
         print(f"Error enviando email: {e}")
         raise e
+
+    if fallidos:
+        raise RuntimeError(
+            f"No se pudo enviar a {len(fallidos)} de {len(recipients)} destinatarios: {', '.join(fallidos)}"
+        )
+    return True
 
 
 def send_welcome_email(email: str, usuario: str, password:str,  nombre:str) -> bool:
