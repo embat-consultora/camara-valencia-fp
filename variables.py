@@ -1,4 +1,4 @@
-title="Cámara Valencia - FP"
+title="Plataforma FP Match - MCC"
 logoutButton="Desloguearse"
 page_icon="./images/cv-fp.ico"
 companyIcon="./images/cv-fp.png"
