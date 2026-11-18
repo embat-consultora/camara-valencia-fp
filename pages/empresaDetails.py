@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 from page_utils import apply_page_config
-from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas,logError
+from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas,logError, getCiclosYAreas, eliminarOferta, actualizarOfertaEmpresa, ofertaSinAsignaciones
 from navigation import make_sidebar
-from modules.forms_helper import file_size_bytes
+from modules.forms_helper import file_size_bytes, render_requisitos, requisitos_a_estado, slug
 from variables import empresasTabla, max_file_size, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica,archivoNombre
@@ -18,6 +18,121 @@ st.markdown(
     "<h2 style='text-align: center;'>MI EMPRESA</h2>",
     unsafe_allow_html=True
 )
+
+
+def _si_no(valor):
+    """contrato/vehiculo are saved as "Sí"/"No" (older rows may be booleans)."""
+    if isinstance(valor, str):
+        return "Sí" if valor.strip().lower() in ("sí", "si", "true") else "No"
+    return "Sí" if valor else "No"
+
+
+@st.dialog("Eliminar oferta")
+def dialog_eliminar_oferta(fp, numero):
+    st.warning(f"Vas a eliminar la **Oferta #{numero}** por completo. Esta acción no se puede deshacer.")
+    col_ok, col_no = st.columns(2)
+    with col_ok:
+        if st.button("Eliminar", type="primary", key=f"confirmar_eliminar_oferta_{fp['id']}"):
+            try:
+                eliminarOferta(fp["id"])
+            except Exception as e:
+                st.error(str(e))
+                return
+            st.toast("Oferta eliminada", icon="✅")
+            st.rerun()
+    with col_no:
+        if st.button("Volver", key=f"volver_eliminar_oferta_{fp['id']}"):
+            st.rerun()
+
+
+def editar_oferta(fp, areas_map):
+    oid = fp["id"]
+    k = f"oferta_{oid}"
+    ciclos = fp.get("ciclos_formativos") or {}
+    puestos = fp.get("puestos") or {}
+
+    # Load the saved requirements into the widgets once
+    if not st.session_state.get(f"{k}_req_cargado"):
+        for key, value in requisitos_a_estado(f"{k}_req", fp.get("requisitos")).items():
+            st.session_state[key] = value
+        st.session_state[f"{k}_req_cargado"] = True
+
+    st.markdown("**Ciclos formativos y puestos**")
+    nuevos_alumnos, nuevos_puestos = {}, {}
+    for ciclo, valores in ciclos.items():
+        total = valores.get("alumnos") or 0
+        ocupadas = max(total - (valores.get("disponibles") or 0), 0)
+        st.markdown(f"🎓 **{ciclo}**")
+        nuevos_alumnos[ciclo] = st.number_input(
+            "Cantidad de alumnos", min_value=max(ocupadas, 1), max_value=50,
+            value=max(total, ocupadas, 1), step=1, key=f"{k}_alumnos_{slug(ciclo)}",
+            help=f"Ya hay {ocupadas} alumno(s) asignado(s): no puede ser menor." if ocupadas else None,
+        )
+        actuales = {p.get("area"): p.get("proyecto", "") for p in (puestos.get(ciclo) or []) if p.get("area")}
+        opciones = list(dict.fromkeys(list(areas_map.get(ciclo, [])) + list(actuales)))
+        areas = st.multiselect(
+            "Puestos / áreas", opciones, default=list(actuales),
+            key=f"{k}_areas_{slug(ciclo)}", placeholder="Selecciona áreas",
+        )
+        nuevos_puestos[ciclo] = [
+            {"area": area, "proyecto": st.text_input(
+                f"Proyecto relacionado ({area})", value=actuales.get(area, ""),
+                key=f"{k}_proy_{slug(ciclo)}_{slug(area)}",
+            ).strip()}
+            for area in areas
+        ]
+
+    st.markdown("**Dirección del centro de trabajo**")
+    direccion = st.text_input("Dirección", value=fp.get("direccion_empresa") or "", key=f"{k}_dir")
+    col_cp, col_loc = st.columns(2)
+    with col_cp:
+        cp = st.text_input("Código Postal", value=fp.get("cp_empresa") or "", key=f"{k}_cp")
+    with col_loc:
+        localidad = st.text_input("Localidad", value=fp.get("localidad_empresa") or "", key=f"{k}_loc")
+
+    st.markdown("**Requisitos adicionales**")
+    requisitos = render_requisitos(
+        f"{k}_req", idiomas_label="Idiomas", skills_label="Skills",
+        otros_label="Otros requisitos (por ejemplo, residencia)",
+    )
+
+    st.markdown("**Información adicional**")
+    contrato = st.radio(
+        "Si el alumno cubre vuestras expectativas, ¿habría posibilidad de hacerle un contrato laboral?",
+        ["Sí", "No"], index=["Sí", "No"].index(_si_no(fp.get("contrato"))),
+        horizontal=True, key=f"{k}_contrato",
+    )
+    vehiculo = st.radio(
+        "¿Se necesita vehículo propio para acceder a vuestras instalaciones?",
+        ["Sí", "No"], index=["Sí", "No"].index(_si_no(fp.get("vehiculo"))),
+        horizontal=True, key=f"{k}_vehiculo",
+    )
+
+    sin_area = [c for c, lista in nuevos_puestos.items() if not lista]
+    if sin_area:
+        st.markdown(
+            f"<span style='color:red;'>Selecciona al menos un área en: {', '.join(sin_area)}</span>",
+            unsafe_allow_html=True,
+        )
+    if st.button("💾 Guardar cambios", type="primary", key=f"{k}_guardar", disabled=bool(sin_area)):
+        try:
+            actualizarOfertaEmpresa(oid, nuevos_alumnos, {
+                "puestos": nuevos_puestos,
+                "direccion_empresa": direccion.strip(),
+                "cp_empresa": cp.strip(),
+                "localidad_empresa": localidad.strip(),
+                "requisitos": requisitos,
+                "contrato": contrato,
+                "vehiculo": vehiculo,
+            })
+        except Exception as e:
+            st.error(str(e))
+            return
+        st.session_state[f"{k}_cerrar_edicion"] = True
+        st.session_state.pop(f"{k}_req_cargado", None)
+        st.toast("Oferta actualizada", icon="✅")
+        st.rerun()
+
 
 # -- aca el "email" es el CIF de la empresa
 cif = st.session_state.get("username", "000000")
@@ -114,6 +229,7 @@ with tabEmpresa:
 
     
 with tabOferta:
+        _, AREAS_MAP = getCiclosYAreas()
  # --- Mostrar FP asociadas ---
         anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
 
@@ -170,10 +286,26 @@ with tabOferta:
                     if requisitos:
                         st.markdown(f"**Requisitos:** {requisitos}")
 
-                    contrato = fp.get("contrato")
-                    vehiculo = fp.get("vehiculo")
-                    st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
-                    st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
+                    st.write(f"**Contrato:** {_si_no(fp.get('contrato'))}")
+                    st.write(f"**Vehículo:** {_si_no(fp.get('vehiculo'))}")
+
+                    st.divider()
+                    puede_eliminar = ofertaSinAsignaciones(fp)
+                    col_edit, col_del = st.columns([3, 1])
+                    with col_edit:
+                        # Close the editor after a save (the toggle can only be reset before it's drawn)
+                        if st.session_state.pop(f"oferta_{fp['id']}_cerrar_edicion", False):
+                            st.session_state[f"oferta_{fp['id']}_editar"] = False
+                        editando = st.toggle("✏️ Editar oferta", key=f"oferta_{fp['id']}_editar")
+                    with col_del:
+                        if st.button(
+                            "🗑️ Eliminar oferta", key=f"eliminar_oferta_{fp['id']}",
+                            disabled=not puede_eliminar,
+                            help=None if puede_eliminar else "No se puede eliminar: ya hay alumnos asignados a esta oferta.",
+                        ):
+                            dialog_eliminar_oferta(fp, i)
+                    if editando:
+                        editar_oferta(fp, AREAS_MAP)
 
                     if estado_actual in estados:
                         default_index = estados.index(estado_actual)

@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from modules.data_base import (
-    generarFormularioCierre,finalizarPractica,getEquals,logError,update, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,crearPractica,getFormsLinks,getCiclosYAreas
+    generarFormularioCierre,finalizarPractica,getEquals,logError,update, getPracticas, upsert,asignarFechasFormsFeedback,get, upsertCustome, cancelarPractica,anularPractica,crearPractica,getFormsLinks,getCiclosYAreas
 )
 from page_utils import apply_page_config
 from navigation import make_sidebar
@@ -386,6 +386,29 @@ def dialog_cancelacion(practica):
         st.toast("✅  La Formación ha pasado a estado CANCELADA")
         st.session_state.page = "lista"
         st.rerun()
+
+@st.dialog("Anular Formación")
+def dialog_anular(practica):
+    st.warning(
+        "Vas a **anular** la formación: se eliminará de la base de datos, el alumno volverá a "
+        "estar disponible y se devolverá la plaza a la oferta. "
+    )
+    col_ok, col_no = st.columns(2)
+    with col_ok:
+        if st.button("Confirmar", type="primary", key=f"confirmar_anular_{practica.get('id')}"):
+            try:
+                anularPractica(practica)
+            except Exception as e:
+                st.error(f"Error anulando la formación: {e}")
+                return
+            invalidate_runtime_caches()
+            st.toast("✅ La Formación ha sido anulada")
+            st.session_state.page = "lista"
+            st.session_state.practica_seleccionada = None
+            st.rerun()
+    with col_no:
+        if st.button("Volver", key=f"volver_anular_{practica.get('id')}"):
+            st.rerun()
 
 @st.dialog("Finalizar de Formación")
 def dialog_finalizar(practica):
@@ -1083,7 +1106,7 @@ def seccion_gestion(p):
             st.write(f"**Fecha de inicio:** {fecha_inicio_texto}")
         with col2:
             st.write(f"**Fecha de fin Real:** {fecha_fin_texto}")
-        colForm , col, colCancel = st.columns([3,0.5, 1])
+        colForm , col, colCancel, colAnular = st.columns([3,0.5, 1, 1])
         with colForm:
             if st.button("Finalizar Formación", key=f"finalizar_{p['id']}", type="primary", disabled=st.session_state["edit_disabled"]):
                 dialog_finalizar(p)       
@@ -1091,6 +1114,10 @@ def seccion_gestion(p):
         with colCancel:
             if st.button("Cancelar Formación", key=f"cancelar_{p['id']}", type="secondary", disabled= st.session_state["edit_disabled"]):
                 dialog_cancelacion(p)       
+
+        with colAnular:
+            if st.button("Anular Formación", key=f"anular_{p['id']}", type="secondary", disabled=st.session_state["edit_disabled"]):
+                dialog_anular(p)
                 
 def feedback_formaciones(practica):
     practicaId=practica.get('id')

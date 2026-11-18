@@ -107,6 +107,27 @@ opciones_motivo = [
         "Otros"
     ]
 
+# Requisitos / skills (formEmpresa y formAlumno). Sin comas: se guardan separados por coma.
+idiomasRequisitos = [
+    "Inglés", "Valenciano", "Castellano", "Francés", "Alemán",
+    "Italiano", "Portugués", "Chino", "Árabe",
+]
+nivelesIdioma = ["A1", "A2", "B1", "B2", "C1", "C2", "Nativo"]
+skillsRequisitos = [
+    "Trabajo en equipo",
+    "Proactividad",
+    "Creatividad",
+    "Responsabilidad",
+    "Resolución de problemas",
+    "Resistencia a la adversidad",
+    "Iniciativa y autonomía",
+    "Comunicación oral y escrita",
+    "Coordinación con otras áreas (ventas/administración/marketing/producción)",
+    "Conocimiento de tendencias actuales",
+    "Manejo básico del paquete Office",
+    "Carnet de conducir"
+]
+
 tipoPracticas= [
                     "Autogestionada",
                     "Asignada por el Centro"
