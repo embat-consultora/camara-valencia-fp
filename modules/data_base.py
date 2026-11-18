@@ -1168,6 +1168,72 @@ def anularPractica(practica):
     )
 
 
+def _oferta_actual(oferta_id):
+    res = supabase.table(necesidadFP).select("*").eq("id", oferta_id).execute()
+    if not res.data:
+        raise ValueError("La oferta ya no existe.")
+    return res.data[0]
+
+
+def ofertaSinAsignaciones(oferta):
+    """True when no place has been taken: alumnos == disponibles for every cycle."""
+    ciclos = oferta.get("ciclos_formativos") or {}
+    return all((c.get("alumnos") or 0) == (c.get("disponibles") or 0) for c in ciclos.values())
+
+
+def eliminarOferta(oferta_id):
+    """Deletes an offer only if nobody has taken a place and no practice points to it."""
+    oferta = _oferta_actual(oferta_id)
+    if not ofertaSinAsignaciones(oferta):
+        raise ValueError("No se puede eliminar: ya hay alumnos asignados a esta oferta.")
+    if getEquals(practicaTabla, {"oferta": oferta_id}):
+        raise ValueError("No se puede eliminar: hay formaciones vinculadas a esta oferta.")
+    delete(necesidadFP, "id", oferta_id)
+
+
+def actualizarOfertaEmpresa(oferta_id, alumnos_por_ciclo, campos):
+    """Updates an offer from the company page.
+    alumnos_por_ciclo: {ciclo: new total}. disponibles keeps the places already taken
+    (alumnos - disponibles), so the new total can't go below them.
+    campos: other columns (puestos, requisitos, contrato, vehiculo, dirección...)."""
+    oferta = _oferta_actual(oferta_id)
+    ciclos = oferta.get("ciclos_formativos") or {}
+    for ciclo, nuevo_total in alumnos_por_ciclo.items():
+        if ciclo not in ciclos:
+            continue
+        total = ciclos[ciclo].get("alumnos") or 0
+        ocupadas = max(total - (ciclos[ciclo].get("disponibles") or 0), 0)
+        if nuevo_total < ocupadas:
+            raise ValueError(
+                f"{ciclo}: ya hay {ocupadas} alumno(s) asignado(s); la cantidad no puede ser menor."
+            )
+        ciclos[ciclo]["alumnos"] = int(nuevo_total)
+        ciclos[ciclo]["disponibles"] = int(nuevo_total) - ocupadas
+
+    payload = dict(campos)
+    payload["ciclos_formativos"] = ciclos
+    payload["cupo_alumnos"] = sum((c.get("alumnos") or 0) for c in ciclos.values())
+    update(necesidadFP, payload, {"id": oferta_id})
+
+
+def crearOfertaEmpresa(cif, alumnos_por_ciclo, campos):
+    """Creates a new offer from the company page. Every cycle starts with
+    disponibles == alumnos (no places taken yet)."""
+    if not alumnos_por_ciclo:
+        raise ValueError("Selecciona al menos un ciclo formativo.")
+    ciclos = {c: {"alumnos": int(n), "disponibles": int(n)} for c, n in alumnos_por_ciclo.items()}
+    payload = dict(campos) | {
+        "empresa": cif,
+        "ciclos_formativos": ciclos,
+        "cupo_alumnos": sum(v["alumnos"] for v in ciclos.values()),
+        "estado": estados[4],  # same initial state the company form uses
+    }
+    res = add(necesidadFP, payload)
+    if not res or not res.data:
+        raise RuntimeError("La base de datos no devolvió la oferta guardada.")
+    return res.data[0]
+
+
 def crearPractica(empresaCif,alumnoDni, ciclo, area, proyecto, fecha,ciclos_info,cupos_disp,oferta_id, status:None, anio=None, curso=None):
     registro_existente = getEquals(practicaTabla, {"alumno": alumnoDni, "empresa":empresaCif})
     payload_practica = {
