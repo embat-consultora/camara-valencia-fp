@@ -5,6 +5,7 @@ from modules.data_base import get, getEquals, update, upsert,upsertCustome
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
+from modules.forms_helper import leer_csv
 from variables import empresasTabla, necesidadFP, estados, aniosList,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email,send_welcome_email
@@ -356,7 +357,7 @@ with tab2:
         if uploaded_csv:
             try:
                 # Leer TODO como string siempre → adiós floats y NaNs
-                df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
+                df_csv = leer_csv(uploaded_csv, sample_df.columns)
 
                 st.write("📄 **Vista previa del archivo cargado:**")
                 st.dataframe(df_csv.head(),width='stretch')
