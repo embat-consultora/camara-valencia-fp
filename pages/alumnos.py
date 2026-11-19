@@ -12,6 +12,28 @@ from modules.drive_helper import list_drive_files,upload_to_drive,folderNombreAl
 from modules.forms_helper import  file_size_bytes
 import re
 import random
+import io
+
+
+def leer_csv_alumnos(archivo, columnas_esperadas):
+    """Lee el CSV aceptando , ; o tabulador como separador y UTF-8, UTF-8 con BOM o Windows-1252 (Excel)."""
+    contenido = archivo.getvalue()
+    try:
+        texto = contenido.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        texto = contenido.decode("cp1252")
+
+    cabecera = texto.splitlines()[0] if texto else ""
+    separador = max([",", ";", "\t"], key=cabecera.count)
+    if cabecera.count(separador) == 0:
+        separador = ","
+
+    df = pd.read_csv(io.StringIO(texto), dtype=str, sep=separador).fillna("")
+
+    # Nombres de columna sin espacios y sin importar mayúsculas (Dni, DNI, nia → dni, NIA)
+    canonicas = {c.lower(): c for c in columnas_esperadas}
+    df.columns = [canonicas.get(str(c).strip().lower(), str(c).strip()) for c in df.columns]
+    return df
 apply_page_config()
 make_sidebar()
 
@@ -442,7 +464,7 @@ with tab2:
         if uploaded_csv:
             try:
                 # Leer TODO como string siempre → adiós floats y NaNs
-                df_csv = pd.read_csv(uploaded_csv, dtype=str, encoding="utf-8").fillna("")
+                df_csv = leer_csv_alumnos(uploaded_csv, sample_df.columns)
 
                 st.write("📄 **Vista previa del archivo cargado:**")
                 st.dataframe(df_csv.head(), width='stretch')
