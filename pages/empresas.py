@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-from modules.data_base import get, getEquals, update, upsert,upsertCustome
+from modules.data_base import get, getEquals, update, upsert,upsertCustome, getCiclosYAreas
+from modules.oferta_form import nueva_oferta, nueva_oferta_abierta, abrir_nueva_oferta, acciones_oferta, _si_no
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
@@ -155,7 +156,17 @@ with tab1:
         with tabOfertas:
             anioFiltro = aniosList[st.session_state.get("index_academic", 0)]
             fps = getEquals(necesidadFP, {"empresa": empresa["CIF"], "anio": anioFiltro})
+            ciclos_lista, areas_map = getCiclosYAreas()
             st.subheader(f"Formaciones Presentadas - {empresa['nombre']} - Curso Académico: {anioFiltro}")
+
+            if not nueva_oferta_abierta(empresa["CIF"]):
+                if st.button("➕ Agregar oferta", type="primary", key=f"btn_agregar_oferta_{empresa_id}"):
+                    abrir_nueva_oferta(empresa["CIF"])
+                    st.rerun()
+            else:
+                tutores_empresa = getEquals(tutoresTabla, {"cif_empresa": empresa["CIF"]})
+                nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa or [], anioFiltro)
+
             if fps:
                 for i, fp in enumerate(fps, start=1):
                     estado_actual = fp.get("estado") or estados[4]
@@ -198,10 +209,11 @@ with tab1:
                         if requisitos:
                             st.markdown(f"**Requisitos:** {requisitos}")
 
-                        contrato = fp.get("contrato")
-                        vehiculo = fp.get("vehiculo")
-                        st.write(f"**Contrato:** {'Sí' if contrato else 'No'}")
-                        st.write(f"**Vehículo:** {'Sí' if vehiculo else 'No'}")
+                        st.write(f"**Contrato:** {_si_no(fp.get('contrato'))}")
+                        st.write(f"**Vehículo:** {_si_no(fp.get('vehiculo'))}")
+
+                        st.divider()
+                        acciones_oferta(fp, i, areas_map)
 
 
             else:
