@@ -181,7 +181,9 @@ with tabOferta:
                     st.write(f"**Vehículo:** {_si_no(fp.get('vehiculo'))}")
 
                     st.divider()
-                    acciones_oferta(fp, i, AREAS_MAP)
+                    if st.session_state.tutores is None:
+                        st.session_state.tutores = getEquals(tutoresTabla, {"cif_empresa": cif})
+                    acciones_oferta(fp, i, AREAS_MAP, st.session_state.tutores or [])
 
         else:
            st.info('No hay necesidades FP registradas para esta empresa o para el filtro seleccionado')     

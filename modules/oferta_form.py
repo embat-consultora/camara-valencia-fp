@@ -22,6 +22,20 @@ def cerrar_nueva_oferta(cif):
         del st.session_state[key]
 
 
+def _selector_tutor(key, tutores, actual=None):
+    """Tutor selectbox. With no tutors it asks to add them first in the Tutores tab."""
+    if not tutores:
+        st.caption("No hay tutores cargados. Cárgalos antes en la pestaña «Tutores».")
+        return None
+    opciones = {t["id"]: f"{t.get('nombre', '')} ({t.get('email', '')})" for t in tutores}
+    ids = list(opciones)
+    return st.selectbox(
+        "Tutor de empresa", ids, format_func=opciones.get,
+        index=ids.index(actual) if actual in ids else None,
+        placeholder="Selecciona un tutor", key=key,
+    )
+
+
 def nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa, anio_actual):
     """Form that creates a training offer for `empresa` from scratch."""
     cif = empresa["CIF"]
@@ -35,15 +49,7 @@ def nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa, anio_actual)
             index=anios.index(anio_actual) if anio_actual in anios else 0, key=f"{k}_anio",
         )
 
-        tutor_id = None
-        if tutores_empresa:
-            opciones_tutor = {t["id"]: f"{t.get('nombre', '')} ({t.get('email', '')})" for t in tutores_empresa}
-            tutor_id = st.selectbox(
-                "Tutor de empresa", list(opciones_tutor), format_func=opciones_tutor.get,
-                index=None, placeholder="Selecciona un tutor", key=f"{k}_tutor",
-            )
-        else:
-            st.caption("No tienes tutores cargados, dirigete a la pestaña de Tutores para cargarlos.")
+        tutor_id = _selector_tutor(f"{k}_tutor", tutores_empresa)
 
         st.markdown("**Ciclos formativos y puestos**")
         ciclos_sel = st.multiselect(
@@ -158,7 +164,7 @@ def dialog_eliminar_oferta(fp, numero):
             st.rerun()
 
 
-def editar_oferta(fp, areas_map):
+def editar_oferta(fp, areas_map, tutores=None):
     oid = fp["id"]
     k = f"oferta_{oid}"
     ciclos = fp.get("ciclos_formativos") or {}
@@ -197,6 +203,9 @@ def editar_oferta(fp, areas_map):
             ).strip()}
             for area in areas
         ]
+
+    st.markdown("**Tutor**")
+    tutor_id = _selector_tutor(f"{k}_tutor", tutores or [], actual=fp.get("tutor"))
 
     st.markdown("**Dirección del centro de trabajo**")
     direccion = st.text_input("Dirección", value=fp.get("direccion_empresa") or "", key=f"{k}_dir")
@@ -240,6 +249,8 @@ def editar_oferta(fp, areas_map):
                 "requisitos": requisitos,
                 "contrato": contrato,
                 "vehiculo": vehiculo,
+                # without a tutor list keep the saved tutor instead of clearing it
+                **({"tutor": tutor_id} if tutores else {}),
             })
         except Exception as e:
             st.error(str(e))
@@ -250,7 +261,7 @@ def editar_oferta(fp, areas_map):
         st.rerun()
 
 
-def acciones_oferta(fp, numero, areas_map):
+def acciones_oferta(fp, numero, areas_map, tutores=None):
     """Edit toggle + delete button for one offer. Delete is only enabled while no
     students are assigned (alumnos == disponibles in every cycle)."""
     puede_eliminar = ofertaSinAsignaciones(fp)
@@ -268,4 +279,4 @@ def acciones_oferta(fp, numero, areas_map):
         ):
             dialog_eliminar_oferta(fp, numero)
     if editando:
-        editar_oferta(fp, areas_map)
+        editar_oferta(fp, areas_map, tutores)

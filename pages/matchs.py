@@ -108,7 +108,14 @@ for oferta_data in ofertas:
     empresa = oferta_data.get("empresas")
     nombre_empresa = oferta_data.get("nombre", "Empresa sin nombre")
     oferta_id = oferta_data.get("id")
-    tutores=getEquals(tutoresTabla,{"id":oferta_data.get("tutor")})
+    
+    tutor_id = oferta_data.get("tutor")
+    tutores = []
+    if tutor_id not in (None, ""):
+        try:
+            tutores = getEquals(tutoresTabla, {"id": tutor_id}) or []
+        except Exception:
+            tutores = []  # invalid tutor id: show "Ninguno asignado" instead of breaking the page
 
     # Cargar ciclos formativos
     ciclos_info = oferta_data.get("ciclos_formativos", {})
