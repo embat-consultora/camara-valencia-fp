@@ -239,23 +239,26 @@ with tab1:
             else:
                 df_tutores = pd.DataFrame(columns=["id", "created_at", "nombre", "email", "nif", "cif_empresa", "telefono"])
             key_editor = f"editor_tutores_{empresa_id}"
-            st.data_editor(
-                df_tutores,
-                column_config={
-                    "id": None,
-                    "created_at": None,
-                    "nombre": "Nombre",
-                    "email": "Email",
-                    "telefono": "Teléfono",
-                    "oferta": None,
-                    "nif": "NIF",
-                    "cif_empresa": None,
-                },
-                num_rows="dynamic",
-                key=key_editor,
-                width='stretch',
-            )
-            if st.button("Actualizar Tutores", key=f"btn_actualizar_tutores_{empresa_id}"):
+            # Inside a form: edits don't rerun the page until "Actualizar Tutores" is pressed
+            with st.form(f"form_tutores_{empresa_id}", border=False):
+                st.data_editor(
+                    df_tutores,
+                    column_config={
+                        "id": None,
+                        "created_at": None,
+                        "nombre": "Nombre",
+                        "email": "Email",
+                        "telefono": "Teléfono",
+                        "oferta": None,
+                        "nif": "NIF",
+                        "cif_empresa": None,
+                    },
+                    num_rows="dynamic",
+                    key=key_editor,
+                    width='stretch',
+                )
+                guardar_tutores = st.form_submit_button("Actualizar Tutores")
+            if guardar_tutores:
                 cambios = st.session_state[key_editor]
                 if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
                     for row in cambios["added_rows"]:
