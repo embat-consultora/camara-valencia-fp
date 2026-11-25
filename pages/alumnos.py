@@ -495,6 +495,7 @@ with tab2:
                                 "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip(),
                                 "ciclo_formativo": re.sub(r"['\"]", "", row.get("ciclo", "")).strip(),
                                 "horas_totales": horas_float,
+                                "estado": "Sin Empresa"
                             }
 
                             # 4️⃣ Insert/update
