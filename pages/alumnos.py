@@ -136,7 +136,15 @@ with tab1:
                     new_dni = st.text_input("DNI", alumno.get("dni", ""))
                     new_nia = st.text_input("NIA", alumno.get("NIA", ""))
                     new_nuss = st.text_input("NUSS", alumno.get("nuss", ""))
-                  
+                    # Same options as the student form (formAlumno)
+                    sexo_opts = ["Prefiero No especificar", "Femenino", "Masculino"]
+                    sexo_actual = (alumno.get("sexo") or "").strip()
+                    new_sexo = st.selectbox(
+                        "Sexo", options=sexo_opts,
+                        index=sexo_opts.index(sexo_actual) if sexo_actual in sexo_opts else None,
+                        placeholder="Sin especificar", key=f"sexo_edit_{alumno_id}",
+                    )
+
                 with col2:
                     new_telefono = st.text_input("Teléfono", alumno.get("telefono", ""))
                     new_email = st.text_input("Email", alumno.get("email_alumno", ""))
@@ -221,6 +229,8 @@ with tab1:
                                 "requisitos": requisitos,
                                 "horas_totales": horas_totales
                             }
+                        if new_sexo is not None:
+                            data_alumnos["sexo"] = new_sexo
                         res_al = update(
                             alumnosTabla,
                             data_alumnos,
@@ -315,6 +325,8 @@ with tab2:
         with st.form(key=f"nuevo_alumno_form_{st.session_state.form_registro_key}"):
             new_nombre = st.text_input("Nombre")
             new_apellido = st.text_input("Apellido")
+            # Same options and default as the student form (formAlumno)
+            new_sexo = st.selectbox("Sexo", ["Prefiero No especificar", "Femenino", "Masculino"])
             new_direccion = st.text_input("Dirección")
             new_codigoPostal = st.text_input("CP")
             new_localidad = st.selectbox("Localidad *", (localidades))
@@ -364,6 +376,7 @@ with tab2:
                         {
                             "nombre": new_nombre,
                             "apellido": new_apellido,
+                            "sexo": new_sexo,
                             "direccion": new_direccion,
                             "localidad": new_localidad,
                             "dni": new_dni,
@@ -406,6 +419,7 @@ with tab2:
         sample_df = pd.DataFrame({
             "nombre": [""],
             "apellido": [""],
+            "sexo": ["Femenino | Masculino | Prefiero No especificar"],
             "direccion": [""],
             "codigo_postal": [""],
             "localidad": [""],
@@ -495,7 +509,8 @@ with tab2:
                                 "curso": re.sub(r"['\"]", "", row.get("curso", "")).strip(),
                                 "ciclo_formativo": re.sub(r"['\"]", "", row.get("ciclo", "")).strip(),
                                 "horas_totales": horas_float,
-                                "estado": "Sin Empresa"
+                                "estado": "Sin Empresa",
+                                "sexo": row.get("sexo", "").strip()
                             }
 
                             # 4️⃣ Insert/update
