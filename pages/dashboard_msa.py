@@ -278,6 +278,33 @@ def ofertas_activas_por_ciclo(df_ofertas, df_empresas):
     return pd.DataFrame(ofertas_ciclos)
 
 
+def ofertas_por_ciclo_del_curso(df_ofertas, anio):
+    """One row per offer and cycle for the academic year (all offers, full or not)."""
+    columnas = ["id", "empresa", "ciclo_formativo", "plazas", "disponibles"]
+    if df_ofertas.empty:
+        return pd.DataFrame(columns=columnas)
+    filas = []
+    for oferta in df_ofertas.to_dict("records"):
+        if anio and anio != aniosList[0] and str(oferta.get("anio") or "").strip() != str(anio).strip():
+            continue
+        ciclos_oferta = oferta.get("ciclos_formativos")
+        if not isinstance(ciclos_oferta, dict):
+            continue
+        for ciclo, datos_ciclo in ciclos_oferta.items():
+            if not isinstance(datos_ciclo, dict):
+                continue
+            filas.append({
+                "id": oferta.get("id"),
+                "empresa": oferta.get("empresa"),
+                "ciclo_formativo": ciclo,
+                "plazas": pd.to_numeric(datos_ciclo.get("alumnos"), errors="coerce"),
+                "disponibles": pd.to_numeric(datos_ciclo.get("disponibles"), errors="coerce"),
+            })
+    df = pd.DataFrame(filas, columns=columnas)
+    df[["plazas", "disponibles"]] = df[["plazas", "disponibles"]].fillna(0)
+    return df
+
+
 def es_verdadero(valor):
     if isinstance(valor, bool):
         return valor
@@ -548,8 +575,8 @@ card(kpi_3, "🤝", "Formaciones Iniciadas", len(df_practicas_dashboard), "#0033
 card(kpi_4, "🚗", "Tasa de movilidad", f"{tasa_movilidad:.1f}%", "#5B8C5A")
 
 st.divider()
-tab_alumnos, tab_ofertas, tab_feedback = st.tabs(
-    ["🎓 Alumnos", "🏢 Ofertas", "📩 Formaciones"]
+tab_alumnos, tab_empresas, tab_ofertas, tab_feedback = st.tabs(
+    ["🎓 Alumnos", "🏢 Empresas", "📄 Ofertas", "📩 Formaciones"]
 )
 
 with tab_alumnos:
@@ -647,6 +674,62 @@ with tab_alumnos:
                     ),
                     use_container_width=True,
                 )
+
+with tab_empresas:
+    texto_curso = "de todos los cursos" if anio_filtro == aniosList[0] else f"del curso {anio_filtro}"
+    st.subheader("Empresas")
+    st.caption(f"Ofertas {texto_curso}, estén completas o con plazas disponibles.")
+
+    df_ofertas_curso = ofertas_por_ciclo_del_curso(df_ofertas_raw, anio_filtro)
+    empresas_totales = (
+        df_empresas_raw["CIF"].dropna().astype(str).nunique()
+        if "CIF" in df_empresas_raw.columns else len(df_empresas_raw)
+    )
+    empresas_con_ofertas_curso = df_ofertas_curso["empresa"].dropna().astype(str).nunique()
+    ofertas_curso = df_ofertas_curso["id"].nunique()
+
+    emp_1, emp_2, emp_3 = st.columns(3)
+    card(emp_1, "🏢", "Empresas totales", empresas_totales, AZUL_CAMARA)
+    card(emp_2, "📌", "Empresas con ofertas en el curso", empresas_con_ofertas_curso, CIAN_CAMARA)
+    card(emp_3, "📄", "Ofertas del curso", ofertas_curso, "#003366")
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    if df_ofertas_curso.empty:
+        st.info(f"No hay ofertas {texto_curso}.")
+    else:
+        resumen_ciclo = (
+            df_ofertas_curso.groupby("ciclo_formativo")
+            .agg(
+                Empresas=("empresa", "nunique"),
+                Ofertas=("id", "nunique"),
+                Plazas=("plazas", "sum"),
+                Disponibles=("disponibles", "sum"),
+            )
+            .reset_index()
+            .rename(columns={"ciclo_formativo": "Ciclo formativo"})
+            .sort_values(["Empresas", "Ofertas"], ascending=False)
+        )
+        resumen_ciclo[["Plazas", "Disponibles"]] = resumen_ciclo[["Plazas", "Disponibles"]].astype(int)
+
+        grafico_ciclo, tabla_ciclo = st.columns([3, 2])
+        with grafico_ciclo:
+            st.plotly_chart(
+                px.bar(
+                    resumen_ciclo.sort_values("Empresas"),
+                    x="Empresas",
+                    y="Ciclo formativo",
+                    orientation="h",
+                    text_auto=True,
+                    title="Empresas con ofertas por ciclo formativo",
+                    color_discrete_sequence=[AZUL_CAMARA],
+                    labels={"Empresas": "Cantidad de empresas"},
+                    hover_data=["Ofertas", "Plazas", "Disponibles"],
+                ),
+                width="stretch",
+            )
+        with tabla_ciclo:
+            st.markdown("**Empresas y ofertas por ciclo**")
+            st.dataframe(resumen_ciclo, hide_index=True, width="stretch")
 
 with tab_ofertas:
     st.subheader("Ofertas disponibles por ciclo")
