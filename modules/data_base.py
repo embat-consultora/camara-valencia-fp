@@ -1175,10 +1175,38 @@ def _oferta_actual(oferta_id):
     return res.data[0]
 
 
-def ofertaSinAsignaciones(oferta):
-    """True when no place has been taken: alumnos == disponibles for every cycle."""
+def _practicas_activas_por_ciclo(oferta_id):
+    """{ciclo: number of practices (drafts included) linked to the offer that aren't cancelled}.
+    Drafts link a student to the offer without lowering disponibles, so the counter alone
+    can miss them."""
+    rows = supabase.table(practicaTabla).select("ciclo_formativo, status").eq("oferta", oferta_id).execute().data or []
+    activas = {}
+    for r in rows:
+        if r.get("status") == estados[3]:  # Cancelada: the place was returned
+            continue
+        ciclo = r.get("ciclo_formativo")
+        activas[ciclo] = activas.get(ciclo, 0) + 1
+    return activas
+
+
+def minimoAlumnosPorCiclo(oferta):
+    """{ciclo: lowest allowed student count}: the places already taken according to the
+    offer (alumnos - disponibles) or the students enrolled through practices, whichever is higher."""
+    activas = _practicas_activas_por_ciclo(oferta["id"])
     ciclos = oferta.get("ciclos_formativos") or {}
-    return all((c.get("alumnos") or 0) == (c.get("disponibles") or 0) for c in ciclos.values())
+    return {
+        ciclo: max((v.get("alumnos") or 0) - (v.get("disponibles") or 0), activas.get(ciclo, 0), 0)
+        for ciclo, v in ciclos.items()
+    }
+
+
+def ofertaSinAsignaciones(oferta):
+    """True when no place has been taken (alumnos == disponibles for every cycle)
+    and no practice is linked to the offer."""
+    ciclos = oferta.get("ciclos_formativos") or {}
+    if not all((c.get("alumnos") or 0) == (c.get("disponibles") or 0) for c in ciclos.values()):
+        return False
+    return not getEquals(practicaTabla, {"oferta": oferta["id"]})
 
 
 def eliminarOferta(oferta_id):
@@ -1198,14 +1226,15 @@ def actualizarOfertaEmpresa(oferta_id, alumnos_por_ciclo, campos):
     campos: other columns (puestos, requisitos, contrato, vehiculo, dirección...)."""
     oferta = _oferta_actual(oferta_id)
     ciclos = oferta.get("ciclos_formativos") or {}
+    minimos = minimoAlumnosPorCiclo(oferta)
     for ciclo, nuevo_total in alumnos_por_ciclo.items():
         if ciclo not in ciclos:
             continue
         total = ciclos[ciclo].get("alumnos") or 0
         ocupadas = max(total - (ciclos[ciclo].get("disponibles") or 0), 0)
-        if nuevo_total < ocupadas:
+        if nuevo_total < minimos.get(ciclo, ocupadas):
             raise ValueError(
-                f"{ciclo}: ya hay {ocupadas} alumno(s) asignado(s); la cantidad no puede ser menor."
+                f"{ciclo}: ya hay {minimos[ciclo]} alumno(s) inscripto(s); la cantidad no puede ser menor."
             )
         ciclos[ciclo]["alumnos"] = int(nuevo_total)
         ciclos[ciclo]["disponibles"] = int(nuevo_total) - ocupadas
@@ -1217,7 +1246,7 @@ def actualizarOfertaEmpresa(oferta_id, alumnos_por_ciclo, campos):
 
 
 def crearOfertaEmpresa(cif, alumnos_por_ciclo, campos):
-    """Creates a new offer from the company page. Every cycle starts with
+    """Creates a new offer for a company. Every cycle starts with
     disponibles == alumnos (no places taken yet)."""
     if not alumnos_por_ciclo:
         raise ValueError("Selecciona al menos un ciclo formativo.")
