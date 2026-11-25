@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from modules.data_base import get, getEquals, update, upsert,upsertCustome, getCiclosYAreas
+from modules.data_base import get, getEquals, update, upsert,upsertCustome, getCiclosYAreas, updateTutores
 from modules.oferta_form import nueva_oferta, nueva_oferta_abierta, abrir_nueva_oferta, acciones_oferta, _si_no
 from page_utils import apply_page_config
 from pathlib import Path
@@ -111,7 +111,8 @@ with tab1:
             selected_name = st.selectbox("Seleccionar empresa", list(empresa_options.keys()))
         empresa_id = empresa_options[selected_name]
         empresa = df_empresas[df_empresas["id"] == empresa_id].iloc[0].to_dict()
-        tabEditar, tabOfertas = st.tabs(["✏️ Editar Empresa", "📄 Formaciones Presentadas"])
+        tabEditar, tabOfertas, tabTutoresEmp = st.tabs(["✏️ Editar Empresa", "📄 Formaciones Presentadas", "👤 Tutores"])
+        tutores_empresa = getEquals(tutoresTabla, {"cif_empresa": empresa["CIF"]}) or []
         with tabEditar:
             st.subheader(f"Editar Empresa: {empresa.get('nombre', '')}")
             new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
@@ -164,8 +165,7 @@ with tab1:
                     abrir_nueva_oferta(empresa["CIF"])
                     st.rerun()
             else:
-                tutores_empresa = getEquals(tutoresTabla, {"cif_empresa": empresa["CIF"]})
-                nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa or [], anioFiltro)
+                nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa, anioFiltro)
 
             if fps:
                 for i, fp in enumerate(fps, start=1):
@@ -213,7 +213,7 @@ with tab1:
                         st.write(f"**Vehículo:** {_si_no(fp.get('vehiculo'))}")
 
                         st.divider()
-                        acciones_oferta(fp, i, areas_map)
+                        acciones_oferta(fp, i, areas_map, tutores_empresa)
 
 
             else:
@@ -229,6 +229,51 @@ with tab1:
                         )
                 
                 st.write(f"Link del formulario:  {st.secrets["urls"]["FORM_EMPRESA"] }?curso_academico={st.session_state['selector_curso_ac_doc']}")
+
+        # --- Tutores de la empresa (same table as the Tutores tab in Mi Empresa) ---
+        with tabTutoresEmp:
+            st.subheader(f"Tutores - {empresa['nombre']}")
+            st.caption('Agrega, modifica o elimina tutores usando la tabla: posiciona el ratón sobre la tabla y podrás ver las opciones. Luego presiona "Actualizar Tutores".')
+            if tutores_empresa:
+                df_tutores = pd.DataFrame(tutores_empresa)
+            else:
+                df_tutores = pd.DataFrame(columns=["id", "created_at", "nombre", "email", "nif", "cif_empresa", "telefono"])
+            key_editor = f"editor_tutores_{empresa_id}"
+            # Inside a form: edits don't rerun the page until "Actualizar Tutores" is pressed
+            with st.form(f"form_tutores_{empresa_id}", border=False):
+                st.data_editor(
+                    df_tutores,
+                    column_config={
+                        "id": None,
+                        "created_at": None,
+                        "nombre": "Nombre",
+                        "email": "Email",
+                        "telefono": "Teléfono",
+                        "oferta": None,
+                        "nif": "NIF",
+                        "cif_empresa": None,
+                    },
+                    num_rows="dynamic",
+                    key=key_editor,
+                    width='stretch',
+                )
+                guardar_tutores = st.form_submit_button("Actualizar Tutores")
+            if guardar_tutores:
+                cambios = st.session_state[key_editor]
+                if cambios["edited_rows"] or cambios["added_rows"] or cambios["deleted_rows"]:
+                    for row in cambios["added_rows"]:
+                        nombre = (row.get("nombre") or "Sin Nombre").strip()
+                        email = (row.get("email") or "").strip()
+                        if not email or "@" not in email:
+                            st.error(f"Email inválido para {nombre}, corrobore que no tiene filas vacías; si las tiene, elimínelas.")
+                            st.stop()
+                    with st.spinner("⏳ Procesando tutores, por favor espera..."):
+                        try:
+                            updateTutores(cambios, df_tutores, cif=empresa["CIF"])
+                            st.toast("Tutores guardados", icon="✅")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
 
 
 # -------------------------------------------------------------------
