@@ -7,6 +7,7 @@ from navigation import make_sidebar
 from variables import alumnosTabla, tutoresTabla, necesidadFP, verdeOk, estados,aniosList
 from datetime import datetime
 from modules.text_helper import st_custom_message
+from modules.distancia import coordenadas, texto_distancia
 from modules.drive_helper import copiar_archivos_alumno_a_practica
 now = datetime.now().isoformat()
 
@@ -104,6 +105,9 @@ df_matches = pd.DataFrame(ranking) if ranking else pd.DataFrame()
 # Iterar sobre cada oferta
 # ---------------------------------
 
+# Student address (postal code / town) by DNI, for the approximate distance
+alumnos_por_dni = {str(a.get("dni")): a for a in (alumnosList or [])}
+
 for oferta_data in ofertas:
     empresa = oferta_data.get("empresas")
     nombre_empresa = oferta_data.get("nombre", "Empresa sin nombre")
@@ -116,6 +120,13 @@ for oferta_data in ofertas:
             tutores = getEquals(tutoresTabla, {"id": tutor_id}) or []
         except Exception:
             tutores = []  # invalid tutor id: show "Ninguno asignado" instead of breaking the page
+
+    # Workplace of the offer (falls back to the company address)
+    empresa_dir = empresa or {}
+    punto_empresa = coordenadas(
+        oferta_data.get("cp_empresa") or empresa_dir.get("codigo_postal"),
+        oferta_data.get("localidad_empresa") or empresa_dir.get("localidad"),
+    )
 
     # Cargar ciclos formativos
     ciclos_info = oferta_data.get("ciclos_formativos", {})
@@ -207,6 +218,13 @@ for oferta_data in ofertas:
                                             return f" _({valor})_"
                                         return ""
 
+                                    datos_alumno = alumnos_por_dni.get(str(row.get('alumno_dni')), {})
+                                    punto_alumno = coordenadas(
+                                        datos_alumno.get("codigo_postal"),
+                                        datos_alumno.get("localidad") or row.get("alumno_localidad"),
+                                    )
+                                    distancia = texto_distancia(punto_alumno, punto_empresa)
+
                                     vehiculo_alumno = row.get('alumno_vehiculo')
                                     if isinstance(vehiculo_alumno, bool):
                                         vehiculo_alumno = "Sí" if vehiculo_alumno else "No"
@@ -216,7 +234,8 @@ for oferta_data in ofertas:
                                         f"- Vehículo: {row['pts_vehiculo']} {'✅' if row['pts_vehiculo'] > 0 else ''}{detalle_match(row['pts_vehiculo'], vehiculo_alumno)}\n"
                                         f"- Localidad: {row['pts_localidad']} {'✅' if row['pts_localidad'] > 0 else ''}{detalle_match(row['pts_localidad'], row.get('alumno_localidad'))}\n"
                                         f"- Preferencias: {row['pts_pref']} {'✅' if row['pts_pref'] > 0 else ''}{detalle_match(row['pts_pref'], row.get('pref_match'))}\n"
-                                        f"- Requisitos: {row['pts_requisitos']} {'✅' if row['pts_requisitos'] > 0 else ''}{detalle_match(row['pts_requisitos'], row.get('requisitos_match'))}"
+                                        f"- Requisitos: {row['pts_requisitos']} {'✅' if row['pts_requisitos'] > 0 else ''}{detalle_match(row['pts_requisitos'], row.get('requisitos_match'))}\n"
+                                        f"- 📍 Distancia aprox.: {distancia}"
 
                                     )
 
