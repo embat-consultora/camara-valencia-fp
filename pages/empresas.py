@@ -353,7 +353,7 @@ with tab2:
             "direccion": [""],
             "codigo_postal": [""],
             "localidad": [""],
-              "provincia": [""],
+            "provincia": [""],
             "email_empresa": [""],
             "telefono": [""],
             "tutor": [""],
