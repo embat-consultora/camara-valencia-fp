@@ -19,6 +19,7 @@ from variables import (
     formsTutorEmpresa,
     necesidadFP,
     practicaTabla,
+    provincia_de_localidad,
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -96,6 +97,7 @@ def load_all_data():
                     "apellido",
                     "localidad",
                     "sexo",
+                    "provincia",
                     "ciclo_formativo",
                     "estado",
                     "vehiculo",
@@ -187,11 +189,30 @@ def filtrar_por_curso(df, anio, curso):
     return resultado
 
 
-def aplicar_filtros(df, ciclos, localidades, estados):
+def con_provincia(df):
+    """Adds/fills `provincia`: the saved one, else the province of the town, else "Sin definir"."""
+    if df is None or df.empty:
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    resultado = df.copy()
+    guardada = (
+        resultado["provincia"].astype("string").str.strip()
+        if "provincia" in resultado.columns else pd.Series(pd.NA, index=resultado.index, dtype="string")
+    )
+    deducida = (
+        resultado["localidad"].map(provincia_de_localidad)
+        if "localidad" in resultado.columns else pd.Series(None, index=resultado.index)
+    )
+    resultado["provincia"] = guardada.mask(guardada.isna() | guardada.eq(""), deducida).fillna("Sin definir")
+    return resultado
+
+
+def aplicar_filtros(df, ciclos, localidades, estados, provincias=None):
     if df is None or df.empty:
         return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
     resultado = df.copy()
+    if provincias and "provincia" in resultado.columns:
+        resultado = resultado[resultado["provincia"].astype(str).isin(map(str, provincias))]
     if ciclos and "ciclo_formativo" in resultado.columns:
         resultado = resultado[
             resultado["ciclo_formativo"].astype(str).isin(map(str, ciclos))
@@ -445,9 +466,9 @@ anio_filtro = st.session_state.get("selector_curso_ac_global", aniosList[0])
 curso_filtro = st.session_state.get("selector_curso_global", cursoList[0])
 
 df_feedback_base = filtrar_por_curso(df_feedback_stats, anio_filtro, curso_filtro)
-df_alumnos_base = filtrar_por_curso(df_alumnos_raw, anio_filtro, curso_filtro)
-df_practicas_base = filtrar_por_curso(df_practicas_raw, anio_filtro, curso_filtro)
-df_master_base = filtrar_por_curso(df_master_raw, anio_filtro, curso_filtro)
+df_alumnos_base = con_provincia(filtrar_por_curso(df_alumnos_raw, anio_filtro, curso_filtro))
+df_practicas_base = con_provincia(filtrar_por_curso(df_practicas_raw, anio_filtro, curso_filtro))
+df_master_base = con_provincia(filtrar_por_curso(df_master_raw, anio_filtro, curso_filtro))
 
 st.markdown(
     f"""
@@ -476,10 +497,10 @@ st.title("Panel Estratégico CÁMARA FP")
 st.caption(f"Curso académico: **{anio_filtro}** · Curso: **{curso_filtro}**")
 
 ciclos = valores_filtro(df_alumnos_base, "ciclo_formativo")
-localidades = valores_filtro(df_alumnos_base, "localidad", limpiar_localidad)
+provincias_filtro = valores_filtro(df_alumnos_base, "provincia")
 estados = valores_filtro(df_alumnos_base, "estado")
 
-filtro_ciclo, filtro_localidad, filtro_estado = st.columns(3)
+filtro_ciclo, filtro_provincia, filtro_localidad, filtro_estado = st.columns(4)
 with filtro_ciclo:
     ciclos_seleccionados = st.multiselect(
         "Ciclo Formativo",
@@ -487,6 +508,23 @@ with filtro_ciclo:
         key="dashboard_ciclo_formativo",
         placeholder="Todos",
     )
+with filtro_provincia:
+    provincias_seleccionadas = st.multiselect(
+        "Provincia",
+        provincias_filtro,
+        key="dashboard_provincia",
+        placeholder="Todas",
+    )
+# Towns of the selected provinces only
+df_para_localidades = (
+    df_alumnos_base[df_alumnos_base["provincia"].isin(provincias_seleccionadas)]
+    if provincias_seleccionadas and "provincia" in df_alumnos_base.columns else df_alumnos_base
+)
+localidades = valores_filtro(df_para_localidades, "localidad", limpiar_localidad)
+if "dashboard_localidad" in st.session_state:
+    st.session_state["dashboard_localidad"] = [
+        l for l in st.session_state["dashboard_localidad"] if l in localidades
+    ]
 with filtro_localidad:
     localidades_seleccionadas = st.multiselect(
         "Localidad",
@@ -507,25 +545,30 @@ df_alumnos = aplicar_filtros(
     ciclos_seleccionados,
     localidades_seleccionadas,
     estados_seleccionados,
+    provincias_seleccionadas,
 )
 df_practicas = aplicar_filtros(
     df_practicas_base,
     ciclos_seleccionados,
     localidades_seleccionadas,
     estados_seleccionados,
+    provincias_seleccionadas,
 )
 df_master = aplicar_filtros(
     df_master_base,
     ciclos_seleccionados,
     localidades_seleccionadas,
     estados_seleccionados,
+    provincias_seleccionadas,
 )
 df_practicas_dashboard = df_master
-df_ofertas = filtrar_por_curso(
+df_ofertas = con_provincia(filtrar_por_curso(
     ofertas_activas_por_ciclo(df_ofertas_raw, df_empresas_raw),
     anio_filtro,
     curso_filtro,
-)
+))
+if provincias_seleccionadas and "provincia" in df_ofertas.columns:
+    df_ofertas = df_ofertas[df_ofertas["provincia"].astype(str).isin(provincias_seleccionadas)]
 if ciclos_seleccionados and "ciclo_formativo" in df_ofertas.columns:
     df_ofertas = df_ofertas[
         df_ofertas["ciclo_formativo"].astype(str).isin(ciclos_seleccionados)
@@ -651,6 +694,25 @@ with tab_alumnos:
                         color_discrete_sequence=PALETA_GRAFICOS,
                     ),
                     use_container_width=True,
+                )
+            if "provincia" in df_alumnos.columns:
+                datos_provincia = (
+                    df_alumnos["provincia"]
+                    .value_counts()
+                    .rename_axis("Provincia")
+                    .reset_index(name="Alumnos")
+                    .sort_values("Alumnos", ascending=True)
+                )
+                st.plotly_chart(
+                    px.bar(
+                        datos_provincia,
+                        x="Provincia",
+                        y="Alumnos",
+                        text_auto=True,
+                        title="Alumnos por provincia",
+                        color_discrete_sequence=[CIAN_CAMARA],
+                    ),
+                    width="stretch",
                 )
             if "localidad" in df_alumnos.columns:
                 datos_localidad = (

@@ -1,6 +1,6 @@
 import streamlit as st
 from modules.data_base import crearOfertaEmpresa, eliminarOferta, actualizarOfertaEmpresa, ofertaSinAsignaciones, minimoAlumnosPorCiclo
-from modules.forms_helper import render_requisitos, requisitos_a_estado, slug
+from modules.forms_helper import render_requisitos, requisitos_a_estado, slug, selector_provincia_localidad
 from variables import aniosList
 
 
@@ -75,11 +75,10 @@ def nueva_oferta(empresa, ciclos_lista, areas_map, tutores_empresa, anio_actual)
 
         st.markdown("**Dirección del centro de trabajo**")
         direccion = st.text_input("Dirección", value=empresa.get("direccion") or "", key=f"{k}_dir")
-        col_cp, col_loc = st.columns(2)
-        with col_cp:
-            cp = st.text_input("Código Postal", value=empresa.get("codigo_postal") or "", key=f"{k}_cp")
-        with col_loc:
-            localidad = st.text_input("Localidad", value=empresa.get("localidad") or "", key=f"{k}_loc")
+        cp = st.text_input("Código Postal", value=empresa.get("codigo_postal") or "", key=f"{k}_cp")
+        _, localidad = selector_provincia_localidad(
+            f"{k}_ubic", empresa.get("provincia"), empresa.get("localidad"), label_localidad="Localidad",
+        )
 
         st.markdown("**Requisitos adicionales**")
         requisitos = render_requisitos(
@@ -209,11 +208,11 @@ def editar_oferta(fp, areas_map, tutores=None):
 
     st.markdown("**Dirección del centro de trabajo**")
     direccion = st.text_input("Dirección", value=fp.get("direccion_empresa") or "", key=f"{k}_dir")
-    col_cp, col_loc = st.columns(2)
-    with col_cp:
-        cp = st.text_input("Código Postal", value=fp.get("cp_empresa") or "", key=f"{k}_cp")
-    with col_loc:
-        localidad = st.text_input("Localidad", value=fp.get("localidad_empresa") or "", key=f"{k}_loc")
+    cp = st.text_input("Código Postal", value=fp.get("cp_empresa") or "", key=f"{k}_cp")
+    # Offers have no province column: it's worked out from the saved town
+    _, localidad = selector_provincia_localidad(
+        f"{k}_ubic", None, fp.get("localidad_empresa"), label_localidad="Localidad",
+    )
 
     st.markdown("**Requisitos adicionales**")
     requisitos = render_requisitos(

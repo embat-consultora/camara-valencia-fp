@@ -419,6 +419,42 @@ localidades = [
   "ZARRA"
 ]
 
+# --- Provincias y localidades de España ---
+# Provincias: las 52 de España (50 provincias + Ceuta y Melilla).
+provincias = [
+    "A Coruña", "Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz",
+    "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ceuta",
+    "Ciudad Real", "Córdoba", "Cuenca", "Girona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva",
+    "Huesca", "Jaén", "La Rioja", "Las Palmas", "León", "Lleida", "Lugo", "Madrid",
+    "Málaga", "Melilla", "Murcia", "Navarra", "Ourense", "Palencia", "Pontevedra", "Salamanca",
+    "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia",
+    "Valladolid", "Vizcaya", "Zamora", "Zaragoza",
+]
+provinciaDefecto = "Valencia"
+
+# Municipios por provincia: relación oficial del INE (diccionario de municipios 2026,
+# https://www.ine.es/daco/daco42/codmun/diccionario26.xlsx), en mayúsculas.
+# Valencia usa la lista `localidades` de arriba para que coincidan los datos ya guardados.
+import json as _json
+from pathlib import Path as _Path
+
+with open(_Path(__file__).parent / "modules" / "data" / "municipios_es.json", encoding="utf-8") as _f:
+    localidadesPorProvincia = _json.load(_f)
+localidadesPorProvincia[provinciaDefecto] = [l for l in localidades if l]
+
+
+def provincia_de_localidad(localidad):
+    """Province of a saved town (Valencia first), or None if it isn't in any list."""
+    valor = str(localidad or "").strip().upper()
+    if not valor:
+        return None
+    if valor in localidadesPorProvincia[provinciaDefecto]:
+        return provinciaDefecto
+    for provincia, lista in localidadesPorProvincia.items():
+        if valor in lista:
+            return provincia
+    return None
+
 linkCalendar ='https://sites.google.com/data-so.com/calendario-fp/inicio'
 urlPoliticaPrivacidad = 'https://mediterraneoculinary.com/politica-privacidad/'
 aniosList= ("Seleccionar", "2025-2026", "2026-2027","2027-2028","2028-2029","2029-2030","2030-2031","2031-2032","2032-2033","2033-2034","2034-2035","2035-2036","2036-2037","2037-2038","2038-2039","2039-2040")

@@ -5,7 +5,7 @@ import  uuid
 from modules.emailSender import send_welcome_email
 from modules.drive_helper import upload_to_drive,folderNombreAlumno
 from modules.data_base import upsert,getCiclosYAreas, getEqual, upsertCustome
-from modules.forms_helper import required_ok, file_size_bytes, slug, render_requisitos
+from modules.forms_helper import required_ok, file_size_bytes, slug, render_requisitos, selector_provincia, selector_localidad
 from modules.privacidad import render_aviso_legal, datos_aceptacion
 from variables import usuariosTabla,carpetaAlumnos,estadosAlumno,alumnosTabla,formTabla,tipoPracticas,alumnoEstadosTabla,max_file_size, localidades,cursoList , aniosList
 import random
@@ -69,11 +69,13 @@ with col1:
 with col2:
     direccion = input_requerido("Dirección *", key="direccion_alumno")
 
+dni = input_requerido("DNI/NIE *", key="dni_alumno")
+
 col1, col2 = st.columns(2)
 with col1:
-    dni = input_requerido("DNI/NIE *", key="dni_alumno")
+    provincia = selector_provincia("provincia_alumno")
 with col2:
-    localidad = st.selectbox("Localidad *", (localidades), key="localidad_alumno")
+    localidad = selector_localidad("localidad_alumno", provincia)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -219,6 +221,7 @@ if submit:
                 "dni": dni.strip().upper(),
                 "direccion": direccion.strip(),
                 "codigo_postal": cp.strip(),
+                "provincia": provincia,
                 "localidad": localidad.strip(),
                 "vehiculo": vehiculo,
                 "ciclo_formativo": ciclo,

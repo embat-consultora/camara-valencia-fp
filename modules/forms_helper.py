@@ -2,7 +2,7 @@ import io
 import re
 import pandas as pd
 import streamlit as st
-from variables import idiomasRequisitos, nivelesIdioma, skillsRequisitos
+from variables import idiomasRequisitos, nivelesIdioma, skillsRequisitos, provincias, provinciaDefecto, localidadesPorProvincia, provincia_de_localidad
 
 def slug(s: str) -> str:
     s = str(s or "")
@@ -93,3 +93,60 @@ def leer_csv(archivo, columnas_esperadas):
     canonicas = {c.lower(): c for c in columnas_esperadas}
     df.columns = [canonicas.get(str(c).strip().lower(), str(c).strip()) for c in df.columns]
     return df
+
+
+# --- Provincia + localidad ---
+def _localidad_canonica(provincia, localidad):
+    """The list's spelling of a saved town ("El Campello" -> "EL CAMPELLO")."""
+    actual = str(localidad or "").strip()
+    lista = localidadesPorProvincia.get(provincia, [])
+    return actual.upper() if actual.upper() in lista else actual
+
+
+def opciones_localidad(provincia, localidad_actual=None):
+    """Towns of a province. A saved town that isn't in the list (old or typed by hand)
+    is kept as the first option so editing a record doesn't lose it."""
+    opciones = list(localidadesPorProvincia.get(provincia, []))
+    actual = _localidad_canonica(provincia, localidad_actual)
+    if actual and actual not in opciones and provincia_de_localidad(actual) in (None, provincia):
+        opciones.insert(0, actual)
+    return opciones
+
+
+def selector_provincia(key, provincia_actual=None, localidad_actual=None, label="Provincia *", disabled=False):
+    """Province selectbox. Starts on the saved province, else the province of the saved
+    town, else Valencia."""
+    if key not in st.session_state or st.session_state[key] not in provincias:
+        inicial = provincia_actual if provincia_actual in provincias else None
+        st.session_state[key] = inicial or provincia_de_localidad(localidad_actual) or provinciaDefecto
+    return st.selectbox(label, provincias, key=key, disabled=disabled)
+
+
+def selector_localidad(key, provincia, localidad_actual=None, label="Localidad *", disabled=False):
+    """Town selectbox for `provincia`. Returns "" while nothing is picked."""
+    opciones = opciones_localidad(provincia, localidad_actual)
+    actual = _localidad_canonica(provincia, localidad_actual)
+    # Province changed (or first draw): drop a town that doesn't belong to it
+    if key in st.session_state and st.session_state[key] not in opciones:
+        del st.session_state[key]
+    if key not in st.session_state and actual in opciones:
+        st.session_state[key] = actual
+    extra = {} if key in st.session_state else {"index": None}
+    valor = st.selectbox(
+        label, opciones, key=key, disabled=disabled,
+        placeholder="Selecciona una localidad", **extra,
+    )
+    return valor or ""
+
+
+def selector_provincia_localidad(key, provincia_actual=None, localidad_actual=None,
+                                 label_localidad="Localidad *", disabled=False):
+    """Province and town side by side. Returns (provincia, localidad).
+    Not for use inside st.form: the town list only refreshes outside a form."""
+    col_prov, col_loc = st.columns(2)
+    with col_prov:
+        provincia = selector_provincia(f"{key}_provincia", provincia_actual, localidad_actual, disabled=disabled)
+    with col_loc:
+        localidad = selector_localidad(f"{key}_localidad", provincia, localidad_actual,
+                                       label=label_localidad, disabled=disabled)
+    return provincia, localidad

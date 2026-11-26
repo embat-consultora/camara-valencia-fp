@@ -9,7 +9,7 @@ from variables import usuariosTabla,alumnosTabla, aniosList, cursoList, localida
 from datetime import datetime
 from modules.emailSender import send_email, send_welcome_email
 from modules.drive_helper import list_drive_files,upload_to_drive,folderNombreAlumno,archivoNombre
-from modules.forms_helper import  file_size_bytes, leer_csv
+from modules.forms_helper import  file_size_bytes, leer_csv, selector_provincia, selector_localidad, selector_provincia_localidad
 import re
 import random
 apply_page_config()
@@ -150,12 +150,12 @@ with tab1:
                     new_email = st.text_input("Email", alumno.get("email_alumno", ""))
                     new_direccion = st.text_input("Dirección", alumno.get("direccion", ""))
                     new_codigoPostal = st.text_input("CP", alumno.get("codigo_postal", ""))
-                    current_loc = alumno.get("localidad", "")
-                    try:
-                        default_index_loc = localidades.index(current_loc)
-                    except (ValueError, TypeError):
-                        default_index_loc = 10
-                    new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc)
+                    new_provincia = selector_provincia(
+                        f"alu_{alumno_id}_provincia", alumno.get("provincia"), alumno.get("localidad"),
+                    )
+                    new_localidad = selector_localidad(
+                        f"alu_{alumno_id}_localidad", new_provincia, alumno.get("localidad"),
+                    )
                     
                     tipo_opts = tipoPracticas
                 st.divider()
@@ -214,6 +214,7 @@ with tab1:
                                 "nombre": new_nombre,
                                 "apellido": new_apellido,
                                 "direccion": new_direccion,
+                                "provincia": new_provincia,
                                 "localidad": new_localidad,
                                 "codigo_postal": new_codigoPostal,
                                 "dni": new_dni,
@@ -322,37 +323,43 @@ with tab1:
 with tab2:
     tabNuevo, tabBulk = st.tabs(["Nuevo Alumno", "Carga Masiva (.csv)"])
     with tabNuevo:
-        with st.form(key=f"nuevo_alumno_form_{st.session_state.form_registro_key}"):
-            new_nombre = st.text_input("Nombre")
-            new_apellido = st.text_input("Apellido")
+        # A bordered box instead of st.form: inside a form the town list wouldn't follow the
+        # province until submit. Keys end in form_registro_key so every field clears after
+        # creating a student, like the form did.
+        fk = st.session_state.form_registro_key
+        with st.container(border=True):
+            new_nombre = st.text_input("Nombre", key=f"nuevo_nombre_{fk}")
+            new_apellido = st.text_input("Apellido", key=f"nuevo_apellido_{fk}")
             # Same options and default as the student form (formAlumno)
-            new_sexo = st.selectbox("Sexo", ["Prefiero No especificar", "Femenino", "Masculino"])
-            new_direccion = st.text_input("Dirección")
-            new_codigoPostal = st.text_input("CP")
-            new_localidad = st.selectbox("Localidad *", (localidades))
-            new_dni = st.text_input("DNI")
-            new_nia = st.text_input("NIA")
-            new_nuss = st.text_input("NUSS")
-            new_telefono = st.text_input("Teléfono")
-            new_email = st.text_input("Email")
+            new_sexo = st.selectbox("Sexo", ["Prefiero No especificar", "Femenino", "Masculino"], key=f"nuevo_sexo_{fk}")
+            new_direccion = st.text_input("Dirección", key=f"nuevo_direccion_{fk}")
+            new_codigoPostal = st.text_input("CP", key=f"nuevo_cp_{fk}")
+            new_provincia, new_localidad = selector_provincia_localidad(f"nuevo_alumno_{fk}")
+            new_dni = st.text_input("DNI", key=f"nuevo_dni_{fk}")
+            new_nia = st.text_input("NIA", key=f"nuevo_nia_{fk}")
+            new_nuss = st.text_input("NUSS", key=f"nuevo_nuss_{fk}")
+            new_telefono = st.text_input("Teléfono", key=f"nuevo_telefono_{fk}")
+            new_email = st.text_input("Email", key=f"nuevo_email_{fk}")
             tipo_opts = tipoPracticas
             new_tipo_practica = st.selectbox(
                 "Tipo de Formación",
                 options=tipo_opts,
-                index=0
+                index=0,
+                key=f"nuevo_tipo_{fk}",
             )
             selected_ciclo = st.selectbox(
                     "Ciclo Formativo",
                     options=[""] + ciclos,  # agrega una opción vacía
                     index= 0,
-                    placeholder="Selecciona un ciclo formativo"
+                    placeholder="Selecciona un ciclo formativo",
+                    key=f"nuevo_ciclo_{fk}",
                 )
-            ano = st.selectbox("Curso Académico *", options= aniosList)
-            curso = st.selectbox("Curso *", options= cursoList, key="nuevo_curso")
+            ano = st.selectbox("Curso Académico *", options= aniosList, key=f"nuevo_anio_{fk}")
+            curso = st.selectbox("Curso *", options= cursoList, key=f"nuevo_curso_{fk}")
             val_horas_totales = 10
-            horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=1) 
+            horas_totales = st.number_input("Horas Totales", value=val_horas_totales, step=1, key=f"nuevo_horas_{fk}")
 
-            submitted = st.form_submit_button("Crear Alumno")
+            submitted = st.button("Crear Alumno", key=f"nuevo_crear_{fk}")
 
         if submitted:
             # --- SECCIÓN DE VALIDACIÓN ---
@@ -378,6 +385,7 @@ with tab2:
                             "apellido": new_apellido,
                             "sexo": new_sexo,
                             "direccion": new_direccion,
+                            "provincia": new_provincia,
                             "localidad": new_localidad,
                             "dni": new_dni,
                             "NIA": new_nia,
@@ -422,6 +430,7 @@ with tab2:
             "sexo": ["Femenino | Masculino | Prefiero No especificar"],
             "direccion": [""],
             "codigo_postal": [""],
+            "provincia": [""],
             "localidad": [""],
             "dni": [""],  # obligatorio
             "NIA": [""],
@@ -501,6 +510,7 @@ with tab2:
                                 "direccion": row.get("direccion", "").strip(),
                                 "codigo_postal": row.get("codigo_postal", "").strip(),
                                 "localidad": row.get("localidad", "").strip().upper(),
+                                "provincia": row.get("provincia", "").strip().upper(),
                                 "NIA": row.get("NIA", "").strip(),
                                 "telefono": row.get("telefono", "").strip(),
                                 "email_alumno": row.get("email_alumno", "").strip(),
