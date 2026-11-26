@@ -11,7 +11,34 @@ st.set_page_config(layout="wide")
 apply_page_config()
 make_sidebar()
 
+# Keep the tables visible while the page reruns (after "Guardar Cambios" it saves, reloads
+# the data and redraws the grid). By default Streamlit greys out stale elements meanwhile;
+# the "Guardando datos" / "Cargando datos" spinners already show that it's working.
+st.markdown(
+    """
+    <style>
+    [data-testid="stElementContainer"][data-stale="true"] {
+        opacity: 1 !important;
+        transition: none !important;
+    }
+    /* Spinner while a grid loads. Its frame starts at 0 px high until the grid's code is
+       ready, so the spinner sits on the box that holds the frame (with a minimum height);
+       once the grid is drawn it covers the spinner. */
+    .cargando-tabla { display: flex; align-items: center; gap: .6rem; color: #555; padding: .5rem 0; }
+    .cargando-tabla::before { content: ""; width: 18px; height: 18px; border-radius: 50%;
+        border: 3px solid #d0d7de; border-top-color: #013d5f; animation: girar-carga .9s linear infinite; }
+    @keyframes girar-carga { to { transform: rotate(360deg); } }
+    [data-testid="stElementContainer"]:has(iframe[title*="aggrid" i]) {
+        min-height: 110px;
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='70' viewBox='0 0 220 70'><circle cx='110' cy='22' r='16' fill='none' stroke='%23d0d7de' stroke-width='4'/><path d='M110 6 a16 16 0 0 1 16 16' fill='none' stroke='%23013d5f' stroke-width='4' stroke-linecap='round'><animateTransform attributeName='transform' type='rotate' from='0 110 22' to='360 110 22' dur='0.9s' repeatCount='indefinite'/></path><text x='110' y='62' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23555'>Cargando tabla...</text></svg>") center 30px no-repeat;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 import json
+import unicodedata
 
 def extraer_ofertas_por_ciclo(df_empresas, anio=None):
     mapping = {}
@@ -165,25 +192,63 @@ def load_data():
         or st.session_state.practicas_data is None
         or st.session_state["practicas_data_filter"] != current_filter
     ):
-        with st.spinner("Cargando datos desde la base..."):
-            st.session_state["practicas_data"] = get_data_cached(anioFiltro, cursoFiltro)
-            st.session_state["practicas_data_filter"] = current_filter
-            st.session_state["data_loaded"] = True
-            st.session_state["force_reload"] = False
+        st.session_state["practicas_data"] = get_data_cached(anioFiltro, cursoFiltro)
+        st.session_state["practicas_data_filter"] = current_filter
+        st.session_state["data_loaded"] = True
+        st.session_state["force_reload"] = False
 
 st.title("🚀 Panel de Gestión de Formaciones en Empresa")
-with st.spinner("Cargando datos desde la base..."):
+
+# Everything the tables need is loaded here, under one spinner, before the tabs are drawn
+# (otherwise the tabs sit empty while the remaining queries run).
+_precargados = {}
+
+
+def _precargado(nombre):
+    """Result of a query loaded under the spinner; re-raises its error so each table
+    keeps its own error handling."""
+    valor = _precargados[nombre]
+    if isinstance(valor, Exception):
+        raise valor
+    return valor
+
+
+with st.spinner("Cargando tabla..."):
     load_data()
-nombres_tabs = ["🎓 Alumnos", "🏢 Ofertas por Ciclo"]
+    for _nombre, _carga in {
+        "gestores": get_gestores_cached,
+        "tutores": get_tutores_cached,
+        "empresas_ofertas": get_empresas_ofertas_cached,
+        "gestores_ofertas": get_gestores_ofertas_cached,
+        "ofertas": lambda: get_ofertas_cached(anioFiltro),
+    }.items():
+        try:
+            _precargados[_nombre] = _carga()
+        except Exception as _error:
+            _precargados[_nombre] = _error
+nombres_tabs = ["🎓 Alumnos", "🧭 Autogestionadas", "🏢 Ofertas por Ciclo"]
 if rol_usuario == "admin":
     nombres_tabs.append("⚙️ Configuración")
 tabs = st.tabs(nombres_tabs)
 
 tab_alumnos = tabs[0]
-tab_ofertas = tabs[1]
+tab_autogestionadas = tabs[1]
+tab_ofertas = tabs[2]
 
 if rol_usuario == "admin":
-    tab_config = tabs[2]
+    tab_config = tabs[3]
+
+# Set to True once the Autogestionadas table is drawn; otherwise that tab shows a message
+autogestionadas_mostradas = False
+
+# Spinner in each students tab from the moment the tabs appear until its table starts
+# drawing (the data is prepared in between and nothing else would be on screen)
+_HTML_CARGANDO = '<div class="cargando-tabla">Cargando tabla...</div>'
+cargando_por_tab = {}
+for _sufijo, _tab in (("gestionadas", tab_alumnos), ("autogestionadas", tab_autogestionadas)):
+    with _tab:
+        cargando_por_tab[_sufijo] = st.empty()
+        cargando_por_tab[_sufijo].markdown(_HTML_CARGANDO, unsafe_allow_html=True)
 
 # --- TAB ALUMNOS ---
 with tab_alumnos:
@@ -218,17 +283,17 @@ with tab_alumnos:
         df_raw['puesto'] = df_raw['puesto'].fillna("")
         df_raw['tutor_centro'] = df_raw['tutor_centro'].fillna("")
         try:
-            df_gestores_lista = get_gestores_cached()
+            df_gestores_lista = _precargado("gestores")
             nombres_gestores = df_gestores_lista['nombre'].tolist()
         except:
             nombres_gestores = []
 
         try:
-            df_tutores_lista = get_tutores_cached()
+            df_tutores_lista = _precargado("tutores")
             nombres_tutores_centro = sorted(df_tutores_lista['nombre'].unique().tolist())
         except:
             nombres_tutores_centro = []
-        df_empresas = get_empresas_ofertas_cached()
+        df_empresas = _precargado("empresas_ofertas")
         df_empresas_filtrado =df_empresas
         if df_empresas is None or len(df_empresas) == 0:
             st.info("No hay empresas cargadas aun.")
@@ -294,12 +359,16 @@ with tab_alumnos:
                 if not df_raw.empty:
                     df_raw['ciclo_acronimo'] = df_raw['abreviatura']
                     cols_visibles = [
-                        "ciclo_acronimo", "apellido", "nombre","telefono","localidad", "tipoPractica", "vehiculo", "horas_totales", 
-                        "nombre_empresa","email_empresa","asignado","area", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro" 
+                        "ciclo_acronimo", "apellido", "nombre","telefono","localidad", "vehiculo", "horas_totales", 
+                        "empresa_provisoria", "nombre_empresa","email_empresa","asignado","area", "puesto","cupos_disponibles","tutor_centro", "gestor", "comentarios_centro"
                     ]
+                    if "empresa_provisoria" not in df_raw.columns:
+                        df_raw["empresa_provisoria"] = ""
+                    df_raw["empresa_provisoria"] = df_raw["empresa_provisoria"].fillna("")
                 
                     cols_tecnicas = ["dni", "ciclo_formativo", "oferta", "ciclos_info","practica_id", "direccion_empresa","localidad_empresa", "anio","curso"]
-                    cols_finales = cols_visibles + [c for c in cols_tecnicas if c in df_raw.columns]
+                    cols_finales_extra = ["tipoPractica"] if "tipoPractica" in df_raw.columns else []
+                    cols_finales = cols_visibles + [c for c in cols_tecnicas if c in df_raw.columns] + cols_finales_extra
                     df_display = df_raw[cols_finales].copy()
                     if "direccion_empresa" not in df_display.columns:
                         df_display["direccion_empresa"] = None
@@ -321,343 +390,392 @@ with tab_alumnos:
                     # Ahora sí, asegúrate de incluirla en la lista de columnas visibles
                     if "cupos_disponibles" not in cols_visibles:
                         cols_visibles.append("cupos_disponibles")
-                    if rol_usuario == "admin":
-                        st.caption("Si no encontrás la empresa y ya tienes al alumno para asignar, dirigite a la sección de  Formación en Empresa -> Carga Rápida")
-                    gb = GridOptionsBuilder.from_dataframe(df_display)
+                    def tabla_alumnos(df_display, sufijo, texto_vacio):
+                        """Draws the students grid (same columns and behaviour in both tabs)."""
+                        cargando_por_tab[sufijo].empty()
+                        if df_display.empty:
+                            st.info(texto_vacio)
+                            return
+                        if rol_usuario == "admin":
+                            st.caption("Si no encontrás la empresa y ya tienes al alumno para asignar, dirigite a la sección de  Formación en Empresa -> Carga Rápida")
+                        # Spinner from here until the grid has been sent (building its options
+                        # and data takes a moment, and nothing would be on screen meanwhile)
+                        with st.spinner("Cargando tabla..."):
+                            gb = GridOptionsBuilder.from_dataframe(df_display)
                     
-                    # Inyectamos las traducciones en las opciones principales del grid
-                    gb.configure_grid_options(localeText=locale_tabla_principal)
-                    gb.configure_grid_options(stopEditingWhenCellsLoseFocus=True)
-                    gb.configure_grid_options(suppressSizeToFit=True)
-                    gb.configure_side_bar(
-                        filters_panel=False,
-                        columns_panel=True,
-                        defaultToolPanel="",
-                    )
-                    gb.configure_grid_options(
-                        getMainMenuItems=JsCode("""
-                            function(params) {
-                                const opcionesExcluidas = [
-                                    'sortAscending',
-                                    'sortDescending',
-                                    'autoSizeThis',
-                                    'autoSizeAll'
-                                ];
-                                return params.defaultItems.filter(
-                                    item => !opcionesExcluidas.includes(item)
-                                );
-                            }
-                        """)
-                    )
-                    # Los anchos son parte del contrato visual de esta tabla.
-                    gb.configure_default_column(editable=True, filter=True, resizable=False)
+                            # Inyectamos las traducciones en las opciones principales del grid
+                            gb.configure_grid_options(localeText=locale_tabla_principal)
+                            gb.configure_grid_options(stopEditingWhenCellsLoseFocus=True)
+                            gb.configure_grid_options(suppressSizeToFit=True)
+                            gb.configure_side_bar(
+                                filters_panel=False,
+                                columns_panel=True,
+                                defaultToolPanel="",
+                            )
+                            gb.configure_grid_options(
+                                getMainMenuItems=JsCode("""
+                                    function(params) {
+                                        const opcionesExcluidas = [
+                                            'sortAscending',
+                                            'sortDescending',
+                                            'autoSizeThis',
+                                            'autoSizeAll'
+                                        ];
+                                        return params.defaultItems.filter(
+                                            item => !opcionesExcluidas.includes(item)
+                                        );
+                                    }
+                                """)
+                            )
+                            # Los anchos son parte del contrato visual de esta tabla.
+                            gb.configure_default_column(editable=True, filter=True, resizable=False)
 
-                    gb.configure_column("ciclo_acronimo", headerName="Ciclo", pinned='left', width=100, editable=False)
-                    gb.configure_column("apellido", headerName="Apellidos", width=200)
-                    gb.configure_column("nombre", headerName="Nombre", width=200)
-                    gb.configure_column("telefono", headerName="Telefono Alumno", width=150)
-                    gb.configure_column("email_empresa", headerName="Email Empresa", width=200,editable=False )
-                    gb.configure_column("comentarios_centro", headerName="Comentarios", width=200)
-                    gb.configure_column("vehiculo", headerName="Vehículo", width=100, editable=False)
-                    gb.configure_column("localidad", headerName="Localidad", width=150, editable=False)
-                    gb.configure_column("tipoPractica", headerName="Tipo Formación", width=180, editable=False)
+                            gb.configure_column("ciclo_acronimo", headerName="Ciclo", pinned='left', width=100, editable=False)
+                            gb.configure_column("apellido", headerName="Apellidos", width=200)
+                            gb.configure_column("nombre", headerName="Nombre", width=200)
+                            gb.configure_column("telefono", headerName="Telefono Alumno", width=150)
+                            gb.configure_column("email_empresa", headerName="Email Empresa", width=200,editable=False )
+                            gb.configure_column("comentarios_centro", headerName="Comentarios", width=200)
+                            gb.configure_column("empresa_provisoria", headerName="Empresa Provisoria", width=200)
+                            gb.configure_column("vehiculo", headerName="Vehículo", width=100, editable=False)
+                            gb.configure_column("localidad", headerName="Localidad", width=150, editable=False)
 
-                    gb.configure_column("gestor", 
-                        headerName="Gestor", 
-                        width=120,
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': nombres_gestores},
-                        editable=(rol_usuario != "tutor_centro"),
-                    )
-
-                    gb.configure_column("horas_totales", headerName="Hrs", width=100)
-
-                    gb.configure_column("nombre_empresa", 
-                        headerName="Empresa",
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams=JsCode(f"""
-                            function(params) {{
-                                const mapeoCiclos = {json_ciclo_empresas};
-                                const cicloAlumno = params.data.ciclo_formativo;
-                                const empresaActual = params.data.nombre_empresa;
-                                
-                                let datosEmpresas = mapeoCiclos[cicloAlumno] || [];
-                                
-                                // Filtrar: dejamos las que tienen cupo O la que ya tiene el alumno asignada
-                                let empresasValidas = datosEmpresas
-                                    .filter(e => e.disponibles > 0 || e.nombre === empresaActual)
-                                    .map(e => e.nombre);
-                                
-                                return {{
-                                    values: ['⚠️ SIN ASIGNAR', ...empresasValidas]
-                                }};
-                            }}
-                        """),
-                        cellStyle=JsCode("""
-                            function(params) {
-                                if (params.value === '⚠️ SIN ASIGNAR') return {'backgroundColor': '#d63031', 'color': 'white', 'fontWeight': 'bold'};
-                                return {'backgroundColor': '#55efc4', 'color': 'black'};
-                            }
-                        """),
-                        onCellValueChanged=JsCode(f"""
-                            function(params) {{
-                                const mapeoCiclos = {json_ciclo_empresas};
-                                const nuevaEmpresa = params.data.nombre_empresa;
-                                const ciclo = params.data.ciclo_formativo;
-
-                                let totalCupos = 0;
-                                let ofertaId = null;
-                                let email_empresa = null;
-                                let direccion_empresa = null;
-                                let localidad_empresa = null;
-
-                                if (nuevaEmpresa === '⚠️ SIN ASIGNAR') {{
-                                    params.data.email_empresa = '';
-                                    params.data.area = '';
-                                    params.data.oferta = '';
-                                    params.data.cupos_disponibles = null;
-                                    params.data.puesto = null;
-                                    params.data.direccion_empresa = '';
-                                    params.data.localidad_empresa = '';
-                                }} else {{
-                                    if (mapeoCiclos[ciclo]) {{
-                                        const empData = mapeoCiclos[ciclo]
-                                            .find(e => e.nombre === nuevaEmpresa);
-
-                                        if (empData) {{
-                                            totalCupos = empData.disponibles;
-                                            ofertaId = empData.oferta;
-                                            email_empresa = empData.email_empresa;
-                                            direccion_empresa = empData.direccion_empresa;
-                                            localidad_empresa = empData.localidad_empresa;
-                                        }}
-                                        params.data.cupos_disponibles = totalCupos;
-                                        params.data.puesto = null;
-                                        params.data.oferta = ofertaId;
-                                        params.data.email_empresa = email_empresa;
-                                        params.data.direccion_empresa = direccion_empresa;
-                                        params.data.localidad_empresa = localidad_empresa;
-                                    }}
-
-
-                                }}
-
-                                params.api.refreshCells({{
-                                    rowNodes: [params.node],
-                                    columns: [
-                                        'cupos_disponibles',
-                                        'puesto',
-                                        'area',
-                                        'oferta',
-                                        'email_empresa',
-                                        'direccion_empresa',
-                                        'localidad_empresa'
-                                    ]
-                                }});
-                            }}
-                        """),
-                    )
-
-                    gb.configure_column("asignado", 
-                        headerName="Asignar", 
-                        editable=True,
-                        width=150,
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': [None,"Asignar"]},
-                        cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
-                    )
-                    gb.configure_column("tutor_centro", 
-                        headerName="Tutor Centro", 
-                        editable=True,
-                        width=200,
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': nombres_tutores_centro}, # Pasamos la lista aquí
-                        cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
-                    )
-                    gb.configure_column("area",
-                        headerName="Área",
-                        editable=True,
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams=JsCode(f"""
-                        function(params) {{
-                            // Usamos || {{}} para asegurar que si el JSON falla, sea un objeto vacío y no 'null'
-                            const mapeo = {json_mapeo} || {{}}; 
-                            const empresa = params.data.nombre_empresa;
-                            const ciclo = params.data.ciclo_formativo;
-                            
-                            // Verificamos existencia antes de iterar/mapear
-                            if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
-                                const opciones = mapeo[empresa][ciclo];
-                                return {{ values: Array.isArray(opciones) ? opciones.map(p => p.area) : [] }};
-                            }}
-                            return {{ values: [] }};
-                        }}
-                    """),
-
-                    onCellValueChanged=JsCode(f"""
-                    function(params) {{
-                        const mapeo = {json_mapeo} || {{}};
-                        const empresa = params.data.nombre_empresa;
-                        const ciclo = params.data.ciclo_formativo;
-                        const areaNombre = params.data.area;
-                    }}
-                """),
-                        width=250
-                    )
-
-                    gb.configure_column("puesto",
-                        headerName="Proyecto",
-                        editable=True,
-                        cellEditor='agSelectCellEditor',
-                        cellEditorParams=JsCode(f"""
-                        function(params) {{
-                            // Usamos || {{}} para asegurar que si el JSON falla, sea un objeto vacío y no 'null'
-                            const mapeo = {json_mapeo} || {{}}; 
-                            const empresa = params.data.nombre_empresa;
-                            const ciclo = params.data.ciclo_formativo;
-                            
-                            // Verificamos existencia antes de iterar/mapear
-                            if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
-                                const opciones = mapeo[empresa][ciclo];
-                                return {{ values: Array.isArray(opciones) ? opciones.map(p => p.nombre) : [] }};
-                            }}
-                            return {{ values: [] }};
-                        }}
-                    """),
-
-                    onCellValueChanged=JsCode(f"""
-                    function(params) {{
-                        const mapeo = {json_mapeo} || {{}};
-                        const empresa = params.data.nombre_empresa;
-                        const ciclo = params.data.ciclo_formativo;
-                        const puestoNombre = params.data.puesto;
-
-                        if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
-                            const listaPuestos = mapeo[empresa][ciclo];
-                            // Buscamos el objeto que coincide con el nombre seleccionado
-                            const puestoEncontrado = listaPuestos.find(p => p.nombre === puestoNombre);
-                            
-                            if (puestoEncontrado) {{
-                                // ASIGNAMOS EL TUTOR AL CAMPO 'tutor'
-                                console.log("¡Puesto encontrado! Info:", puestoEncontrado);
-                                params.data.tutor = puestoEncontrado.tutor;
-                                params.data.direccion = puestoEncontrado.direccion;
-                                params.data.localidad = puestoEncontrado.localidad;
-
-                            }} else {{
-                                params.data.tutor = null;
-                                const infoBase = mapeo[empresa]["info_base"];
-                                params.data.direccion_empresa = infoBase ? infoBase.direccion : null;
-                                params.data.localidad_empresa = infoBase ? infoBase.localidad : null;
-                            }}
-                        }}
-                    
-                    }}
-                """),
-                        width=250
-                    )
-                            
-                    gb.configure_column(
-                        "cupos_disponibles",
-                        headerName="Plazas Libres",
-                        width=130,
-                        editable=False,
-                        # 1. Definimos el estilo (Colores de fondo y texto)
-                        cellStyle=JsCode("""
-                            function(params) {
-                                if (params.value === null || params.value === undefined) return null;
-                                if (params.value <= 0) {
-                                    return {'backgroundColor': '#ff7675', 'color': 'white', 'fontWeight': 'bold'};
-                                } else if (params.value <= 2) {
-                                    return {'backgroundColor': '#fab1a0', 'color': 'black', 'fontWeight': 'bold'};
-                                } else {
-                                    return {'backgroundColor': '#55efc4', 'color': 'black', 'fontWeight': 'bold'};
-                                }
-                            }
-                        """),
-                        # 2. Definimos el texto con el icono (Sin HTML, solo strings)
-                        valueFormatter=JsCode("""
-                            function(params) {
-                                if (params.value === null || params.value === undefined) return '-';
-                                if (params.value <= 0) return '🔴 Agotado';
-                                if (params.value <= 2) return '🟠 ' + params.value + ' disp.';
-                                return '🟢 ' + params.value + ' disp.';
-                            }
-                        """)
-                    )
-
-                    for col in cols_tecnicas:
-                        if col in df_display.columns:
-                            gb.configure_column(
-                                col,
-                                hide=True,
-                                suppressColumnsToolPanel=False,
+                            gb.configure_column("gestor", 
+                                headerName="Gestor", 
+                                width=120,
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams={'values': nombres_gestores},
+                                editable=(rol_usuario != "tutor_centro"),
                             )
 
-                    gridOptions = gb.build()
-                    # GridOptionsBuilder activa fitGridWidth por defecto; eso
-                    # modifica los anchos y elimina el scroll horizontal.
-                    gridOptions.pop("autoSizeStrategy", None)
-                    gridOptions["rowHeight"] = 42
-                    grid_height = min(850, max(180, 52 + len(df_display) * 50 + 18))
-                    grid_columns_state = {
-                        "state": [
-                            {"colId": "ciclo_acronimo", "width": 150},
-                            {"colId": "apellido", "width": 200},
-                            {"colId": "nombre", "width": 200},
-                            {"colId": "telefono", "width": 150},
-                            {"colId": "email_empresa", "width": 200},
-                            {"colId": "comentarios_centro", "width": 200},
-                            {"colId": "vehiculo", "width": 100},
-                            {"colId": "localidad", "width": 150},
-                            {"colId": "tipoPractica", "width": 180},
-                            {"colId": "gestor", "width": 120},
-                            {"colId": "horas_totales", "width": 100},
-                            {"colId": "nombre_empresa", "width": 200},
-                            {"colId": "asignado", "width": 120},
-                            {"colId": "tutor_centro", "width": 200},
-                            {"colId": "area", "width": 250},
-                            {"colId": "puesto", "width": 250},
-                            {"colId": "cupos_disponibles", "width": 130},
-                        ]
-                    }
-                    grid_response = AgGrid(
-                        df_display,
-                        gridOptions=gridOptions,
-                        columns_state=grid_columns_state,
-                        allow_unsafe_jscode=True,
-                        enable_enterprise_modules=True,
-                        update_on=["cellValueChanged"],
-                        theme='alpine',
-                        height=grid_height,
-                        key=f"grid_alumnos_v_{st.session_state.grid_version}",
-                        resizable=False
+                            gb.configure_column("horas_totales", headerName="Hrs", width=100)
+
+                            gb.configure_column("nombre_empresa", 
+                                headerName="Empresa",
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams=JsCode(f"""
+                                    function(params) {{
+                                        const mapeoCiclos = {json_ciclo_empresas};
+                                        const cicloAlumno = params.data.ciclo_formativo;
+                                        const empresaActual = params.data.nombre_empresa;
+                                
+                                        let datosEmpresas = mapeoCiclos[cicloAlumno] || [];
+                                
+                                        // Filtrar: dejamos las que tienen cupo O la que ya tiene el alumno asignada
+                                        let empresasValidas = datosEmpresas
+                                            .filter(e => e.disponibles > 0 || e.nombre === empresaActual)
+                                            .map(e => e.nombre);
+                                
+                                        return {{
+                                            values: ['⚠️ SIN ASIGNAR', ...empresasValidas]
+                                        }};
+                                    }}
+                                """),
+                                cellStyle=JsCode("""
+                                    function(params) {
+                                        if (params.value === '⚠️ SIN ASIGNAR') return {'backgroundColor': '#d63031', 'color': 'white', 'fontWeight': 'bold'};
+                                        return {'backgroundColor': '#55efc4', 'color': 'black'};
+                                    }
+                                """),
+                                onCellValueChanged=JsCode(f"""
+                                    function(params) {{
+                                        const mapeoCiclos = {json_ciclo_empresas};
+                                        const nuevaEmpresa = params.data.nombre_empresa;
+                                        const ciclo = params.data.ciclo_formativo;
+
+                                        let totalCupos = 0;
+                                        let ofertaId = null;
+                                        let email_empresa = null;
+                                        let direccion_empresa = null;
+                                        let localidad_empresa = null;
+
+                                        if (nuevaEmpresa === '⚠️ SIN ASIGNAR') {{
+                                            params.data.email_empresa = '';
+                                            params.data.area = '';
+                                            params.data.oferta = '';
+                                            params.data.cupos_disponibles = null;
+                                            params.data.puesto = null;
+                                            params.data.direccion_empresa = '';
+                                            params.data.localidad_empresa = '';
+                                        }} else {{
+                                            if (mapeoCiclos[ciclo]) {{
+                                                const empData = mapeoCiclos[ciclo]
+                                                    .find(e => e.nombre === nuevaEmpresa);
+
+                                                if (empData) {{
+                                                    totalCupos = empData.disponibles;
+                                                    ofertaId = empData.oferta;
+                                                    email_empresa = empData.email_empresa;
+                                                    direccion_empresa = empData.direccion_empresa;
+                                                    localidad_empresa = empData.localidad_empresa;
+                                                }}
+                                                params.data.cupos_disponibles = totalCupos;
+                                                params.data.puesto = null;
+                                                params.data.oferta = ofertaId;
+                                                params.data.email_empresa = email_empresa;
+                                                params.data.direccion_empresa = direccion_empresa;
+                                                params.data.localidad_empresa = localidad_empresa;
+                                            }}
+
+
+                                        }}
+
+                                        params.api.refreshCells({{
+                                            rowNodes: [params.node],
+                                            columns: [
+                                                'cupos_disponibles',
+                                                'puesto',
+                                                'area',
+                                                'oferta',
+                                                'email_empresa',
+                                                'direccion_empresa',
+                                                'localidad_empresa'
+                                            ]
+                                        }});
+                                    }}
+                                """),
+                            )
+
+                            gb.configure_column("asignado", 
+                                headerName="Asignar", 
+                                editable=True,
+                                width=150,
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams={'values': [None,"Asignar"]},
+                                cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
+                            )
+                            gb.configure_column("tutor_centro", 
+                                headerName="Tutor Centro", 
+                                editable=True,
+                                width=200,
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams={'values': nombres_tutores_centro}, # Pasamos la lista aquí
+                                cellStyle={'color': '#0984e3', 'fontWeight': 'bold'}
+                            )
+                            gb.configure_column("area",
+                                headerName="Área",
+                                editable=True,
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams=JsCode(f"""
+                                function(params) {{
+                                    // Usamos || {{}} para asegurar que si el JSON falla, sea un objeto vacío y no 'null'
+                                    const mapeo = {json_mapeo} || {{}}; 
+                                    const empresa = params.data.nombre_empresa;
+                                    const ciclo = params.data.ciclo_formativo;
+                            
+                                    // Verificamos existencia antes de iterar/mapear
+                                    if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
+                                        const opciones = mapeo[empresa][ciclo];
+                                        return {{ values: Array.isArray(opciones) ? opciones.map(p => p.area) : [] }};
+                                    }}
+                                    return {{ values: [] }};
+                                }}
+                            """),
+
+                            onCellValueChanged=JsCode(f"""
+                            function(params) {{
+                                const mapeo = {json_mapeo} || {{}};
+                                const empresa = params.data.nombre_empresa;
+                                const ciclo = params.data.ciclo_formativo;
+                                const areaNombre = params.data.area;
+                            }}
+                        """),
+                                width=250
+                            )
+
+                            gb.configure_column("puesto",
+                                headerName="Proyecto",
+                                editable=True,
+                                cellEditor='agSelectCellEditor',
+                                cellEditorParams=JsCode(f"""
+                                function(params) {{
+                                    // Usamos || {{}} para asegurar que si el JSON falla, sea un objeto vacío y no 'null'
+                                    const mapeo = {json_mapeo} || {{}}; 
+                                    const empresa = params.data.nombre_empresa;
+                                    const ciclo = params.data.ciclo_formativo;
+                            
+                                    // Verificamos existencia antes de iterar/mapear
+                                    if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
+                                        const opciones = mapeo[empresa][ciclo];
+                                        return {{ values: Array.isArray(opciones) ? opciones.map(p => p.nombre) : [] }};
+                                    }}
+                                    return {{ values: [] }};
+                                }}
+                            """),
+
+                            onCellValueChanged=JsCode(f"""
+                            function(params) {{
+                                const mapeo = {json_mapeo} || {{}};
+                                const empresa = params.data.nombre_empresa;
+                                const ciclo = params.data.ciclo_formativo;
+                                const puestoNombre = params.data.puesto;
+
+                                if (mapeo[empresa] && mapeo[empresa][ciclo]) {{
+                                    const listaPuestos = mapeo[empresa][ciclo];
+                                    // Buscamos el objeto que coincide con el nombre seleccionado
+                                    const puestoEncontrado = listaPuestos.find(p => p.nombre === puestoNombre);
+                            
+                                    if (puestoEncontrado) {{
+                                        // ASIGNAMOS EL TUTOR AL CAMPO 'tutor'
+                                        console.log("¡Puesto encontrado! Info:", puestoEncontrado);
+                                        params.data.tutor = puestoEncontrado.tutor;
+                                        params.data.direccion = puestoEncontrado.direccion;
+                                        params.data.localidad = puestoEncontrado.localidad;
+
+                                    }} else {{
+                                        params.data.tutor = null;
+                                        const infoBase = mapeo[empresa]["info_base"];
+                                        params.data.direccion_empresa = infoBase ? infoBase.direccion : null;
+                                        params.data.localidad_empresa = infoBase ? infoBase.localidad : null;
+                                    }}
+                                }}
+                    
+                            }}
+                        """),
+                                width=250
+                            )
+                            
+                            gb.configure_column(
+                                "cupos_disponibles",
+                                headerName="Plazas Libres",
+                                width=130,
+                                editable=False,
+                                # 1. Definimos el estilo (Colores de fondo y texto)
+                                cellStyle=JsCode("""
+                                    function(params) {
+                                        if (params.value === null || params.value === undefined) return null;
+                                        if (params.value <= 0) {
+                                            return {'backgroundColor': '#ff7675', 'color': 'white', 'fontWeight': 'bold'};
+                                        } else if (params.value <= 2) {
+                                            return {'backgroundColor': '#fab1a0', 'color': 'black', 'fontWeight': 'bold'};
+                                        } else {
+                                            return {'backgroundColor': '#55efc4', 'color': 'black', 'fontWeight': 'bold'};
+                                        }
+                                    }
+                                """),
+                                # 2. Definimos el texto con el icono (Sin HTML, solo strings)
+                                valueFormatter=JsCode("""
+                                    function(params) {
+                                        if (params.value === null || params.value === undefined) return '-';
+                                        if (params.value <= 0) return '🔴 Agotado';
+                                        if (params.value <= 2) return '🟠 ' + params.value + ' disp.';
+                                        return '🟢 ' + params.value + ' disp.';
+                                    }
+                                """)
+                            )
+
+                            for col in cols_tecnicas:
+                                if col in df_display.columns:
+                                    gb.configure_column(
+                                        col,
+                                        hide=True,
+                                        suppressColumnsToolPanel=False,
+                                    )
+
+                            gridOptions = gb.build()
+                            # GridOptionsBuilder activa fitGridWidth por defecto; eso
+                            # modifica los anchos y elimina el scroll horizontal.
+                            gridOptions.pop("autoSizeStrategy", None)
+                            gridOptions["rowHeight"] = 42
+                            grid_height = min(850, max(180, 52 + len(df_display) * 50 + 18))
+                            grid_columns_state = {
+                                "state": [
+                                    {"colId": "ciclo_acronimo", "width": 150},
+                                    {"colId": "apellido", "width": 200},
+                                    {"colId": "nombre", "width": 200},
+                                    {"colId": "telefono", "width": 150},
+                                    {"colId": "email_empresa", "width": 200},
+                                    {"colId": "comentarios_centro", "width": 200},
+                                    {"colId": "vehiculo", "width": 100},
+                                    {"colId": "localidad", "width": 150},
+                                    {"colId": "gestor", "width": 120},
+                                    {"colId": "horas_totales", "width": 100},
+                                    {"colId": "empresa_provisoria", "width": 200},
+                                    {"colId": "nombre_empresa", "width": 200},
+                                    {"colId": "asignado", "width": 120},
+                                    {"colId": "tutor_centro", "width": 200},
+                                    {"colId": "area", "width": 250},
+                                    {"colId": "puesto", "width": 250},
+                                    {"colId": "cupos_disponibles", "width": 130},
+                                ]
+                            }
+                            # Inside a form: edits stay in the browser (no rerun / grey screen on every
+                            # cell) and are sent only when one of the "Guardar Cambios" buttons is pressed.
+                            with st.form(f"form_alumnos_{sufijo}", border=False):
+                                guardar_arriba = st.form_submit_button(
+                                    "💾 Guardar Cambios", type="primary", width='stretch', key=f"guardar_arriba_{sufijo}"
+                                )
+                                grid_response = AgGrid(
+                                    df_display,
+                                    gridOptions=gridOptions,
+                                    columns_state=grid_columns_state,
+                                    allow_unsafe_jscode=True,
+                                    enable_enterprise_modules=True,
+                                    update_on=["cellValueChanged"],
+                                    theme='alpine',
+                                    height=grid_height,
+                                    key=f"grid_alumnos_{sufijo}_v_{st.session_state.grid_version}",
+                                    resizable=False
                         
+                                )
+                                guardar_abajo = st.form_submit_button(
+                                    "💾 Guardar Cambios", type="primary", width='stretch', key=f"guardar_abajo_{sufijo}"
+                                )
+
+                        if guardar_arriba or guardar_abajo:
+                            df_grid = grid_response['data']
+                            with st.spinner("Guardando datos"):
+                                try:
+                                    guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
+                                    st.cache_data.clear()
+                                    st.toast("✅ ¡Cambios guardados correctamente!")
+                                    st.session_state["data_loaded"] = False 
+                                    st.session_state["practicas_data"] = None
+                                    st.session_state["practicas_data_filter"] = None
+                                    st.session_state.grid_version += 1
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error técnico: {e}")
+
+                    # Alphabetical: by cycle, then by surname (accents and case ignored)
+                    def _orden(serie):
+                        return serie.fillna("").astype(str).map(
+                            lambda v: unicodedata.normalize("NFKD", v).encode("ascii", "ignore").decode().casefold().strip()
+                        )
+                    df_display = df_display.sort_values(
+                        ["ciclo_acronimo", "apellido", "nombre"], key=_orden, kind="stable"
+                    ).reset_index(drop=True)
+
+                    es_autogestionada = (
+                        df_display.get("tipoPractica", pd.Series("", index=df_display.index))
+                        .fillna("").astype(str).str.strip().str.casefold()
+                        == "autogestionada"
                     )
-
-                    if st.button("💾 Guardar Cambios Alumnos", type="primary",width='stretch'):
-                        df_grid = grid_response['data']
-                        print(df_display)
-
-                        print(df_grid)
-                        with st.spinner("Guardando datos"):
-                            try:
-                                guardar_cambios_alumnos(df_grid, df_display, mapa_nombres_id)
-                                st.cache_data.clear()
-                                st.toast("✅ ¡Cambios guardados correctamente!")
-                                st.session_state["data_loaded"] = False 
-                                st.session_state["practicas_data"] = None
-                                st.session_state["practicas_data_filter"] = None
-                                st.session_state.grid_version += 1
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error técnico: {e}")
+                    # Only used to split the tabs: not shown in either table
+                    df_display = df_display.drop(columns=["tipoPractica"], errors="ignore")
+                    tabla_alumnos(
+                        df_display[~es_autogestionada].reset_index(drop=True), "gestionadas",
+                        "No hay alumnos (no autogestionados) para el filtro seleccionado.",
+                    )
+                    with tab_autogestionadas:
+                        tabla_alumnos(
+                            df_display[es_autogestionada].reset_index(drop=True), "autogestionadas",
+                            "No hay alumnos con formación autogestionada para el filtro seleccionado.",
+                        )
+                    autogestionadas_mostradas = True
                 else:
                     st.info("Ya asignaste a todos los alumnos o no tienes alumnos nuevos")
+for _marcador in cargando_por_tab.values():
+    _marcador.empty()
+
+if not autogestionadas_mostradas:
+    with tab_autogestionadas:
+        st.info("No hay alumnos para el filtro seleccionado.")
+
 # --- TAB OFERTAS (Todo el código igual, visible para ambos) ---
 with tab_ofertas:
     try:
-        df_gestores_all = get_gestores_ofertas_cached()
+        df_gestores_all = _precargado("gestores_ofertas")
         gestores_activos_df = pd.DataFrame(columns=['nombre', 'ciclo', 'activo'])
         
         if df_gestores_all.empty:
@@ -668,7 +786,7 @@ with tab_ofertas:
         st.error("No se pudo cargar la lista de gestores.")
         gestores_activos_df = []
         
-    df_raw_ofertas = get_ofertas_cached(anioFiltro)
+    df_raw_ofertas = _precargado("ofertas")
     if df_raw_ofertas.empty:
         st.info("No hay ofertas registradas.")
     else:
@@ -686,34 +804,44 @@ with tab_ofertas:
                 gestores_ciclo = gestores_activos_df[
                     gestores_activos_df['ciclo'].str.upper().str.contains(f'"{nombre_ciclo_buscado}"', na=False, regex=False)
                 ]['nombre'].tolist()
-                areas_del_ciclo = puestos_info.get(nombre_ciclo, [{"area": "General", "proyecto": ""}])
+                areas_del_ciclo = puestos_info.get(nombre_ciclo) or [{"area": "General", "proyecto": ""}]
 
-                for area_item in areas_del_ciclo:
-                    nombre_area = area_item.get('area', 'General')
-                    seg_especifico = seguimiento_full.get(nombre_ciclo, {}).get(nombre_area, {})
-                    
-                    fila = {
-                        "id": record.get('id'),
-                        "Empresa": empresa.get('nombre', 'N/A'),
-                        "Teléfono": empresa.get('telefono', ''),
-                        "Dirección": empresa.get('direccion', ''),
-                        "Localidad": empresa.get('localidad', ''),
-                        "Horario": empresa.get('horario', ''),
-                        "Ciclo": nombre_ciclo,
-                        "Alumnos Pedidos": datos_alumnos.get('alumnos', datos_alumnos.get('disponibles', 0)),
-                        "Disponibles": datos_alumnos.get('disponibles', 0),
-                        "Área": nombre_area,
-                        "Proyecto": area_item.get('proyecto', ''),
-                        "Requisitos": record.get('requisitos', ''),
-                        "Contrato": record.get('contrato', ''),
-                        "Vehículo": record.get('vehiculo', ''),
-                        "Nombre Tutor": tutores_full[0].get('nombre', record.get('nombre_tutor', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('nombre_tutor', ''),
-                        "Email Tutor": tutores_full[0].get('email', record.get('email_tutor', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('email_tutor', ''),
-                        "Telefono Tutor": tutores_full[0].get('telefono', record.get('telefono', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('telefono', ''),
-                    }
-                    for gestor in gestores_ciclo:
-                        fila[f"Prop. {gestor}"] = seg_especifico.get(gestor, "")
-                    rows_list.append(fila)
+                # One row per offer: all its areas and projects for this cycle in one cell
+                nombres_areas = list(dict.fromkeys(
+                    (a.get('area') or 'General') for a in areas_del_ciclo
+                ))
+                nombres_proyectos = list(dict.fromkeys(
+                    str(a.get('proyecto')).strip() for a in areas_del_ciclo
+                    if a.get('proyecto') and str(a.get('proyecto')).strip()
+                ))
+                seguimiento_ciclo = seguimiento_full.get(nombre_ciclo, {}) or {}
+                fila = {
+                    "id": record.get('id'),
+                    "Empresa": empresa.get('nombre', 'N/A'),
+                    "Teléfono": empresa.get('telefono', ''),
+                    "Dirección": empresa.get('direccion', ''),
+                    "Localidad": empresa.get('localidad', ''),
+                    "Horario": empresa.get('horario', ''),
+                    "Ciclo": nombre_ciclo,
+                    "Alumnos Pedidos": datos_alumnos.get('alumnos', datos_alumnos.get('disponibles', 0)),
+                    "Disponibles": datos_alumnos.get('disponibles', 0),
+                    "Área": ", ".join(nombres_areas),
+                    "Proyecto": ", ".join(nombres_proyectos),
+                    "Requisitos": record.get('requisitos', ''),
+                    "Contrato": record.get('contrato', ''),
+                    "Vehículo": record.get('vehiculo', ''),
+                    "Nombre Tutor": tutores_full[0].get('nombre', record.get('nombre_tutor', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('nombre_tutor', ''),
+                    "Email Tutor": tutores_full[0].get('email', record.get('email_tutor', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('email_tutor', ''),
+                    "Telefono Tutor": tutores_full[0].get('telefono', record.get('telefono', '')) if (isinstance(tutores_full, list) and len(tutores_full) > 0) else record.get('telefono', ''),
+                }
+                for gestor in gestores_ciclo:
+                    # Saved per area; show the distinct values of all the offer's areas
+                    valores = list(dict.fromkeys(
+                        str((seguimiento_ciclo.get(area) or {}).get(gestor) or "").strip()
+                        for area in nombres_areas
+                    ))
+                    fila[f"Prop. {gestor}"] = " / ".join(v for v in valores if v)
+                rows_list.append(fila)
 
         df_final = pd.DataFrame(rows_list)
 
@@ -760,6 +888,7 @@ with tab_ofertas:
                         "Alumnos Pedidos": st.column_config.NumberColumn("Pedidos", disabled=True),
                         "Disponibles": st.column_config.NumberColumn("Disponibles", disabled=True),
                         "Área": st.column_config.TextColumn(disabled=True),
+                        "Proyecto": st.column_config.TextColumn(disabled=True),
                     }
                     
                     # Formateamos solo las columnas de los gestores que SI están presentes
@@ -784,23 +913,26 @@ with tab_ofertas:
                             for row_idx, nuevos_valores in cambios.items():
                                 fila_editor = df_ciclo_tab.iloc[int(row_idx)]
                                 id_oferta = fila_editor['id']
-                                area_actual = fila_editor['Área']
                                 registro_db = df_db_actual[df_db_actual['id'] == id_oferta].iloc[0]
                                 seguimiento_db = registro_db.get('seguimiento_gestores', {}) or {}
                                 tutores_db = registro_db.get('tutores_por_puesto', {}) or {}
+                                puestos_db = (registro_db.get('puestos', {}) or {}).get(nombre_ciclo) or [{"area": "General"}]
+                                areas_oferta = list(dict.fromkeys((a.get('area') or 'General') for a in puestos_db))
 
                                 if nombre_ciclo not in seguimiento_db: seguimiento_db[nombre_ciclo] = {}
-                                if area_actual not in seguimiento_db[nombre_ciclo]: seguimiento_db[nombre_ciclo][area_actual] = {}
                                 if nombre_ciclo not in tutores_db: tutores_db[nombre_ciclo] = {}
-                                if area_actual not in tutores_db[nombre_ciclo]: tutores_db[nombre_ciclo][area_actual] = {}
+                                # The row covers all the offer's areas: same values for each one
+                                for area_actual in areas_oferta:
+                                    if area_actual not in seguimiento_db[nombre_ciclo]: seguimiento_db[nombre_ciclo][area_actual] = {}
+                                    if area_actual not in tutores_db[nombre_ciclo]: tutores_db[nombre_ciclo][area_actual] = {}
 
-                                for g in gestores_ciclo:
-                                    col_name = f"Prop. {g}"
-                                    val = nuevos_valores.get(col_name, fila_editor.get(col_name, ""))
-                                    seguimiento_db[nombre_ciclo][area_actual][g] = val
+                                    for g in gestores_del_ciclo:
+                                        col_name = f"Prop. {g}"
+                                        if col_name in nuevos_valores:
+                                            seguimiento_db[nombre_ciclo][area_actual][g] = nuevos_valores[col_name]
 
-                                seguimiento_db[nombre_ciclo][area_actual]['tutor'] = nuevos_valores.get("Nombre Tutor", fila_editor["Nombre Tutor"])
-                                seguimiento_db[nombre_ciclo][area_actual]['email'] = nuevos_valores.get("Email Tutor", fila_editor["Email Tutor"])
+                                    seguimiento_db[nombre_ciclo][area_actual]['tutor'] = nuevos_valores.get("Nombre Tutor", fila_editor["Nombre Tutor"])
+                                    seguimiento_db[nombre_ciclo][area_actual]['email'] = nuevos_valores.get("Email Tutor", fila_editor["Email Tutor"])
 
                                 update_payload = {
                                     "seguimiento_gestores": seguimiento_db,

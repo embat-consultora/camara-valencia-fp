@@ -6,7 +6,7 @@ from modules.oferta_form import nueva_oferta, nueva_oferta_abierta, abrir_nueva_
 from page_utils import apply_page_config
 from pathlib import Path
 from navigation import make_sidebar
-from modules.forms_helper import leer_csv
+from modules.forms_helper import leer_csv, selector_provincia_localidad
 from variables import empresasTabla, necesidadFP, estados, aniosList,bodyEmailsEmpresa, tutoresTabla,usuariosTabla,localidades
 from datetime import datetime
 from modules.emailSender import send_email,send_welcome_email
@@ -117,12 +117,9 @@ with tab1:
             st.subheader(f"Editar Empresa: {empresa.get('nombre', '')}")
             new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
             new_direccion = st.text_input("Dirección", empresa.get("direccion", ""))
-            try:
-                current_loc = empresa.get("localidad", "")
-                default_index_loc = localidades.index(current_loc)
-            except (ValueError, TypeError):
-                default_index_loc = 10
-            new_localidad = st.selectbox("Localidad *", options=localidades, index=default_index_loc, key=f"localidad_emp_{empresa_id}")
+            new_provincia, new_localidad = selector_provincia_localidad(
+                f"emp_{empresa_id}", empresa.get("provincia"), empresa.get("localidad"),
+            )
             new_cif = st.text_input("CIF", empresa.get("CIF", ""), disabled=True)
             new_telefono = st.text_input("Teléfono", empresa.get("telefono", ""))
             new_email = st.text_input("Email", empresa.get("email_empresa", ""))
@@ -133,6 +130,7 @@ with tab1:
                     {
                         "nombre": new_nombre,
                         "direccion": new_direccion,
+                        "provincia": new_provincia,
                         "localidad": new_localidad,
                         "CIF": new_cif,
                         "telefono": new_telefono,
@@ -284,21 +282,24 @@ with tab2:
     tabNuevo, tabBulk = st.tabs(["Nueva Empresa", "Carga Masiva (.csv)"])
     with tabNuevo:
         st.subheader("➕ Nueva Empresa")
-        with st.form(f"nueva_empresa_form_{st.session_state.form_registro_key}"):
-            nombre_empresa = st.text_input("Nombre de la empresa")
-            direccion = st.text_input("Dirección")
-            cp = st.text_input("Código Postal")
-            localidad = st.selectbox("Localidad *", options=localidades)
-            cif = st.text_input("CIF *")
-            nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario")
-            telefono_contacto = st.text_input("Teléfono de contacto")
-            email_contacto = st.text_input("Email de contacto")
-            nombre_responsable = st.text_input("Nombre del responsable legal")
-            nie_responsable = st.text_input("NIF del responsable legal")
-            horario = st.text_input("Horario Empresa")
-            pagina_web = st.text_input("Página web")
-            col1, col2 = st.columns(2)
-            submitted = st.form_submit_button("Crear Empresa")
+        # A bordered box instead of st.form: inside a form the town list wouldn't follow the
+        # province until submit. Keys end in form_registro_key so every field clears after
+        # creating a company, like the form did.
+        fk = st.session_state.form_registro_key
+        with st.container(border=True):
+            nombre_empresa = st.text_input("Nombre de la empresa", key=f"nueva_emp_nombre_{fk}")
+            direccion = st.text_input("Dirección", key=f"nueva_emp_direccion_{fk}")
+            cp = st.text_input("Código Postal", key=f"nueva_emp_cp_{fk}")
+            provincia, localidad = selector_provincia_localidad(f"nueva_empresa_{fk}")
+            cif = st.text_input("CIF *", key=f"nueva_emp_cif_{fk}")
+            nombre_contacto = st.text_input("Nombre de la persona que rellena el formulario", key=f"nueva_emp_contacto_{fk}")
+            telefono_contacto = st.text_input("Teléfono de contacto", key=f"nueva_emp_telefono_{fk}")
+            email_contacto = st.text_input("Email de contacto", key=f"nueva_emp_email_{fk}")
+            nombre_responsable = st.text_input("Nombre del responsable legal", key=f"nueva_emp_responsable_{fk}")
+            nie_responsable = st.text_input("NIF del responsable legal", key=f"nueva_emp_nif_{fk}")
+            horario = st.text_input("Horario Empresa", key=f"nueva_emp_horario_{fk}")
+            pagina_web = st.text_input("Página web", key=f"nueva_emp_web_{fk}")
+            submitted = st.button("Crear Empresa", key=f"nueva_emp_crear_{fk}")
             if submitted:
                 if not cif or cif.strip() == "":
                     st.warning("⚠️ El campo CIF es obligatorio")
@@ -309,6 +310,7 @@ with tab2:
                             {
                                 "nombre": nombre_empresa,
                                 "direccion": direccion,
+                                "provincia": provincia,
                                 "localidad": localidad,
                                 "codigo_postal": cp,
                                 "CIF": cif.strip(),

@@ -907,6 +907,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
             return int(val)
         # 3. EXTRAER VALORES ACTUALES
         curr_comentarios = clean_str(row.get('comentarios_centro'))
+        curr_empresa_prov = clean_str(row.get('empresa_provisoria'))
         curr_obs = clean_str(row.get('observaciones_seguimiento'))
         curr_nombre = clean_str(row.get('nombre'))
         curr_apellido = clean_str(row.get('apellido'))
@@ -917,6 +918,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
         curr_curso = clean_str(row.get('curso'))
         # 4. EXTRAER VALORES ORIGINALES
         orig_comentarios = clean_str(row_orig.get('comentarios_centro'))
+        orig_empresa_prov = clean_str(row_orig.get('empresa_provisoria'))
         orig_obs = clean_str(row_orig.get('observaciones_seguimiento'))
         orig_nombre = clean_str(row_orig.get('nombre'))
         orig_apellido = clean_str(row_orig.get('apellido'))
@@ -931,6 +933,7 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                       curr_apellido != orig_apellido or
                       curr_horas != orig_horas or
                       curr_comentarios != orig_comentarios or
+                      curr_empresa_prov != orig_empresa_prov or
                       curr_obs != orig_obs or
                       curr_gestor != orig_gestor)
 
@@ -944,6 +947,9 @@ def guardar_cambios_alumnos(df_updated, df_original, mapa_nombres_id):
                 "observaciones_seguimiento": curr_obs,
                 "gestor": curr_gestor
             }
+            # Only sent when it changed, so other saves keep working if the column is missing
+            if curr_empresa_prov != orig_empresa_prov:
+                datos_alumno["empresa_provisoria"] = curr_empresa_prov
             upsert(alumnosTabla, datos_alumno, keys=["dni"])
 
         # 6. LÓGICA DE ASIGNACIÓN DE EMPRESA

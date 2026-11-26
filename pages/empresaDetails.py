@@ -4,7 +4,7 @@ from page_utils import apply_page_config
 from modules.data_base import getEquals, upsert, updateTutores,getEquals, getPracticas,logError, getCiclosYAreas
 from navigation import make_sidebar
 from modules.oferta_form import nueva_oferta, nueva_oferta_abierta, abrir_nueva_oferta, acciones_oferta, _si_no
-from modules.forms_helper import file_size_bytes
+from modules.forms_helper import file_size_bytes, selector_provincia_localidad
 from variables import empresasTabla, max_file_size, necesidadFP, estados, aniosList, localidades,estados as estadosPractica, tutoresTabla,practicaTabla,linkCalendar,carpetaPractica,locale_tabla_principal
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 from modules.drive_helper import list_drive_files, upload_to_drive,folderNamePractica,archivoNombre
@@ -86,16 +86,8 @@ with tabEmpresa:
         with st.expander(f"Empresa: {empresa['nombre']}", expanded=True):
             new_nombre = st.text_input("Nombre", empresa.get("nombre", ""))
             new_direccion = st.text_input("Dirección", empresa.get("direccion", ""))
-            try:
-                indice_default = localidades.index(empresa.get("localidad", ""))
-            except ValueError:
-                indice_default = 0
-
-            new_localidad = st.selectbox(
-                "Localidad *", 
-                localidades, 
-                index=indice_default, 
-                key="localidad"
+            new_provincia, new_localidad = selector_provincia_localidad(
+                "mi_empresa", empresa.get("provincia"), empresa.get("localidad"),
             )
             st.write("**CIF**")
             st.info(empresa.get("CIF", "N/A"))
@@ -107,6 +99,7 @@ with tabEmpresa:
                         "nombre": new_nombre,
                         "CIF": cif,
                         "direccion": new_direccion,
+                        "provincia": new_provincia,
                         "localidad": new_localidad,
                         "telefono": new_telefono,
                         "email_empresa": new_email

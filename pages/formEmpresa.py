@@ -5,13 +5,13 @@ import random
 import smtplib
 from datetime import datetime, time
 from httpx import HTTPError
-from modules.forms_helper import required_ok, slug, render_requisitos
+from modules.forms_helper import required_ok, slug, render_requisitos, selector_provincia, selector_localidad
 from modules.data_base import upsert,add, upsertCustome,getCiclosYAreas,getEqual
 from modules.emailSender import send_welcome_email
 from modules.privacidad import render_aviso_legal, datos_aceptacion
 from postgrest.exceptions import APIError
 from streamlit_javascript import st_javascript
-from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,sectorEmpresa,usuariosTabla,idiomasRequisitos,nivelesIdioma,skillsRequisitos
+from variables import empresaEstadosTabla,formTabla,empresasTabla,necesidadFP,estados,tutoresTabla,localidades,provincias,localidadesPorProvincia,sectorEmpresa,usuariosTabla,idiomasRequisitos,nivelesIdioma,skillsRequisitos
 
 logger = logging.getLogger(__name__)
 DRAFT_STORAGE_KEY = "form_empresa_draft_v1"
@@ -74,6 +74,7 @@ draft_widget_keys = [
     "email_contacto",
     "cp",
     "nombre_responsable",
+    "provincia",
     "localidad",
     "nie_responsable",
     "cif",
@@ -86,6 +87,7 @@ draft_widget_keys = [
     "telefono_tutor",
     "direccion_centro",
     "cp_centro",
+    "provincia_centro",
     "localidad_centro",
     "posible_contrato",
     "vehiculo",
@@ -95,7 +97,10 @@ draft_widget_keys = [
 ]
 valid_widget_options = {
     "sector": sectorEmpresa,
-    "localidad": localidades,
+    "provincia": provincias,
+    "provincia_centro": provincias,
+    "localidad": [l for lista in localidadesPorProvincia.values() for l in lista],
+    "localidad_centro": [l for lista in localidadesPorProvincia.values() for l in lista],
     "posible_contrato": ["Sí", "No"],
     "vehiculo": ["Sí", "No"],
 }
@@ -266,9 +271,11 @@ with col2:
 
 col1, col2 = st.columns(2)
 with col1:
-    localidad = st.selectbox("Localidad *", (localidades), key="localidad")
+    provincia = selector_provincia("provincia")
 with col2:
-    nie_responsable = input_requerido("NIF del responsable legal *", key="nie_responsable")
+    localidad = selector_localidad("localidad", provincia)
+
+nie_responsable = input_requerido("NIF del responsable legal *", key="nie_responsable")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -297,11 +304,12 @@ with col2:
 st.divider()
 st.write("DIRECCIÓN DEL CENTRO DE TRABAJO DONDE SE REALIZARÁN LAS FORMACIONES")
 direccion_centro = st.text_input("Dirección del centro de trabajo", key="direccion_centro")
+cp_centro = st.text_input("Código Postal del centro de trabajo", key="cp_centro")
 col1, col2 = st.columns(2)
 with col1:
-    cp_centro = st.text_input("Código Postal del centro de trabajo", key="cp_centro")
+    provincia_centro = selector_provincia("provincia_centro", label="Provincia del centro de trabajo")
 with col2:
-    localidad_centro = st.text_input("Localidad del centro de trabajo", key="localidad_centro")
+    localidad_centro = selector_localidad("localidad_centro", provincia_centro, label="Localidad del centro de trabajo")
 st.divider()
 st.write("INFORMACIÓN ADICIONAL")
 posible_contrato = st.radio(
@@ -443,6 +451,7 @@ if submit:
             "nombre": nombre_empresa.strip(),
             "direccion": direccion.strip(),
             "codigo_postal": cp.strip(),
+            "provincia": provincia,
             "localidad": localidad.strip(),
             "CIF": cif.strip().upper(),
             "telefono": telefono_contacto.strip(),
