@@ -427,6 +427,55 @@ with tab_alumnos:
                                     }
                                 """)
                             )
+                            # Second horizontal scrollbar above the table, kept in sync with the
+                            # grid's own bottom one (AG Grid only has the bottom one).
+                            gb.configure_grid_options(
+                                onGridReady=JsCode("""
+                                    function(params) {
+                                        const iniciar = function(intento) {
+                                            const raiz = document.querySelector('.ag-root-wrapper');
+                                            const abajo = raiz && raiz.querySelector('.ag-body-horizontal-scroll-viewport');
+                                            const contenido = raiz && raiz.querySelector('.ag-body-horizontal-scroll-container');
+                                            if (!abajo || !contenido) {
+                                                if (intento < 40) { setTimeout(function() { iniciar(intento + 1); }, 100); }
+                                                return;
+                                            }
+                                            if (raiz.querySelector('.barra-scroll-arriba')) { return; }
+                                            const arriba = document.createElement('div');
+                                            arriba.className = 'barra-scroll-arriba';
+                                            arriba.style.cssText = 'overflow-x:scroll;overflow-y:hidden;flex:none;';
+                                            const relleno = document.createElement('div');
+                                            relleno.style.height = '1px';
+                                            arriba.appendChild(relleno);
+                                            raiz.insertBefore(arriba, raiz.firstChild);
+
+                                            const medir = function() {
+                                                // Same position and width as the bottom bar (after the pinned
+                                                // Ciclo column, before the vertical scrollbar)
+                                                const r = raiz.getBoundingClientRect();
+                                                const v = abajo.getBoundingClientRect();
+                                                arriba.style.marginLeft = (v.left - r.left - raiz.clientLeft) + 'px';
+                                                arriba.style.width = v.width + 'px';
+                                                relleno.style.width = contenido.offsetWidth + 'px';
+                                                arriba.scrollLeft = abajo.scrollLeft;
+                                            };
+                                            arriba.addEventListener('scroll', function() {
+                                                if (abajo.scrollLeft !== arriba.scrollLeft) { abajo.scrollLeft = arriba.scrollLeft; }
+                                            });
+                                            abajo.addEventListener('scroll', function() {
+                                                if (arriba.scrollLeft !== abajo.scrollLeft) { arriba.scrollLeft = abajo.scrollLeft; }
+                                            });
+                                            ['displayedColumnsChanged', 'columnResized', 'columnVisible',
+                                             'columnPinned', 'gridSizeChanged'].forEach(function(evento) {
+                                                params.api.addEventListener(evento, function() { setTimeout(medir, 0); });
+                                            });
+                                            if (window.ResizeObserver) { new ResizeObserver(medir).observe(contenido); }
+                                            medir();
+                                        };
+                                        iniciar(0);
+                                    }
+                                """)
+                            )
                             # Los anchos son parte del contrato visual de esta tabla.
                             gb.configure_default_column(editable=True, filter=True, resizable=False)
 
@@ -677,7 +726,11 @@ with tab_alumnos:
                             # modifica los anchos y elimina el scroll horizontal.
                             gridOptions.pop("autoSizeStrategy", None)
                             gridOptions["rowHeight"] = 42
-                            grid_height = min(850, max(180, 52 + len(df_display) * 50 + 18))
+                            # Show up to 15 rows; the rest scroll inside the grid.
+                            # Header (48) + rows (42 each) + bottom scrollbar and borders (20)
+                            # + the extra scrollbar above the table (16).
+                            filas_visibles = min(len(df_display), 15)
+                            grid_height = max(180, 48 + filas_visibles * 42 + 20 + 16)
                             grid_columns_state = {
                                 "state": [
                                     {"colId": "ciclo_acronimo", "width": 150},
@@ -714,6 +767,15 @@ with tab_alumnos:
                                     update_on=["cellValueChanged"],
                                     theme='alpine',
                                     height=grid_height,
+                                    # Scrollbars always visible (macOS hides them when idle).
+                                    # Styled scrollbars are never hidden in Chrome, Edge and Safari.
+                                    custom_css={
+                                        "::-webkit-scrollbar": {"-webkit-appearance": "none", "width": "12px", "height": "12px"},
+                                        "::-webkit-scrollbar-track": {"background-color": "#f1f3f5"},
+                                        "::-webkit-scrollbar-corner": {"background-color": "#f1f3f5"},
+                                        "::-webkit-scrollbar-thumb": {"background-color": "#b5bcc4", "border-radius": "6px", "border": "2px solid #f1f3f5"},
+                                        "::-webkit-scrollbar-thumb:hover": {"background-color": "#8c959f"},
+                                    },
                                     key=f"grid_alumnos_{sufijo}_v_{st.session_state.grid_version}",
                                     resizable=False
                         

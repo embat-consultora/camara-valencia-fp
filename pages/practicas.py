@@ -452,130 +452,245 @@ def dialog_finalizar(practica):
         st.session_state.page = "lista"
         st.rerun()
 
+@st.cache_data(ttl=120, show_spinner=False)
+def fetch_empresas_alumnos_cached():
+    return get(empresasTabla) or [], get(alumnosTabla) or []
+
+
+def _email_valido(email):
+    email = (email or "").strip()
+    return "@" in email and "." in email.split("@")[-1]
+
+
+def _ficha_solo_lectura(pares, key):
+    """Data of an existing record, shown read-only (nothing here is saved)."""
+    cols = st.columns(2)
+    for i, (etiqueta, valor) in enumerate(pares):
+        if isinstance(valor, list):
+            valor = ", ".join(str(v) for v in valor)
+        cols[i % 2].text_input(etiqueta, value=str(valor or ""), disabled=True, key=f"{key}_{i}")
+
+
 def mostrar_carga_rapida():
-     with st.form("carga_rapida"):
-        st.info("Utiliza esta sección para dar de alta rápidamente una empresa y un alumno que no existen en la base de datos y vincularlos en una formación.")
+    # Messages from the last save survive the rerun that clears the fields
+    for msg in st.session_state.pop("qr_mensajes", []):
+        st.success(msg)
 
-        # 1. DATOS DE LA EMPRESA
-        st.subheader("🏢 Datos de la Empresa")
-        c1, c2 = st.columns(2)
-        new_emp_nombre = c1.text_input("Nombre Comercial / Razón Social", key="qr_emp_nom")
-        new_emp_cif = c2.text_input("CIF (Obligatorio)", key="qr_emp_cif").upper().strip()
+    # Counter in every key: bumping it after saving clears the whole form
+    fk = st.session_state.setdefault("qr_form_version", 0)
+    empresas, alumnos = fetch_empresas_alumnos_cached()
+    empresas = sorted([e for e in empresas if e.get("CIF")], key=lambda e: str(e.get("nombre") or "").lower())
+    alumnos = sorted([a for a in alumnos if a.get("dni")],
+                     key=lambda a: (str(a.get("apellido") or "").lower(), str(a.get("nombre") or "").lower()))
+    empresas_por_cif = {str(e["CIF"]).upper().strip(): e for e in empresas}
+    alumnos_por_dni = {str(a["dni"]).upper().strip(): a for a in alumnos}
 
-        c1_2, c2_2 = st.columns(2)
-        new_emp_tel = c1_2.text_input("Teléfono Empresa", key="qr_emp_tel")
-        new_emp_email = c2_2.text_input("Email Empresa", key="qr_emp_email")
+    # No st.form: the fields have to change as soon as an option is picked
+    with st.container(border=True):
+        st.info("Utiliza esta sección para vincular una empresa y un alumno en una formación. "
+                "Puedes elegir una empresa o un alumno que ya existen, o darlos de alta aquí.")
+
+        # 1. EMPRESA
+        st.subheader("🏢 Empresa")
+        modo_emp = st.radio("Empresa", ["Empresa existente", "Nueva empresa"], horizontal=True,
+                            key=f"qr_emp_modo_{fk}", label_visibility="collapsed")
+        empresa_sel = None
+        new_emp_nombre = new_emp_cif = new_emp_tel = new_emp_email = ""
+        if modo_emp == "Empresa existente":
+            empresa_sel = st.selectbox(
+                "Selecciona la empresa *", empresas, index=None, key=f"qr_emp_sel_{fk}",
+                format_func=lambda e: f"{e.get('nombre') or '(sin nombre)'} — {e.get('CIF')}",
+                placeholder="Busca por nombre o CIF",
+            )
+            if empresa_sel:
+                _ficha_solo_lectura([
+                    ("Nombre", empresa_sel.get("nombre")), ("CIF", empresa_sel.get("CIF")),
+                    ("Teléfono", empresa_sel.get("telefono")), ("Email", empresa_sel.get("email_empresa")),
+                    ("Localidad", empresa_sel.get("localidad")), ("Provincia", empresa_sel.get("provincia")),
+                ], key=f"qr_emp_ver_{empresa_sel.get('CIF')}_{fk}")
+        else:
+            c1, c2 = st.columns(2)
+            new_emp_nombre = c1.text_input("Nombre Comercial / Razón Social *", key=f"qr_emp_nom_{fk}").strip()
+            new_emp_cif = c2.text_input("CIF *", key=f"qr_emp_cif_{fk}").upper().strip()
+            c1_2, c2_2 = st.columns(2)
+            new_emp_tel = c1_2.text_input("Teléfono Empresa", key=f"qr_emp_tel_{fk}").strip()
+            new_emp_email = c2_2.text_input("Email Empresa *", key=f"qr_emp_email_{fk}").strip()
 
         st.divider()
 
-        # 2. DATOS DEL ALUMNO
-        st.subheader("🧑‍🎓 Datos del Alumno")
-        c3, c4, c5 = st.columns([1, 1, 1.5])
-        new_alu_dni = c3.text_input("DNI (Obligatorio)", key="qr_alu_dni").upper().strip()
-        new_alu_nombre = c4.text_input("Nombre", key="qr_alu_nom")
-        new_alu_apellido = c5.text_input("Apellidos", key="qr_alu_ape")
+        # 2. ALUMNO
+        st.subheader("🧑‍🎓 Alumno")
+        modo_alu = st.radio("Alumno", ["Alumno existente", "Nuevo alumno"], horizontal=True,
+                            key=f"qr_alu_modo_{fk}", label_visibility="collapsed")
+        alumno_sel = None
+        new_alu_dni = new_alu_nombre = new_alu_apellido = new_alu_email = ""
+        new_alu_tipo, new_alu_pref = None, []
+        if modo_alu == "Alumno existente":
+            alumno_sel = st.selectbox(
+                "Selecciona el alumno *", alumnos, index=None, key=f"qr_alu_sel_{fk}",
+                format_func=lambda a: f"{a.get('apellido') or ''}, {a.get('nombre') or ''} — {a.get('dni')}".strip(", "),
+                placeholder="Busca por apellido, nombre o DNI",
+            )
+            if alumno_sel:
+                _ficha_solo_lectura([
+                    ("Nombre", alumno_sel.get("nombre")), ("Apellidos", alumno_sel.get("apellido")),
+                    ("DNI", alumno_sel.get("dni")), ("Email", alumno_sel.get("email_alumno")),
+                    ("Teléfono", alumno_sel.get("telefono")), ("Ciclo Formativo", alumno_sel.get("ciclo_formativo")),
+                    ("Tipo de Formación", alumno_sel.get("tipoPractica")), ("Estado", alumno_sel.get("estado")),
+                    ("Ciclo Académico", alumno_sel.get("anio")), ("Curso", alumno_sel.get("curso")),
+                    ("Preferencias/Áreas", alumno_sel.get("preferencias_fp")), ("Localidad", alumno_sel.get("localidad")),
+                ], key=f"qr_alu_ver_{alumno_sel.get('dni')}_{fk}")
+        else:
+            c3, c4, c5 = st.columns([1, 1, 1.5])
+            new_alu_dni = c3.text_input("DNI *", key=f"qr_alu_dni_{fk}").upper().strip()
+            new_alu_nombre = c4.text_input("Nombre *", key=f"qr_alu_nom_{fk}").strip()
+            new_alu_apellido = c5.text_input("Apellidos", key=f"qr_alu_ape_{fk}").strip()
+            new_alu_email = st.text_input("Email Alumno *", key=f"qr_alu_email_{fk}").strip()
 
-        new_alu_email = st.text_input("Email Alumno", key="qr_alu_email")
+        st.divider()
 
-        # 3. CONFIGURACIÓN DE formación Y CICLO
+        # 3. FORMACIÓN
         st.subheader("📋 Configuración de la Formación")
         col_p1, col_p2 = st.columns(2)
+        alu_dni_key = (alumno_sel or {}).get("dni") or "nuevo"
+        if alumno_sel:
+            # The cycle of the formación starts on the student's cycle
+            ciclo_alumno = alumno_sel.get("ciclo_formativo") or ""
+            opciones_ciclo = [""] + ciclos_opts + ([ciclo_alumno] if ciclo_alumno and ciclo_alumno not in ciclos_opts else [])
+            new_alu_ciclo = col_p1.selectbox("Ciclo Formativo", opciones_ciclo,
+                                             index=opciones_ciclo.index(ciclo_alumno),
+                                             key=f"qr_alu_ciclo_{alu_dni_key}_{fk}")
+        else:
+            new_alu_tipo = col_p1.selectbox("Tipo de Formación", options=tipoPracticas, key=f"qr_alu_tipo_{fk}")
+            new_alu_ciclo = col_p2.selectbox("Ciclo Formativo", options=[""] + ciclos_opts, key=f"qr_alu_ciclo_{fk}")
+            if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
+                new_alu_pref = st.multiselect("Preferencias/Áreas", options=prefs_opts_dict[new_alu_ciclo],
+                                              key=f"qr_alu_pref_{fk}")
 
-        # Obtenemos los tipos de formación de tus variables
-        new_alu_tipo = col_p1.selectbox(
-            "Tipo de Formación", 
-            options=tipoPracticas, 
-            key="qr_alu_tipo"
-        )
-
-
-        new_alu_ciclo = col_p2.selectbox(
-            "Ciclo Formativo",
-            options=[""] + ciclos_opts,
-            key="qr_alu_ciclo"
-        )
-
-        new_alu_pref = []
-        if new_alu_ciclo and new_alu_ciclo in prefs_opts_dict:
-            new_alu_pref = st.multiselect(
-                "Preferencias/Áreas",
-                options=prefs_opts_dict[new_alu_ciclo],
-                key="qr_alu_pref"
-            )
+        anio_def = (alumno_sel or {}).get("anio")
+        curso_def = (alumno_sel or {}).get("curso")
         col1, col2 = st.columns(2)
-        with col1:
-            anio = st.selectbox("Ciclo Académico*", aniosList, key="ano_alumno")
-        with col2:
-            curso = st.selectbox("Curso *", cursoList, key="curso_alumno")
-        # 4. BOTÓN DE ACCIÓN
-        submit_btn = st.form_submit_button("🚀 Guardar y Vincular Formación")
+        anio = col1.selectbox("Ciclo Académico *", aniosList,
+                              index=aniosList.index(anio_def) if anio_def in aniosList else 0,
+                              key=f"qr_anio_{alu_dni_key}_{fk}")
+        curso = col2.selectbox("Curso *", cursoList,
+                               index=cursoList.index(curso_def) if curso_def in cursoList else 0,
+                               key=f"qr_curso_{alu_dni_key}_{fk}")
 
-        if submit_btn:
-            if not new_emp_cif or not new_alu_dni or not new_emp_nombre or not new_alu_nombre:
-                st.error("⚠️ CIF, DNI y Nombres son obligatorios para procesar el alta.")
-            else:
-                with st.spinner("Procesando alta rápida..."):
-                    try:
-                        # A. Alta Empresa
-                        upsert(empresasTabla, {
-                            "CIF": new_emp_cif,
-                            "nombre": new_emp_nombre,
-                            "telefono": new_emp_tel,
-                            "email_empresa": new_emp_email
-                        }, keys=["CIF"])
-                        new_pass = f"{new_emp_cif}{random.randint(10, 99)}"
-                        usuario, usuario_creado = upsertCustome(usuariosTabla, {
-                                    "email": new_emp_cif,
-                                    "password": new_pass,
-                                    "rol": "empresa",
-                                }, keys=["email"], return_created=True)
-                        if usuario_creado and new_emp_cif:
-                                send_welcome_email(new_emp_email, new_emp_cif,new_pass, new_emp_nombre)
-                        # B. Alta Alumno
-                        upsert(alumnosTabla, {
-                            "dni": new_alu_dni,
-                            "nombre": new_alu_nombre,
-                            "apellido": new_alu_apellido,
-                            "email_alumno": new_alu_email,
-                            "tipoPractica": new_alu_tipo,
-                            "ciclo_formativo": new_alu_ciclo,
-                            "preferencias_fp": new_alu_pref,
-                            "anio": anio,
-                            "curso": curso,
-                            "estado": estadosAlumno[1]
-                        }, keys=["dni"])
-                        new_passA = f"{new_alu_dni}{random.randint(10, 99)}"
-                        usuario, usuario_creado = upsertCustome(usuariosTabla, {
-                                    "email": new_alu_dni,
-                                    "password": new_passA,
-                                    "rol": "alumno",
-                                }, keys=["email"], return_created=True)
-                        if usuario_creado and new_alu_dni:
-                            send_welcome_email(new_alu_email, new_alu_dni,new_passA, new_alu_nombre)
+        submit_btn = st.button("🚀 Guardar y Vincular Formación", type="primary", key=f"qr_guardar_{fk}")
 
-                        # C. Crear la formación (Vincular)
-                        # Usamos los parámetros que requiere tu función crearPractica
-                        crearPractica(
-                            empresaCif=new_emp_cif,
-                            alumnoDni=new_alu_dni,
-                            ciclo=new_alu_ciclo if new_alu_ciclo else "Autogestionado",
-                            area="General",
-                            proyecto="Alta Rápida",
-                            fecha=datetime.now().isoformat(),
-                            ciclos_info=None,
-                            cupos_disp=None,
-                            oferta_id=None,
-                            status= estados[4],
-                            anio= anio,
-                            curso= curso,
-                        )
+    if not submit_btn:
+        return
 
-                        st.success(f"✅ ¡Éxito! Formación creada entre {new_emp_nombre} y {new_alu_nombre}.")
-                        st.success(f"✅ Se ha creado y enviado un usuario y contraseña para la empresa")
-                        st.success(f"✅ Se ha creado y enviado un usuario y contraseña para el alumno")
-                        invalidate_runtime_caches()
-                    except Exception as e:
-                        st.error(f"❌ Error en el proceso: {str(e)}")
+    # --- Validation ---
+    errores = []
+    if modo_emp == "Empresa existente":
+        if not empresa_sel:
+            errores.append("Selecciona una empresa existente o elige «Nueva empresa».")
+    else:
+        if not new_emp_nombre or not new_emp_cif or not new_emp_email:
+            errores.append("Para una empresa nueva, Nombre, CIF y Email son obligatorios.")
+        elif not _email_valido(new_emp_email):
+            errores.append("El email de la empresa no es válido.")
+        elif new_emp_cif in empresas_por_cif:
+            errores.append(f"Ya existe una empresa con CIF {new_emp_cif}: selecciónala en «Empresa existente».")
+    if modo_alu == "Alumno existente":
+        if not alumno_sel:
+            errores.append("Selecciona un alumno existente o elige «Nuevo alumno».")
+    else:
+        if not new_alu_nombre or not new_alu_dni or not new_alu_email:
+            errores.append("Para un alumno nuevo, Nombre, DNI y Email son obligatorios.")
+        elif not _email_valido(new_alu_email):
+            errores.append("El email del alumno no es válido.")
+        elif new_alu_dni in alumnos_por_dni:
+            errores.append(f"Ya existe un alumno con DNI {new_alu_dni}: selecciónalo en «Alumno existente».")
+    if errores:
+        for e in errores:
+            st.error(f"⚠️ {e}")
+        return
+
+    emp_cif = empresa_sel["CIF"] if empresa_sel else new_emp_cif
+    emp_nombre = (empresa_sel.get("nombre") if empresa_sel else new_emp_nombre) or emp_cif
+    alu_dni = alumno_sel["dni"] if alumno_sel else new_alu_dni
+    alu_nombre = (alumno_sel.get("nombre") if alumno_sel else new_alu_nombre) or alu_dni
+
+    mensajes = []
+    with st.spinner("Procesando alta rápida..."):
+        try:
+            # A. Empresa: only a new one is created (an existing one is not modified)
+            if not empresa_sel:
+                upsert(empresasTabla, {
+                    "CIF": new_emp_cif,
+                    "nombre": new_emp_nombre,
+                    "telefono": new_emp_tel,
+                    "email_empresa": new_emp_email,
+                }, keys=["CIF"])
+                new_pass = f"{new_emp_cif}{random.randint(10, 99)}"
+                _, usuario_creado = upsertCustome(usuariosTabla, {
+                    "email": new_emp_cif,
+                    "password": new_pass,
+                    "rol": "empresa",
+                }, keys=["email"], return_created=True)
+                mensajes.append(f"✅ Empresa {new_emp_nombre} creada.")
+                if usuario_creado:
+                    send_welcome_email(new_emp_email, new_emp_cif, new_pass, new_emp_nombre)
+                    mensajes.append("✅ Se ha creado y enviado un usuario y contraseña para la empresa.")
+
+            # B. Alumno: only a new one is created (an existing one is not modified)
+            if not alumno_sel:
+                upsert(alumnosTabla, {
+                    "dni": new_alu_dni,
+                    "nombre": new_alu_nombre,
+                    "apellido": new_alu_apellido,
+                    "email_alumno": new_alu_email,
+                    "tipoPractica": new_alu_tipo,
+                    "ciclo_formativo": new_alu_ciclo,
+                    "preferencias_fp": new_alu_pref,
+                    "anio": anio,
+                    "curso": curso,
+                    "estado": estadosAlumno[1],
+                }, keys=["dni"])
+                new_passA = f"{new_alu_dni}{random.randint(10, 99)}"
+                _, usuario_creado = upsertCustome(usuariosTabla, {
+                    "email": new_alu_dni,
+                    "password": new_passA,
+                    "rol": "alumno",
+                }, keys=["email"], return_created=True)
+                mensajes.append(f"✅ Alumno {new_alu_nombre} creado.")
+                if usuario_creado:
+                    send_welcome_email(new_alu_email, new_alu_dni, new_passA, new_alu_nombre)
+                    mensajes.append("✅ Se ha creado y enviado un usuario y contraseña para el alumno.")
+
+            # C. Formación
+            crearPractica(
+                empresaCif=emp_cif,
+                alumnoDni=alu_dni,
+                ciclo=new_alu_ciclo if new_alu_ciclo else "Autogestionado",
+                area="General",
+                proyecto="Alta Rápida",
+                fecha=datetime.now().isoformat(),
+                ciclos_info=None,
+                cupos_disp=None,
+                oferta_id=None,
+                status=estados[4],
+                anio=anio,
+                curso=curso,
+            )
+        except Exception as e:
+            for m in mensajes:
+                st.success(m)
+            st.error(f"❌ Error en el proceso: {str(e)}")
+            fetch_empresas_alumnos_cached.clear()
+            return
+
+    mensajes.insert(0, f"✅ ¡Éxito! Formación creada entre {emp_nombre} y {alu_nombre}.")
+    st.session_state["qr_mensajes"] = mensajes
+    st.session_state["qr_form_version"] = fk + 1
+    fetch_empresas_alumnos_cached.clear()
+    invalidate_runtime_caches()
+    st.rerun()
+
+
 def guardar_anexo_automatico(practica_id, campo_bd, key_widget):
     # Obtenemos el valor actual del checkbox directamente desde el session_state
     nuevo_valor = st.session_state[key_widget]
